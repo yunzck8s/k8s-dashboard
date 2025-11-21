@@ -2,10 +2,10 @@ package k8s
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,37 +14,45 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 var (
-	Clientset  *kubernetes.Clientset
-	RestConfig *rest.Config
+	Clientset     *kubernetes.Clientset
+	MetricsClient *versioned.Clientset
+	RestConfig    *rest.Config
 )
 
 // InitK8sClient initializes the Kubernetes client
 func InitK8sClient() error {
-	var kubeconfig *string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	var config *rest.Config
+	var err error
+
+	kubeconfig := filepath.Join(homedir.HomeDir(), ".kube", "config")
+
+	if _, err := os.Stat(kubeconfig); err == nil {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return err
+		}
 	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
-
-	// Use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		return fmt.Errorf("failed to build config from flags: %v", err)
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return err
+		}
 	}
 
-	// Create the clientset
+	RestConfig = config
+
 	Clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
 
-	// Store the config for SPDY executor
-	RestConfig = config
+	MetricsClient, err = versioned.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create metrics client: %v", err)
+	}
 
 	// Verify connection
 	_, err = Clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})

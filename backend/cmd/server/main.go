@@ -40,10 +40,13 @@ func main() {
 		v1.GET("/pods", api.GetPods)
 		v1.GET("/pods/:namespace/:name", api.GetPodDetail)
 		v1.GET("/pods/:namespace/:name/yaml", api.GetPodYAML)
+		v1.PUT("/pods/:namespace/:name/yaml", api.UpdatePodYAML)
 		v1.GET("/pods/:namespace/:name/logs", api.HandleLogStream)
 		v1.GET("/pods/:namespace/:name/terminal", api.HandleTerminal)
+		v1.GET("/pods/:namespace/:name/metrics", api.GetPodMetrics)
 		v1.GET("/deployments", api.GetDeployments)
 		v1.GET("/services", api.GetServices)
+		v1.GET("/nodes/:name/metrics", api.GetNodeMetrics)
 	}
 
 	log.Println("Server starting on :8080")
