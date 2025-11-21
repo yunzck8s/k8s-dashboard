@@ -5,6 +5,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import Badge from '../components/Badge';
 import LogViewer from '../components/LogViewer';
+import Terminal from '../components/Terminal';
 
 const PodDetail = () => {
     const { namespace, name } = useParams();
@@ -14,6 +15,8 @@ const PodDetail = () => {
     const [loading, setLoading] = useState(true);
     const [yamlLoading, setYamlLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [showTerminal, setShowTerminal] = useState(false);
+    const [terminalContainer, setTerminalContainer] = useState('');
 
     useEffect(() => {
         const fetchPodDetail = async () => {
@@ -207,6 +210,21 @@ const PodDetail = () => {
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold">{container.name}</h3>
                                     <div className="flex items-center space-x-2">
+                                        <button
+                                            onClick={() => {
+                                                setTerminalContainer(container.name);
+                                                setShowTerminal(true);
+                                            }}
+                                            className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm hover:bg-primary/90 transition-colors flex items-center space-x-2"
+                                        >
+                                            <div className="w-4 h-4">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="4 17 10 11 4 5"></polyline>
+                                                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                                                </svg>
+                                            </div>
+                                            <span>Terminal</span>
+                                        </button>
                                         <Badge variant={container.ready ? 'success' : 'warning'}>
                                             {container.ready ? 'Ready' : 'Not Ready'}
                                         </Badge>
@@ -381,6 +399,16 @@ const PodDetail = () => {
                     </div>
                 )}
             </div>
+
+            {/* Terminal Modal */}
+            {showTerminal && (
+                <Terminal
+                    namespace={pod.namespace}
+                    podName={pod.name}
+                    container={terminalContainer}
+                    onClose={() => setShowTerminal(false)}
+                />
+            )}
         </div>
     );
 };

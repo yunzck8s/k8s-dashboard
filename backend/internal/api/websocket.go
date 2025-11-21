@@ -3,6 +3,7 @@ package api
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -176,18 +177,21 @@ func HandleTerminal(c *gin.Context) {
 		Namespace(namespace).
 		SubResource("exec")
 
-	req.VersionedParams(&corev1.PodExecOptions{
-		Container: container,
-		Command:   []string{command},
-		Stdin:     true,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       true,
-	}, metav1.ParameterCodec)
+	req.Param("container", container)
+	req.Param("stdin", "true")
+	req.Param("stdout", "true")
+	req.Param("stderr", "true")
+	req.Param("tty", "true")
+
+	for _, cmd := range []string{command} {
+		req.Param("command", cmd)
+	}
 
 	// Create SPDY executor
+	fmt.Printf("Exec URL: %s\n", req.URL().String())
 	exec, err := k8s.NewSPDYExecutor(req.URL())
 	if err != nil {
+		fmt.Printf("Failed to create executor: %v\n", err)
 		ws.WriteJSON(TerminalMessage{
 			Type: "error",
 			Data: "Failed to create executor: " + err.Error(),

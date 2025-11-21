@@ -150,6 +150,17 @@ const Terminal = ({ namespace, podName, container, onClose }) => {
                         </h2>
                     </div>
                     <div className="flex items-center space-x-2">
+                        <select
+                            value={command}
+                            onChange={(e) => setCommand(e.target.value)}
+                            className="bg-muted border border-border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                            <option value="/bin/sh">/bin/sh</option>
+                            <option value="/bin/bash">/bin/bash</option>
+                            <option value="/bin/zsh">/bin/zsh</option>
+                            <option value="sh">sh</option>
+                            <option value="bash">bash</option>
+                        </select>
                         <button
                             onClick={handleReconnect}
                             className="p-2 hover:bg-muted rounded-lg transition-colors"
