@@ -10,24 +10,27 @@ const SidebarItem = ({ to, icon, label }) => {
     return (
         <Link
             to={to}
-            className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${isActive
+                ? 'text-white bg-white/10 shadow-lg shadow-blue-500/10 border border-white/10'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
                 }`}
         >
-            <Icon size={20} />
-            <span className="font-medium">{label}</span>
+            {isActive && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+            )}
+            <Icon size={20} className={`transition-transform duration-300 ${isActive ? 'scale-110 text-blue-400' : 'group-hover:scale-110'}`} />
+            <span className="font-medium tracking-wide">{label}</span>
         </Link>
     );
 };
 
 const Layout = () => {
     return (
-        <div className="flex h-screen bg-background text-foreground overflow-hidden">
+        <div className="flex h-screen bg-transparent text-foreground overflow-hidden font-sans selection:bg-blue-500/30">
             {/* Sidebar */}
-            <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-xl flex flex-col">
-                <div className="p-6 border-b border-border">
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+            <aside className="w-72 glass flex flex-col relative z-20">
+                <div className="p-8 border-b border-white/5">
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent tracking-tight filter drop-shadow-lg">
                         K8s Dashboard
                     </h1>
                 </div>
@@ -46,13 +49,20 @@ const Layout = () => {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col overflow-hidden">
+            {/* Main Content */}
+            <main className="flex-1 flex flex-col overflow-hidden relative z-10">
                 {/* Header */}
-                <header className="h-16 border-b border-border bg-card/50 backdrop-blur-xl flex items-center justify-between px-6">
-                    <h2 className="text-lg font-semibold">Dashboard</h2>
-                    <div className="flex items-center space-x-4">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                            A
+                <header className="h-20 glass border-b-0 border-white/5 flex items-center justify-between px-8">
+                    <h2 className="text-xl font-semibold text-gray-100 tracking-wide">Dashboard</h2>
+                    <div className="flex items-center space-x-6">
+                        <div className="flex items-center space-x-3 px-4 py-2 rounded-full bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer">
+                            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
+                            <span className="text-sm text-gray-300">Cluster Active</span>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-[1px] shadow-lg shadow-purple-500/20">
+                            <div className="w-full h-full rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white font-bold text-sm">
+                                A
+                            </div>
                         </div>
                     </div>
                 </header>

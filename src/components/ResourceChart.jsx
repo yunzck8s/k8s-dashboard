@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const ResourceChart = ({ data, title, color = "#3b82f6", dataKey = "value" }) => {
     return (
-        <div className="p-6 rounded-xl bg-card border border-border shadow-sm h-[350px] flex flex-col">
+        <div className="p-6 rounded-xl glass-card h-[350px] flex flex-col">
             <h3 className="text-lg font-semibold mb-4">{title}</h3>
             <div className="flex-1 w-full min-h-0">
                 <ResponsiveContainer width="100%" height="100%">
@@ -14,7 +14,7 @@ const ResourceChart = ({ data, title, color = "#3b82f6", dataKey = "value" }) =>
                                 <stop offset="95%" stopColor={color} stopOpacity={0} />
                             </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                         <XAxis
                             dataKey="time"
                             stroke="hsl(var(--muted-foreground))"

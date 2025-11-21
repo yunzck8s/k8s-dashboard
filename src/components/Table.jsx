@@ -18,10 +18,10 @@ const Table = ({ columns, data, loading, onRowClick }) => {
     }
 
     return (
-        <div className="overflow-x-auto">
+        <div className="overflow-hidden rounded-xl glass-card">
             <table className="w-full">
                 <thead>
-                    <tr className="border-b border-border">
+                    <tr className="border-b border-white/5 bg-white/5">
                         {columns.map((column, index) => (
                             <th
                                 key={index}
@@ -37,7 +37,7 @@ const Table = ({ columns, data, loading, onRowClick }) => {
                         <tr
                             key={rowIndex}
                             onClick={() => onRowClick && onRowClick(row)}
-                            className={`border-b border-border transition-colors ${onRowClick ? 'hover:bg-muted/50 cursor-pointer' : 'hover:bg-muted/30'
+                            className={`border-b border-white/5 transition-all duration-200 ${onRowClick ? 'hover:bg-white/5 cursor-pointer' : 'hover:bg-white/5'
                                 }`}
                         >
                             {columns.map((column, colIndex) => (
