@@ -9,16 +9,31 @@ const LogViewer = ({ namespace, podName, containers }) => {
     const [selectedContainer, setSelectedContainer] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [isConnected, setIsConnected] = useState(false);
+    const [podContainers, setPodContainers] = useState(containers || []);
     const wsRef = useRef(null);
     const logsEndRef = useRef(null);
     const logsContainerRef = useRef(null);
 
+    // Fetch pod details if containers not provided
+    useEffect(() => {
+        if (!containers) {
+            fetch(`/api/v1/pods/${namespace}/${podName}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.containers) {
+                        setPodContainers(data.containers);
+                    }
+                })
+                .catch(err => console.error('Failed to fetch pod details:', err));
+        }
+    }, [namespace, podName, containers]);
+
     useEffect(() => {
         // Set default container
-        if (containers && containers.length > 0 && !selectedContainer) {
-            setSelectedContainer(containers[0].name);
+        if (podContainers && podContainers.length > 0 && !selectedContainer) {
+            setSelectedContainer(podContainers[0].name);
         }
-    }, [containers, selectedContainer]);
+    }, [podContainers, selectedContainer]);
 
     useEffect(() => {
         if (!selectedContainer) return;
@@ -107,7 +122,7 @@ const LogViewer = ({ namespace, podName, containers }) => {
             <div className="rounded-xl bg-card border border-border shadow-sm p-4">
                 <div className="flex flex-wrap gap-4 items-center">
                     {/* Container Selector */}
-                    {containers && containers.length > 1 && (
+                    {podContainers && podContainers.length > 1 && (
                         <div className="flex items-center space-x-2">
                             <label className="text-sm font-medium">Container:</label>
                             <select
@@ -115,7 +130,7 @@ const LogViewer = ({ namespace, podName, containers }) => {
                                 onChange={(e) => setSelectedContainer(e.target.value)}
                                 className="px-3 py-1.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                             >
-                                {containers.map(container => (
+                                {podContainers.map(container => (
                                     <option key={container.name} value={container.name}>
                                         {container.name}
                                     </option>
@@ -144,8 +159,8 @@ const LogViewer = ({ namespace, podName, containers }) => {
                     <button
                         onClick={() => setFollow(!follow)}
                         className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${follow
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
                             }`}
                     >
                         {follow ? <Pause size={16} /> : <Play size={16} />}
@@ -156,8 +171,8 @@ const LogViewer = ({ namespace, podName, containers }) => {
                     <button
                         onClick={() => setTimestamps(!timestamps)}
                         className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${timestamps
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
                             }`}
                     >
                         Timestamps
@@ -215,7 +230,7 @@ const LogViewer = ({ namespace, podName, containers }) => {
                 <div
                     ref={logsContainerRef}
                     className="p-4 bg-black text-green-400 font-mono text-xs overflow-auto"
-                    style={{ height: '500px' }}
+                    style={{ minHeight: '400px', maxHeight: '70vh' }}
                 >
                     {filteredLogs.length === 0 ? (
                         <div className="text-muted-foreground">No logs available</div>

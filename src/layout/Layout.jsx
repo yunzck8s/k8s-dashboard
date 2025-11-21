@@ -35,15 +35,35 @@ const Layout = () => {
                     </h1>
                 </div>
 
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <SidebarItem to="/" icon={LayoutDashboard} label="Overview" />
-                    <SidebarItem to="/nodes" icon={Server} label="Nodes" />
-                    <SidebarItem to="/pods" icon={Box} label="Pods" />
-                    <SidebarItem to="/deployments" icon={Layers} label="Deployments" />
-                    <SidebarItem to="/services" icon={Activity} label="Services" />
+                <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+                    {/* Cluster Group */}
+                    <div>
+                        <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Cluster</h3>
+                        <div className="space-y-1">
+                            <SidebarItem to="/" icon={LayoutDashboard} label="Overview" />
+                            <SidebarItem to="/nodes" icon={Server} label="Nodes" />
+                        </div>
+                    </div>
+
+                    {/* Workloads Group */}
+                    <div>
+                        <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Workloads</h3>
+                        <div className="space-y-1">
+                            <SidebarItem to="/pods" icon={Box} label="Pods" />
+                            <SidebarItem to="/deployments" icon={Layers} label="Deployments" />
+                        </div>
+                    </div>
+
+                    {/* Network Group */}
+                    <div>
+                        <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Network</h3>
+                        <div className="space-y-1">
+                            <SidebarItem to="/services" icon={Activity} label="Services" />
+                        </div>
+                    </div>
                 </nav>
 
-                <div className="p-4 border-t border-border">
+                <div className="p-4 border-t border-white/5">
                     <SidebarItem to="/settings" icon={Settings} label="Settings" />
                 </div>
             </aside>

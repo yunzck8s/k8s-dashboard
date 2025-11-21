@@ -27,19 +27,27 @@ const Pods = () => {
         return () => clearInterval(interval);
     }, []);
 
+    const [selectedNamespace, setSelectedNamespace] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    const namespaces = ['all', ...new Set(pods.map(p => p.namespace))];
+
+    const filteredPods = selectedNamespace === 'all'
+        ? pods
+        : pods.filter(p => p.namespace === selectedNamespace);
+
+    const totalPages = Math.ceil(filteredPods.length / itemsPerPage);
+    const paginatedPods = filteredPods.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
     const getStatusVariant = (status) => {
-        switch (status) {
-            case 'Running':
-                return 'success';
-            case 'Pending':
-                return 'warning';
-            case 'Failed':
-                return 'error';
-            case 'Succeeded':
-                return 'info';
-            default:
-                return 'default';
-        }
+        if (['Running', 'Succeeded'].includes(status)) return 'success';
+        if (['Pending', 'ContainerCreating'].includes(status)) return 'warning';
+        if (['Failed', 'CrashLoopBackOff', 'ErrImagePull', 'ImagePullBackOff', 'Error'].includes(status)) return 'error';
+        return 'default';
     };
 
     const handleRowClick = (row) => {
@@ -87,16 +95,57 @@ const Pods = () => {
     ];
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-center justify-between">
                 <h1 className="text-3xl font-bold tracking-tight">Pods</h1>
-                <div className="text-sm text-muted-foreground">
-                    Total: {pods.length}
+                <div className="flex items-center space-x-4">
+                    <select
+                        value={selectedNamespace}
+                        onChange={(e) => {
+                            setSelectedNamespace(e.target.value);
+                            setCurrentPage(1);
+                        }}
+                        className="bg-card border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        {namespaces.map(ns => (
+                            <option key={ns} value={ns}>
+                                {ns === 'all' ? 'All Namespaces' : ns}
+                            </option>
+                        ))}
+                    </select>
+                    <div className="text-sm text-muted-foreground">
+                        Total: {filteredPods.length}
+                    </div>
                 </div>
             </div>
 
-            <div className="rounded-xl bg-card border border-border shadow-sm overflow-hidden">
-                <Table columns={columns} data={pods} loading={loading} onRowClick={handleRowClick} />
+            <div className="rounded-xl glass-card overflow-hidden">
+                <Table columns={columns} data={paginatedPods} loading={loading} onRowClick={handleRowClick} />
+
+                {/* Pagination */}
+                {!loading && totalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-white/5">
+                        <div className="text-sm text-muted-foreground">
+                            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredPods.length)} of {filteredPods.length}
+                        </div>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                Previous
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1 rounded-md bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

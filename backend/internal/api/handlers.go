@@ -26,20 +26,75 @@ func GetClusterStats(c *gin.Context) {
 		return
 	}
 
+
 	activePods := 0
 	failedPods := 0
 	for _, pod := range pods.Items {
-		if pod.Status.Phase == "Running" || pod.Status.Phase == "Pending" {
-			activePods++
-		} else if pod.Status.Phase == "Failed" {
+		// Check container statuses for actual failure states
+		isFailed := false
+		if pod.Status.Phase == "Failed" {
+			isFailed = true
+		} else {
+			// Check if any container is in a failed state
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.State.Waiting != nil && 
+				   (cs.State.Waiting.Reason == "CrashLoopBackOff" || 
+				    cs.State.Waiting.Reason == "ErrImagePull" || 
+				    cs.State.Waiting.Reason == "ImagePullBackOff" ||
+				    cs.State.Waiting.Reason == "Error") {
+					isFailed = true
+					break
+				}
+				if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
+					isFailed = true
+					break
+				}
+			}
+		}
+		
+		if isFailed {
 			failedPods++
+		} else if pod.Status.Phase == "Running" || pod.Status.Phase == "Pending" || pod.Status.Phase == "Succeeded" {
+			activePods++
 		}
 	}
 
-	// Mock CPU/Memory usage for now as Metrics Server might not be available
+	// Calculate real CPU and Memory usage from Metrics Server
+	var cpuUsage, memoryUsage float64
+	
+	// Get node metrics
+	nodeMetrics, err := k8s.MetricsClient.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{})
+	if err == nil && len(nodeMetrics.Items) > 0 {
+		var totalCPUCapacity, totalMemoryCapacity, totalCPUUsage, totalMemoryUsage int64
+		
+		// Calculate total capacity
+		for _, node := range nodes.Items {
+			totalCPUCapacity += node.Status.Capacity.Cpu().MilliValue()
+			totalMemoryCapacity += node.Status.Capacity.Memory().Value()
+		}
+		
+		// Calculate total usage
+		for _, metric := range nodeMetrics.Items {
+			totalCPUUsage += metric.Usage.Cpu().MilliValue()
+			totalMemoryUsage += metric.Usage.Memory().Value()
+		}
+		
+		// Calculate percentages
+		if totalCPUCapacity > 0 {
+			cpuUsage = float64(totalCPUUsage) / float64(totalCPUCapacity) * 100
+		}
+		if totalMemoryCapacity > 0 {
+			memoryUsage = float64(totalMemoryUsage) / float64(totalMemoryCapacity) * 100
+		}
+	} else {
+		// Fallback to mock data if Metrics Server is unavailable
+		cpuUsage = 0
+		memoryUsage = 0
+	}
+
 	stats := model.ClusterStats{
-		CPUUsage:    45.5,
-		MemoryUsage: 60.2,
+		CPUUsage:    cpuUsage,
+		MemoryUsage: memoryUsage,
 		TotalNodes:  len(nodes.Items),
 		ActivePods:  activePods,
 		FailedPods:  failedPods,
@@ -85,14 +140,29 @@ func GetPods(c *gin.Context) {
 	for _, p := range pods.Items {
 		age := time.Since(p.CreationTimestamp.Time).Round(time.Minute).String()
 		restarts := 0
-		if len(p.Status.ContainerStatuses) > 0 {
-			restarts = int(p.Status.ContainerStatuses[0].RestartCount)
+		status := string(p.Status.Phase)
+
+		// Check for more specific status (e.g., CrashLoopBackOff, ErrImagePull)
+		// Priority: Terminating > Waiting (Error) > Terminated (Error) > Phase
+		if p.DeletionTimestamp != nil {
+			status = "Terminating"
+		} else {
+			for _, cs := range p.Status.ContainerStatuses {
+				restarts += int(cs.RestartCount)
+				if cs.State.Waiting != nil && cs.State.Waiting.Reason != "" {
+					status = cs.State.Waiting.Reason
+					break // Found a specific waiting reason (usually error), prioritize it
+				} else if cs.State.Terminated != nil && cs.State.Terminated.Reason != "" && cs.State.Terminated.ExitCode != 0 {
+					status = cs.State.Terminated.Reason
+					// Don't break yet, Waiting might be more current/important
+				}
+			}
 		}
 
 		podList = append(podList, model.Pod{
 			Name:      p.Name,
 			Namespace: p.Namespace,
-			Status:    string(p.Status.Phase),
+			Status:    status,
 			Restarts:  restarts,
 			Age:       age,
 		})

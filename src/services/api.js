@@ -30,5 +30,11 @@ export const api = {
         const response = await fetch(`${API_BASE}/services`);
         if (!response.ok) throw new Error('Failed to fetch services');
         return response.json();
+    },
+
+    getAllNodeMetrics: async () => {
+        const response = await fetch(`${API_BASE}/metrics/nodes`);
+        if (!response.ok) throw new Error('Failed to fetch node metrics');
+        return response.json();
     }
 };

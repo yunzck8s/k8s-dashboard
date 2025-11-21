@@ -38,3 +38,14 @@ func GetNodeMetrics(c *gin.Context) {
 
 	c.JSON(http.StatusOK, metrics)
 }
+
+// GetAllNodeMetrics returns metrics for all nodes
+func GetAllNodeMetrics(c *gin.Context) {
+	metrics, err := k8s.MetricsClient.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, metrics)
+}
