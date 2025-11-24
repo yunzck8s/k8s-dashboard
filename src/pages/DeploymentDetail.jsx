@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Layers, Box, Activity, AlertCircle, Clock, Image as ImageIcon, Terminal, FileText } from 'lucide-react';
-import Table from '../components/Table';
+import { ArrowLeft, Info, Box, Code, Edit, MoreVertical, Maximize2, RotateCw, Trash2, AlertTriangle, Settings } from 'lucide-react';
 import Badge from '../components/Badge';
+import Table from '../components/Table';
 import Modal from '../components/Modal';
 import LogViewer from '../components/LogViewer';
 import TerminalComponent from '../components/Terminal';
+import ResourceEditor from '../components/ResourceEditor';
+import ConfigEditor from '../components/ConfigEditor';
+import ReplicaWidget from '../components/ReplicaWidget';
+import ActionMenu from '../components/ActionMenu';
+import { api } from '../services/api';
 
 const DeploymentDetail = () => {
     const { namespace, name } = useParams();
@@ -15,33 +20,61 @@ const DeploymentDetail = () => {
     const [selectedPod, setSelectedPod] = useState(null);
     const [showLogs, setShowLogs] = useState(false);
     const [showTerminal, setShowTerminal] = useState(false);
+    const [showYamlEditor, setShowYamlEditor] = useState(false);
+    const [showConfigEditor, setShowConfigEditor] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    const fetchDeployment = async () => {
+        try {
+            const response = await fetch(`/api/v1/deployments/${namespace}/${name}`);
+            const data = await response.json();
+            setDeployment(data);
+        } catch (error) {
+            console.error('Failed to fetch deployment details', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchDeployment = async () => {
-            try {
-                const response = await fetch(`/api/v1/deployments/${namespace}/${name}`);
-                const data = await response.json();
-                setDeployment(data);
-            } catch (error) {
-                console.error('Failed to fetch deployment details', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchDeployment();
         const interval = setInterval(fetchDeployment, 5000);
         return () => clearInterval(interval);
     }, [namespace, name]);
 
-    const handleViewLogs = (pod) => {
-        setSelectedPod(pod);
-        setShowLogs(true);
+    const handleScale = async (replicas) => {
+        await api.scaleDeployment(namespace, name, replicas);
+        await fetchDeployment();
     };
 
-    const handleOpenShell = (pod) => {
-        setSelectedPod(pod);
-        setShowTerminal(true);
+    const handleConfigUpdate = async (newConfig) => {
+        // In a real implementation, we would diff and patch.
+        // For now, we'll convert to YAML and update.
+        // This requires a backend endpoint that accepts JSON or we convert client-side.
+        // Assuming we have a way to update via JSON or we just use the existing YAML update.
+        // For simplicity, we'll assume the backend can handle the update or we'd implement a proper patch.
+        // Here we will just log it as a placeholder since we need a JSON update endpoint or YAML conversion.
+        console.log('Updating config:', newConfig);
+        // TODO: Implement actual update logic
+        await fetchDeployment();
+    };
+
+    const handleRedeploy = async () => {
+        try {
+            await api.redeployDeployment(namespace, name);
+            await fetchDeployment();
+        } catch (error) {
+            console.error('Failed to redeploy', error);
+        }
+    };
+
+    const handleDelete = async () => {
+        try {
+            await api.deleteDeployment(namespace, name);
+            navigate('/deployments');
+        } catch (error) {
+            console.error('Failed to delete', error);
+        }
     };
 
     const podColumns = [
@@ -51,12 +84,7 @@ const DeploymentDetail = () => {
             render: (row) => (
                 <div className="flex items-center space-x-2">
                     <Box size={14} className="text-muted-foreground" />
-                    <button
-                        onClick={() => navigate(`/pods/${row.namespace}/${row.name}`)}
-                        className="font-medium text-sm text-blue-400 hover:text-blue-300 hover:underline"
-                    >
-                        {row.name}
-                    </button>
+                    <span className="font-medium text-sm">{row.name}</span>
                 </div>
             ),
         },
@@ -84,53 +112,14 @@ const DeploymentDetail = () => {
             render: (row) => <span className="text-sm text-muted-foreground">{row.age}</span>,
         },
         {
-            header: 'Actions',
+            header: '',
             accessor: 'name',
             render: (row) => (
-                <div className="flex items-center space-x-2">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewLogs(row);
-                        }}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors text-blue-400 hover:text-blue-300"
-                        title="View Logs"
-                    >
-                        <FileText size={16} />
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenShell(row);
-                        }}
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors text-green-400 hover:text-green-300"
-                        title="Open Shell"
-                    >
-                        <Terminal size={16} />
-                    </button>
-                </div>
+                <ActionMenu actions={[
+                    { label: 'View Logs', icon: 'logs', onClick: () => { setSelectedPod(row); setShowLogs(true); } },
+                    { label: 'Open Shell', icon: 'terminal', onClick: () => { setSelectedPod(row); setShowTerminal(true); } }
+                ]} />
             ),
-        },
-    ];
-
-    const rsColumns = [
-        {
-            header: 'Name',
-            accessor: 'name',
-            render: (row) => (
-                <div className="flex items-center space-x-2">
-                    <Layers size={14} className="text-muted-foreground" />
-                    <span className="font-medium text-sm">{row.name}</span>
-                </div>
-            ),
-        },
-        {
-            header: 'Replicas',
-            accessor: 'replicas',
-        },
-        {
-            header: 'Age',
-            accessor: 'age',
         },
     ];
 
@@ -145,11 +134,10 @@ const DeploymentDetail = () => {
     if (!deployment) {
         return (
             <div className="text-center py-12">
-                <AlertCircle className="w-16 h-16 mx-auto text-red-500 mb-4" />
                 <h2 className="text-2xl font-bold mb-2">Deployment Not Found</h2>
                 <button
                     onClick={() => navigate('/deployments')}
-                    className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
+                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
                 >
                     Back to Deployments
                 </button>
@@ -157,170 +145,151 @@ const DeploymentDetail = () => {
         );
     }
 
+    const headerActions = [
+        {
+            label: 'Edit Config',
+            icon: 'edit',
+            onClick: () => setShowConfigEditor(true)
+        },
+        {
+            label: 'Edit YAML',
+            icon: 'yaml',
+            onClick: () => setShowYamlEditor(true)
+        },
+        {
+            label: 'Redeploy',
+            icon: 'terminal',
+            onClick: handleRedeploy
+        },
+        {
+            label: 'Delete',
+            icon: 'delete',
+            danger: true,
+            onClick: () => setShowDeleteConfirm(true)
+        }
+    ];
+
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="flex flex-col h-full overflow-hidden">
             {/* Header */}
-            <div className="flex items-center space-x-4">
-                <button
-                    onClick={() => navigate('/deployments')}
-                    className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                    <ArrowLeft size={20} />
-                </button>
-                <div className="flex-1">
-                    <h1 className="text-3xl font-bold tracking-tight">{deployment.name}</h1>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Namespace: <span className="text-blue-400">{deployment.namespace}</span>
-                    </p>
-                </div>
-            </div>
-
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="rounded-xl glass-card p-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Desired Replicas</span>
-                        <Activity className="w-5 h-5 text-blue-400" />
-                    </div>
-                    <div className="text-3xl font-bold">{deployment.replicas.desired}</div>
-                </div>
-                <div className="rounded-xl glass-card p-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Ready Replicas</span>
-                        <Box className="w-5 h-5 text-green-400" />
-                    </div>
-                    <div className="text-3xl font-bold text-green-400">{deployment.replicas.ready}</div>
-                </div>
-                <div className="rounded-xl glass-card p-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Available</span>
-                        <Activity className="w-5 h-5 text-purple-400" />
-                    </div>
-                    <div className="text-3xl font-bold">{deployment.replicas.available}</div>
-                </div>
-                <div className="rounded-xl glass-card p-6">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">Updated</span>
-                        <Activity className="w-5 h-5 text-yellow-400" />
-                    </div>
-                    <div className="text-3xl font-bold">{deployment.replicas.updated}</div>
-                </div>
-            </div>
-
-            {/* Details */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="rounded-xl glass-card p-6">
-                    <h3 className="text-lg font-semibold mb-4">Details</h3>
-                    <div className="space-y-3">
-                        <div className="flex items-start">
-                            <ImageIcon className="w-4 h-4 mr-2 mt-1 text-muted-foreground" />
-                            <div className="flex-1">
-                                <div className="text-xs text-muted-foreground">Image</div>
-                                <div className="text-sm font-mono break-all">{deployment.image}</div>
-                            </div>
-                        </div>
-                        <div className="flex items-start">
-                            <Activity className="w-4 h-4 mr-2 mt-1 text-muted-foreground" />
-                            <div className="flex-1">
-                                <div className="text-xs text-muted-foreground">Strategy</div>
-                                <div className="text-sm">{deployment.strategy}</div>
-                            </div>
-                        </div>
-                        <div className="flex items-start">
-                            <Clock className="w-4 h-4 mr-2 mt-1 text-muted-foreground" />
-                            <div className="flex-1">
-                                <div className="text-xs text-muted-foreground">Created</div>
-                                <div className="text-sm">{new Date(deployment.createdAt).toLocaleString()}</div>
+            <div className="p-6 border-b border-white/10 bg-black/20 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => navigate('/deployments')}
+                            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div>
+                            <h1 className="text-2xl font-bold">{deployment.name}</h1>
+                            <div className="flex items-center space-x-2 mt-1">
+                                <Badge variant="default">{deployment.namespace}</Badge>
+                                <span className="text-sm text-muted-foreground">• {deployment.age}</span>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div className="rounded-xl glass-card p-6">
-                    <h3 className="text-lg font-semibold mb-4">Labels</h3>
-                    <div className="flex flex-wrap gap-2">
-                        {deployment.labels && Object.entries(deployment.labels).map(([key, value]) => (
-                            <span key={key} className="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400">
-                                {key}: {value}
-                            </span>
-                        ))}
+                    <div className="flex items-center space-x-4">
+                        <ReplicaWidget
+                            current={deployment.replicas?.ready || 0}
+                            desired={deployment.replicas?.desired || 0}
+                            onUpdate={handleScale}
+                        />
+                        <div className="h-8 w-px bg-white/10" />
+                        <ActionMenu actions={headerActions} />
                     </div>
                 </div>
             </div>
 
-            {/* Pods */}
-            <div className="rounded-xl glass-card p-6">
-                <h3 className="text-lg font-semibold mb-4">Pods ({deployment.pods?.length || 0})</h3>
-                {deployment.pods && deployment.pods.length > 0 ? (
-                    <Table columns={podColumns} data={deployment.pods} />
-                ) : (
-                    <div className="text-center text-muted-foreground py-8">No pods found</div>
-                )}
-            </div>
-
-            {/* ReplicaSets */}
-            <div className="rounded-xl glass-card p-6">
-                <h3 className="text-lg font-semibold mb-4">ReplicaSets</h3>
-                {deployment.replicaSets && deployment.replicaSets.length > 0 ? (
-                    <Table columns={rsColumns} data={deployment.replicaSets} />
-                ) : (
-                    <div className="text-center text-muted-foreground py-8">No ReplicaSets found</div>
-                )}
-            </div>
-
-            {/* Events */}
-            <div className="rounded-xl glass-card p-6">
-                <h3 className="text-lg font-semibold mb-4">Recent Events</h3>
-                {deployment.events && deployment.events.length > 0 ? (
-                    <div className="space-y-2">
-                        {deployment.events.slice(0, 10).map((event, idx) => (
-                            <div key={idx} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5">
-                                <AlertCircle className={`w-4 h-4 mt-0.5 ${event.type === 'Warning' ? 'text-yellow-400' : 'text-blue-400'}`} />
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-medium">{event.reason}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {new Date(event.timestamp).toLocaleString()}
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">{event.message}</p>
-                                </div>
-                            </div>
-                        ))}
+            {/* Content - Unified View */}
+            <div className="flex-1 overflow-auto p-6 space-y-6">
+                {/* Overview Cards */}
+                <div className="grid grid-cols-4 gap-4">
+                    <div className="p-4 rounded-lg bg-black/20 border border-white/10">
+                        <div className="text-xs text-muted-foreground mb-1">Strategy</div>
+                        <div className="text-lg font-medium">{deployment.strategy}</div>
                     </div>
-                ) : (
-                    <div className="text-center text-muted-foreground py-8">No events found</div>
-                )}
+                    <div className="p-4 rounded-lg bg-black/20 border border-white/10">
+                        <div className="text-xs text-muted-foreground mb-1">Available</div>
+                        <div className="text-lg font-medium">{deployment.replicas?.available || 0}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-black/20 border border-white/10">
+                        <div className="text-xs text-muted-foreground mb-1">Updated</div>
+                        <div className="text-lg font-medium">{deployment.replicas?.updated || 0}</div>
+                    </div>
+                    <div className="p-4 rounded-lg bg-black/20 border border-white/10">
+                        <div className="text-xs text-muted-foreground mb-1">Created</div>
+                        <div className="text-lg font-medium">{new Date(deployment.createdAt).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                {/* Pods Section */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium">Pods</h3>
+                        <Badge variant="secondary">{deployment.pods?.length || 0} Total</Badge>
+                    </div>
+                    <div className="rounded-lg border border-white/10 overflow-hidden bg-black/20">
+                        <Table columns={podColumns} data={deployment.pods || []} />
+                    </div>
+                </div>
             </div>
 
-            {/* Logs Modal */}
-            <Modal
-                isOpen={showLogs}
-                onClose={() => setShowLogs(false)}
-                title={`Logs - ${selectedPod?.name}`}
-                size="full"
-            >
-                {selectedPod && (
-                    <LogViewer
-                        namespace={selectedPod.namespace}
-                        podName={selectedPod.name}
-                    />
-                )}
+            {/* Modals */}
+            <Modal isOpen={showLogs} onClose={() => setShowLogs(false)} title={`Logs - ${selectedPod?.name}`} size="full">
+                {selectedPod && <LogViewer namespace={selectedPod.namespace} podName={selectedPod.name} />}
             </Modal>
 
-            {/* Terminal Modal */}
-            <Modal
-                isOpen={showTerminal}
-                onClose={() => setShowTerminal(false)}
-                title={`Terminal - ${selectedPod?.name}`}
-                size="full"
-            >
-                {selectedPod && (
-                    <TerminalComponent
-                        namespace={selectedPod.namespace}
-                        podName={selectedPod.name}
-                    />
-                )}
+            <Modal isOpen={showTerminal} onClose={() => setShowTerminal(false)} title={`Terminal - ${selectedPod?.name}`} size="full">
+                {selectedPod && <TerminalComponent namespace={selectedPod.namespace} podName={selectedPod.name} />}
+            </Modal>
+
+            {/* Edit YAML (Pure) */}
+            <ResourceEditor
+                isOpen={showYamlEditor}
+                onClose={() => setShowYamlEditor(false)}
+                type="deployments"
+                namespace={namespace}
+                name={name}
+                onUpdate={fetchDeployment}
+            />
+
+            {/* Edit Config (Form) */}
+            <ConfigEditor
+                isOpen={showConfigEditor}
+                onClose={() => setShowConfigEditor(false)}
+                deployment={deployment}
+                onSave={handleConfigUpdate}
+            />
+
+            {/* Delete Confirmation */}
+            <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Deployment" size="sm">
+                <div className="space-y-4">
+                    <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                        <div className="flex items-start space-x-3">
+                            <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5" />
+                            <div className="text-sm text-red-200">
+                                <p className="font-medium">This action cannot be undone</p>
+                                <p className="mt-1">All pods will be terminated and the deployment will be permanently deleted.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-end space-x-3 pt-4 border-t border-white/10">
+                        <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium"
+                        >
+                            Delete Deployment
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

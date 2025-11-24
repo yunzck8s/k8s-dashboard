@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Server, Box, Layers, Activity, Settings } from 'lucide-react';
+import { LayoutDashboard, Server, Box, Layers, Activity, Settings, Database, Grid } from 'lucide-react';
 
 const SidebarItem = ({ to, icon, label }) => {
     const Icon = icon;
@@ -51,6 +51,8 @@ const Layout = () => {
                         <div className="space-y-1">
                             <SidebarItem to="/pods" icon={Box} label="Pods" />
                             <SidebarItem to="/deployments" icon={Layers} label="Deployments" />
+                            <SidebarItem to="/statefulsets" icon={Database} label="StatefulSets" />
+                            <SidebarItem to="/daemonsets" icon={Grid} label="DaemonSets" />
                         </div>
                     </div>
 

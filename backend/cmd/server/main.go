@@ -46,9 +46,28 @@ func main() {
 		v1.GET("/pods/:namespace/:name/metrics", api.GetPodMetrics)
 		v1.GET("/deployments", api.GetDeployments)
 		v1.GET("/deployments/:namespace/:name", api.GetDeploymentDetail)
+		v1.GET("/deployments/:namespace/:name/yaml", api.GetDeploymentYAML)
+		v1.PUT("/deployments/:namespace/:name/yaml", api.UpdateDeploymentYAML)
+		v1.GET("/statefulsets", api.GetStatefulSets)
+		v1.GET("/statefulsets/:namespace/:name", api.GetStatefulSetDetail)
+		v1.GET("/statefulsets/:namespace/:name/yaml", api.GetStatefulSetYAML)
+		v1.PUT("/statefulsets/:namespace/:name/yaml", api.UpdateStatefulSetYAML)
+		v1.GET("/daemonsets", api.GetDaemonSets)
+		v1.GET("/daemonsets/:namespace/:name", api.GetDaemonSetDetail)
+		v1.GET("/daemonsets/:namespace/:name/yaml", api.GetDaemonSetYAML)
+		v1.PUT("/daemonsets/:namespace/:name/yaml", api.UpdateDaemonSetYAML)
 		v1.GET("/services", api.GetServices)
+		v1.GET("/nodes/:name", api.GetNodeDetail)
 		v1.GET("/nodes/:name/metrics", api.GetNodeMetrics)
 		v1.GET("/metrics/nodes", api.GetAllNodeMetrics)
+		
+		// Action routes
+		v1.PUT("/deployments/:namespace/:name/scale", api.ScaleDeployment)
+		v1.POST("/deployments/:namespace/:name/redeploy", api.RedeployDeployment)
+		v1.DELETE("/deployments/:namespace/:name", api.DeleteDeployment)
+		v1.PUT("/statefulsets/:namespace/:name/scale", api.ScaleStatefulSet)
+		v1.DELETE("/statefulsets/:namespace/:name", api.DeleteStatefulSet)
+		v1.DELETE("/daemonsets/:namespace/:name", api.DeleteDaemonSet)
 	}
 
 	log.Println("Server starting on :8080")

@@ -12,12 +12,11 @@ type ClusterStats struct {
 
 // Node represents a Kubernetes node
 type Node struct {
-	Name    string `json:"name"`
-	Status  string `json:"status"`
-	Role    string `json:"role"`
-	CPU     string `json:"cpu"`
-	Memory  string `json:"memory"`
-	Version string `json:"version"`
+	Name     string            `json:"name"`
+	Status   string            `json:"status"`
+	Roles    []string          `json:"roles"`
+	Capacity map[string]string `json:"capacity"`
+	Age      string            `json:"age"`
 }
 
 // Pod represents a Kubernetes pod
@@ -113,4 +112,97 @@ type Event struct {
 	Reason    string `json:"reason"`
 	Message   string `json:"message"`
 	Timestamp string `json:"timestamp"`
+}
+// SystemInfo represents node system information
+type SystemInfo struct {
+	MachineID               string `json:"machineID"`
+	SystemUUID              string `json:"systemUUID"`
+	BootID                  string `json:"bootID"`
+	KernelVersion           string `json:"kernelVersion"`
+	OSImage                 string `json:"osImage"`
+	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
+	KubeletVersion          string `json:"kubeletVersion"`
+	KubeProxyVersion        string `json:"kubeProxyVersion"`
+	OperatingSystem         string `json:"operatingSystem"`
+	Architecture            string `json:"architecture"`
+}
+
+// NodeResources represents node resource capacity
+type NodeResources struct {
+	CPU    string `json:"cpu"`
+	Memory string `json:"memory"`
+	Pods   string `json:"pods"`
+}
+
+// ContainerImage represents a container image on a node
+type ContainerImage struct {
+	Names     []string `json:"names"`
+	SizeBytes int64    `json:"sizeBytes"`
+}
+
+// NodeDetail represents detailed information about a node
+type NodeDetail struct {
+	Name        string            `json:"name"`
+	Status      string            `json:"status"`
+	Roles       string            `json:"roles"`
+	Age         string            `json:"age"`
+	Version     string            `json:"version"`
+	InternalIP  string            `json:"internalIP"`
+	ExternalIP  string            `json:"externalIP"`
+	PodCIDR     string            `json:"podCIDR"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	SystemInfo  SystemInfo        `json:"systemInfo"`
+	Conditions  []Condition       `json:"conditions"`
+	Images      []ContainerImage  `json:"images"`
+	Pods        []Pod             `json:"pods"`
+	Events      []Event           `json:"events"`
+	Resources   NodeResources     `json:"resources"`
+}
+// StatefulSet represents a Kubernetes StatefulSet
+type StatefulSet struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Replicas  string `json:"replicas"`
+	Age       string `json:"age"`
+}
+
+// DaemonSet represents a Kubernetes DaemonSet
+type DaemonSet struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Desired   int32  `json:"desired"`
+	Current   int32  `json:"current"`
+	Ready     int32  `json:"ready"`
+	Age       string `json:"age"`
+}
+
+// StatefulSetDetail represents detailed information about a StatefulSet
+type StatefulSetDetail struct {
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Replicas    string            `json:"replicas"`
+	Age         string            `json:"age"`
+	Selector    map[string]string `json:"selector"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	Pods        []Pod             `json:"pods"`
+	Events      []Event           `json:"events"`
+	Images      []string          `json:"images"`
+}
+
+// DaemonSetDetail represents detailed information about a DaemonSet
+type DaemonSetDetail struct {
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Desired     int32             `json:"desired"`
+	Current     int32             `json:"current"`
+	Ready       int32             `json:"ready"`
+	Age         string            `json:"age"`
+	Selector    map[string]string `json:"selector"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	Pods        []Pod             `json:"pods"`
+	Events      []Event           `json:"events"`
+	Images      []string          `json:"images"`
 }
