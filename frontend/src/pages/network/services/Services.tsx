@@ -101,7 +101,7 @@ export default function Services() {
             </thead>
             <tbody>
               {services.map((service) => {
-                const externalIPs = service.status.loadBalancer?.ingress
+                const externalIPs = service.status?.loadBalancer?.ingress
                   ?.map((i) => i.ip || i.hostname)
                   .join(', ') || service.spec.externalIPs?.join(', ') || '-';
                 return (

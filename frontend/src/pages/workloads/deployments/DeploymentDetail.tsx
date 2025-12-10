@@ -6,6 +6,11 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Deployment, Pod } from '../../../types';
+import UpdateStrategyEditor from '../../../components/workloads/UpdateStrategyEditor';
+import RevisionHistory from '../../../components/workloads/RevisionHistory';
+import ActionDropdown from '../../../components/common/ActionDropdown';
+import EditImageModal from '../../../components/workloads/EditImageModal';
+import SchedulingEditor from '../../../components/workloads/SchedulingEditor';
 import {
   ArrowLeftIcon,
   TrashIcon,
@@ -13,7 +18,16 @@ import {
   ClipboardDocumentIcon,
   PlusIcon,
   MinusIcon,
-  ArrowUturnLeftIcon,
+  PauseIcon,
+  PlayIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon,
+  PhotoIcon,
+  ServerIcon,
+  ArrowsPointingOutIcon,
+  EllipsisVerticalIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 type TabType = 'overview' | 'pods' | 'yaml' | 'events';
@@ -22,6 +36,8 @@ export default function DeploymentDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showScaleModal, setShowScaleModal] = useState(false);
+  const [showEditImageModal, setShowEditImageModal] = useState(false);
+  const [showSchedulingEditor, setShowSchedulingEditor] = useState(false);
   const [newReplicas, setNewReplicas] = useState(0);
   const queryClient = useQueryClient();
 
@@ -73,6 +89,42 @@ export default function DeploymentDetail() {
     },
   });
 
+  // 暂停
+  const pauseMutation = useMutation({
+    mutationFn: () => deploymentApi.pause(namespace!, name!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
+    },
+  });
+
+  // 恢复
+  const resumeMutation = useMutation({
+    mutationFn: () => deploymentApi.resume(namespace!, name!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
+    },
+  });
+
+  // 修改镜像
+  const updateImageMutation = useMutation({
+    mutationFn: (containers: Array<{ name: string; image: string }>) =>
+      deploymentApi.updateImage(namespace!, name!, containers),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
+      setShowEditImageModal(false);
+    },
+  });
+
+  // 更新调度配置
+  const updateSchedulingMutation = useMutation({
+    mutationFn: (data: { nodeSelector?: Record<string, string>; tolerations?: Array<{ key?: string; operator?: string; value?: string; effect?: string }> }) =>
+      deploymentApi.updateScheduling(namespace!, name!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
+      setShowSchedulingEditor(false);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -121,40 +173,87 @@ export default function DeploymentDetail() {
             <p className="text-slate-400 mt-1">命名空间: {namespace}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              setNewReplicas(deployment.spec.replicas || 0);
-              setShowScaleModal(true);
-            }}
-            className="btn btn-secondary"
-          >
-            扩缩容
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('确定要重启此 Deployment 吗？')) {
-                restartMutation.mutate();
-              }
-            }}
-            className="btn btn-secondary"
-            disabled={restartMutation.isPending}
-          >
-            <ArrowPathIcon className="w-4 h-4 mr-2" />
-            重启
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('确定要删除此 Deployment 吗？')) {
-                deleteMutation.mutate();
-              }
-            }}
-            className="btn btn-danger"
-            disabled={deleteMutation.isPending}
-          >
-            <TrashIcon className="w-4 h-4 mr-2" />
-            删除
-          </button>
+        <div className="flex items-center gap-2">
+          {/* 主要操作按钮组 */}
+          <div className="flex items-center bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+            <button
+              onClick={() => {
+                setNewReplicas(deployment.spec.replicas || 0);
+                setShowScaleModal(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors border-r border-slate-700"
+            >
+              <ArrowsPointingOutIcon className="w-4 h-4" />
+              扩缩容
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('确定要重启此 Deployment 吗？这将滚动重启所有 Pod。')) {
+                  restartMutation.mutate();
+                }
+              }}
+              disabled={restartMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ArrowPathIcon className={clsx('w-4 h-4', restartMutation.isPending && 'animate-spin')} />
+              重启
+            </button>
+          </div>
+
+          {/* 暂停/恢复按钮 */}
+          {deployment.spec.paused ? (
+            <button
+              onClick={() => resumeMutation.mutate()}
+              disabled={resumeMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <PlayIcon className="w-4 h-4" />
+              恢复发布
+            </button>
+          ) : (
+            <button
+              onClick={() => pauseMutation.mutate()}
+              disabled={pauseMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <PauseIcon className="w-4 h-4" />
+              暂停发布
+            </button>
+          )}
+
+          {/* 更多操作下拉菜单 */}
+          <ActionDropdown
+            trigger={
+              <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
+                <Cog6ToothIcon className="w-4 h-4" />
+                配置
+                <EllipsisVerticalIcon className="w-4 h-4" />
+              </button>
+            }
+            items={[
+              {
+                label: '修改镜像',
+                icon: <PhotoIcon className="w-4 h-4" />,
+                onClick: () => setShowEditImageModal(true),
+              },
+              {
+                label: '调度配置',
+                icon: <ServerIcon className="w-4 h-4" />,
+                onClick: () => setShowSchedulingEditor(true),
+              },
+              { divider: true },
+              {
+                label: '删除 Deployment',
+                icon: <TrashIcon className="w-4 h-4" />,
+                onClick: () => {
+                  if (confirm('确定要删除此 Deployment 吗？此操作不可恢复。')) {
+                    deleteMutation.mutate();
+                  }
+                },
+                danger: true,
+              },
+            ]}
+          />
         </div>
       </div>
 
@@ -180,7 +279,7 @@ export default function DeploymentDetail() {
 
       {/* 标签页内容 */}
       <div>
-        {activeTab === 'overview' && <OverviewTab deployment={deployment} />}
+        {activeTab === 'overview' && <OverviewTab deployment={deployment} namespace={namespace!} name={name!} />}
         {activeTab === 'pods' && <PodsTab pods={podsData?.items || []} namespace={namespace!} />}
         {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
         {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
@@ -230,12 +329,41 @@ export default function DeploymentDetail() {
           </div>
         </div>
       )}
+
+      {/* 修改镜像模态框 */}
+      <EditImageModal
+        isOpen={showEditImageModal}
+        onClose={() => setShowEditImageModal(false)}
+        onSave={(containers) => updateImageMutation.mutate(containers)}
+        containers={deployment.spec.template.spec.containers.map((c) => ({
+          name: c.name,
+          image: c.image,
+        }))}
+        isPending={updateImageMutation.isPending}
+      />
+
+      {/* 调度配置编辑器 */}
+      <SchedulingEditor
+        isOpen={showSchedulingEditor}
+        onClose={() => setShowSchedulingEditor(false)}
+        onSave={(data) => updateSchedulingMutation.mutate(data)}
+        nodeSelector={deployment.spec.template.spec.nodeSelector}
+        tolerations={deployment.spec.template.spec.tolerations}
+        isPending={updateSchedulingMutation.isPending}
+      />
     </div>
   );
 }
 
 // 概览标签页
-function OverviewTab({ deployment }: { deployment: Deployment }) {
+function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; namespace: string; name: string }) {
+  // 获取更新策略
+  const currentStrategy = {
+    type: (deployment.spec.strategy?.type || 'RollingUpdate') as 'RollingUpdate' | 'Recreate',
+    maxUnavailable: deployment.spec.strategy?.rollingUpdate?.maxUnavailable?.toString() || '25%',
+    maxSurge: deployment.spec.strategy?.rollingUpdate?.maxSurge?.toString() || '25%',
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 基本信息 */}
@@ -243,7 +371,7 @@ function OverviewTab({ deployment }: { deployment: Deployment }) {
         <h3 className="text-lg font-semibold text-white mb-4">基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={deployment.metadata.name} />
-          <InfoRow label="命名空间" value={deployment.metadata.namespace} />
+          <InfoRow label="命名空间" value={deployment.metadata.namespace || '-'} />
           <InfoRow label="UID" value={deployment.metadata.uid} mono />
           <InfoRow
             label="创建时间"
@@ -253,7 +381,7 @@ function OverviewTab({ deployment }: { deployment: Deployment }) {
             })}
           />
           <InfoRow label="副本数" value={`${deployment.spec.replicas || 0}`} />
-          <InfoRow label="策略" value={deployment.spec.strategy?.type || 'RollingUpdate'} />
+          <InfoRow label="暂停状态" value={deployment.spec.paused ? '已暂停' : '运行中'} />
         </dl>
       </div>
 
@@ -267,6 +395,25 @@ function OverviewTab({ deployment }: { deployment: Deployment }) {
           <InfoRow label="更新副本数" value={`${deployment.status.updatedReplicas || 0}`} />
           <InfoRow label="观察代数" value={`${deployment.status.observedGeneration || 0}`} />
         </dl>
+      </div>
+
+      {/* 更新策略编辑器 */}
+      <div className="lg:col-span-2">
+        <UpdateStrategyEditor
+          namespace={namespace}
+          name={name}
+          resourceType="Deployment"
+          currentStrategy={currentStrategy}
+        />
+      </div>
+
+      {/* 修订历史 */}
+      <div className="lg:col-span-2">
+        <RevisionHistory
+          namespace={namespace}
+          name={name}
+          resourceType="Deployment"
+        />
       </div>
 
       {/* 标签 */}
@@ -474,9 +621,67 @@ function YamlTab({ yaml }: { yaml: string }) {
 
 // 事件标签页
 function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+  const { data: eventsData, isLoading } = useQuery({
+    queryKey: ['deployment-events', namespace, name],
+    queryFn: () => deploymentApi.getEvents(namespace, name),
+    refetchInterval: 30000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
+      </div>
+    );
+  }
+
+  const events = eventsData?.items || [];
+
+  if (events.length === 0) {
+    return (
+      <div className="card p-6 text-center">
+        <p className="text-slate-400">暂无事件</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="card p-6 text-center">
-      <p className="text-slate-400">事件功能正在开发中...</p>
+    <div className="space-y-3">
+      {events.map((event) => (
+        <div
+          key={event.metadata.uid}
+          className={clsx(
+            'flex items-start gap-3 p-4 rounded-lg border',
+            event.type === 'Warning'
+              ? 'bg-yellow-500/10 border-yellow-500/20'
+              : 'bg-slate-700/50 border-slate-600/50'
+          )}
+        >
+          {event.type === 'Warning' ? (
+            <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          ) : event.type === 'Normal' ? (
+            <CheckCircleIcon className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+          ) : (
+            <InformationCircleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-white">{event.reason}</p>
+              <span className="text-xs text-slate-500 flex-shrink-0">
+                {event.lastTimestamp &&
+                  formatDistanceToNow(new Date(event.lastTimestamp), {
+                    addSuffix: true,
+                    locale: zhCN,
+                  })}
+              </span>
+            </div>
+            <p className="text-sm text-slate-400 mt-1">{event.message}</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {event.involvedObject.kind}/{event.involvedObject.name}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

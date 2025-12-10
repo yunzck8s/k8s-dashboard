@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { daemonSetApi, podApi } from '../../../api';
+import { daemonSetApi } from '../../../api';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
-import type { DaemonSet, Pod } from '../../../types';
+import type { DaemonSet, Pod, Event } from '../../../types';
+import UpdateStrategyEditor from '../../../components/workloads/UpdateStrategyEditor';
 import {
   ArrowLeftIcon,
   TrashIcon,
   ClipboardDocumentIcon,
+  ArrowPathIcon,
+  PencilSquareIcon,
+  CheckIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 type TabType = 'overview' | 'pods' | 'yaml' | 'events';
@@ -17,6 +22,8 @@ type TabType = 'overview' | 'pods' | 'yaml' | 'events';
 export default function DaemonSetDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [isEditingYaml, setIsEditingYaml] = useState(false);
+  const [editedYaml, setEditedYaml] = useState('');
   const queryClient = useQueryClient();
 
   // 获取 DaemonSet 详情
@@ -33,19 +40,18 @@ export default function DaemonSetDetail() {
     enabled: !!namespace && !!name && activeTab === 'yaml',
   });
 
-  // 获取关联的 Pods（通过标签选择器过滤）
+  // 获取关联的 Pods（使用后端 API）
   const { data: podsData } = useQuery({
     queryKey: ['daemonset-pods', namespace, name],
-    queryFn: async () => {
-      const allPods = await podApi.list(namespace!);
-      // 根据 ownerReferences 或标签过滤 DaemonSet 的 Pods
-      const filteredPods = allPods.items.filter(pod => {
-        const ownerRefs = pod.metadata.ownerReferences || [];
-        return ownerRefs.some(ref => ref.kind === 'DaemonSet' && ref.name === name);
-      });
-      return { items: filteredPods };
-    },
+    queryFn: () => daemonSetApi.getPods(namespace!, name!),
     enabled: !!namespace && !!name && activeTab === 'pods',
+  });
+
+  // 获取事件
+  const { data: eventsData } = useQuery({
+    queryKey: ['daemonset-events', namespace, name],
+    queryFn: () => daemonSetApi.getEvents(namespace!, name!),
+    enabled: !!namespace && !!name && activeTab === 'events',
   });
 
   // 删除 DaemonSet
@@ -54,6 +60,24 @@ export default function DaemonSetDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daemonsets'] });
       window.history.back();
+    },
+  });
+
+  // 重启 DaemonSet
+  const restartMutation = useMutation({
+    mutationFn: () => daemonSetApi.restart(namespace!, name!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daemonset', namespace, name] });
+    },
+  });
+
+  // 更新 YAML
+  const updateYamlMutation = useMutation({
+    mutationFn: (yaml: string) => daemonSetApi.updateYaml(namespace!, name!, yaml),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daemonset', namespace, name] });
+      queryClient.invalidateQueries({ queryKey: ['daemonset-yaml', namespace, name] });
+      setIsEditingYaml(false);
     },
   });
 
@@ -108,6 +132,18 @@ export default function DaemonSetDetail() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
+              if (confirm('确定要重启此 DaemonSet 吗？')) {
+                restartMutation.mutate();
+              }
+            }}
+            className="btn btn-secondary"
+            disabled={restartMutation.isPending}
+          >
+            <ArrowPathIcon className={clsx('w-4 h-4 mr-2', restartMutation.isPending && 'animate-spin')} />
+            重启
+          </button>
+          <button
+            onClick={() => {
               if (confirm('确定要删除此 DaemonSet 吗？')) {
                 deleteMutation.mutate();
               }
@@ -143,17 +179,38 @@ export default function DaemonSetDetail() {
 
       {/* 标签页内容 */}
       <div>
-        {activeTab === 'overview' && <OverviewTab daemonSet={daemonSet} />}
+        {activeTab === 'overview' && <OverviewTab daemonSet={daemonSet} namespace={namespace!} name={name!} />}
         {activeTab === 'pods' && <PodsTab pods={podsData?.items || []} namespace={namespace!} />}
-        {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-        {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
+        {activeTab === 'yaml' && (
+          <YamlTab
+            yaml={yamlData || ''}
+            isEditing={isEditingYaml}
+            editedYaml={editedYaml}
+            onStartEdit={() => {
+              setEditedYaml(yamlData || '');
+              setIsEditingYaml(true);
+            }}
+            onCancelEdit={() => setIsEditingYaml(false)}
+            onSaveEdit={() => updateYamlMutation.mutate(editedYaml)}
+            onYamlChange={setEditedYaml}
+            isSaving={updateYamlMutation.isPending}
+          />
+        )}
+        {activeTab === 'events' && <EventsTab events={eventsData?.items || []} />}
       </div>
     </div>
   );
 }
 
 // 概览标签页
-function OverviewTab({ daemonSet }: { daemonSet: DaemonSet }) {
+function OverviewTab({ daemonSet, namespace, name }: { daemonSet: DaemonSet; namespace: string; name: string }) {
+  // 获取更新策略
+  const currentStrategy = {
+    type: (daemonSet.spec.updateStrategy?.type || 'RollingUpdate') as 'RollingUpdate' | 'OnDelete',
+    maxUnavailable: daemonSet.spec.updateStrategy?.rollingUpdate?.maxUnavailable?.toString() || '1',
+    maxSurge: daemonSet.spec.updateStrategy?.rollingUpdate?.maxSurge?.toString(),
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 基本信息 */}
@@ -161,7 +218,7 @@ function OverviewTab({ daemonSet }: { daemonSet: DaemonSet }) {
         <h3 className="text-lg font-semibold text-white mb-4">基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={daemonSet.metadata.name} />
-          <InfoRow label="命名空间" value={daemonSet.metadata.namespace} />
+          <InfoRow label="命名空间" value={daemonSet.metadata.namespace || '-'} />
           <InfoRow label="UID" value={daemonSet.metadata.uid} mono />
           <InfoRow
             label="创建时间"
@@ -186,6 +243,16 @@ function OverviewTab({ daemonSet }: { daemonSet: DaemonSet }) {
           <InfoRow label="错误调度" value={`${daemonSet.status.numberMisscheduled || 0}`} />
           <InfoRow label="观察代数" value={`${daemonSet.status.observedGeneration || 0}`} />
         </dl>
+      </div>
+
+      {/* 更新策略编辑器 */}
+      <div className="lg:col-span-2">
+        <UpdateStrategyEditor
+          namespace={namespace}
+          name={name}
+          resourceType="DaemonSet"
+          currentStrategy={currentStrategy}
+        />
       </div>
 
       {/* 标签 */}
@@ -404,31 +471,119 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
 }
 
 // YAML 标签页
-function YamlTab({ yaml }: { yaml: string }) {
+function YamlTab({
+  yaml,
+  isEditing,
+  editedYaml,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onYamlChange,
+  isSaving,
+}: {
+  yaml: string;
+  isEditing: boolean;
+  editedYaml: string;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onYamlChange: (yaml: string) => void;
+  isSaving: boolean;
+}) {
   const copyYaml = () => {
-    navigator.clipboard.writeText(yaml);
+    navigator.clipboard.writeText(isEditing ? editedYaml : yaml);
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={copyYaml} className="btn btn-secondary">
-          <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
-          复制 YAML
-        </button>
+      <div className="flex justify-end gap-2">
+        {isEditing ? (
+          <>
+            <button onClick={onCancelEdit} className="btn btn-secondary" disabled={isSaving}>
+              <XMarkIcon className="w-4 h-4 mr-2" />
+              取消
+            </button>
+            <button onClick={onSaveEdit} className="btn btn-primary" disabled={isSaving}>
+              <CheckIcon className="w-4 h-4 mr-2" />
+              {isSaving ? '保存中...' : '保存'}
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={copyYaml} className="btn btn-secondary">
+              <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
+              复制 YAML
+            </button>
+            <button onClick={onStartEdit} className="btn btn-primary">
+              <PencilSquareIcon className="w-4 h-4 mr-2" />
+              编辑
+            </button>
+          </>
+        )}
       </div>
       <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+        {isEditing ? (
+          <textarea
+            value={editedYaml}
+            onChange={(e) => onYamlChange(e.target.value)}
+            className="w-full h-[500px] bg-transparent text-sm text-slate-300 font-mono resize-none focus:outline-none"
+            spellCheck={false}
+          />
+        ) : (
+          <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+        )}
       </div>
     </div>
   );
 }
 
 // 事件标签页
-function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+function EventsTab({ events }: { events: Event[] }) {
   return (
-    <div className="card p-6 text-center">
-      <p className="text-slate-400">事件功能正在开发中...</p>
+    <div className="card overflow-hidden">
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>类型</th>
+              <th>原因</th>
+              <th>消息</th>
+              <th>次数</th>
+              <th>最后发生时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((event, index) => (
+              <tr key={event.metadata.uid || index}>
+                <td>
+                  <span
+                    className={clsx(
+                      'badge',
+                      event.type === 'Warning' ? 'badge-warning' : 'badge-success'
+                    )}
+                  >
+                    {event.type}
+                  </span>
+                </td>
+                <td className="text-slate-300">{event.reason}</td>
+                <td className="text-slate-400 max-w-md truncate">{event.message}</td>
+                <td className="text-slate-400">{event.count || 1}</td>
+                <td className="text-slate-400">
+                  {event.lastTimestamp
+                    ? formatDistanceToNow(new Date(event.lastTimestamp), {
+                        addSuffix: true,
+                        locale: zhCN,
+                      })
+                    : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {events.length === 0 && (
+        <div className="text-center py-12 text-slate-400">暂无事件</div>
+      )}
     </div>
   );
 }

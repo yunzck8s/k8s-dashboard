@@ -34,6 +34,16 @@ export interface PodSpec {
   serviceAccountName?: string;
   restartPolicy?: string;
   volumes?: Volume[];
+  nodeSelector?: Record<string, string>;
+  tolerations?: Toleration[];
+}
+
+export interface Toleration {
+  key?: string;
+  operator?: string;
+  value?: string;
+  effect?: string;
+  tolerationSeconds?: number;
 }
 
 export interface Container {
@@ -45,6 +55,7 @@ export interface Container {
   volumeMounts?: VolumeMount[];
   command?: string[];
   args?: string[];
+  imagePullPolicy?: string;
 }
 
 export interface ContainerPort {
@@ -137,6 +148,7 @@ export interface PodStatus {
   startTime?: string;
   containerStatuses?: ContainerStatus[];
   initContainerStatuses?: ContainerStatus[];
+  qosClass?: string;
 }
 
 export type PodPhase = 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown';
@@ -198,6 +210,7 @@ export interface DeploymentSpec {
   strategy?: DeploymentStrategy;
   minReadySeconds?: number;
   revisionHistoryLimit?: number;
+  paused?: boolean;
 }
 
 export interface LabelSelector {
@@ -278,6 +291,17 @@ export interface StatefulSetStatus {
   currentReplicas?: number;
   updatedReplicas?: number;
   availableReplicas?: number;
+  currentRevision?: string;
+  updateRevision?: string;
+  conditions?: StatefulSetCondition[];
+}
+
+export interface StatefulSetCondition {
+  type: string;
+  status: string;
+  lastTransitionTime?: string;
+  reason?: string;
+  message?: string;
 }
 
 // DaemonSet 相关类型
@@ -313,6 +337,15 @@ export interface DaemonSetStatus {
   updatedNumberScheduled?: number;
   numberAvailable?: number;
   numberUnavailable?: number;
+  conditions?: DaemonSetCondition[];
+}
+
+export interface DaemonSetCondition {
+  type: string;
+  status: string;
+  lastTransitionTime?: string;
+  reason?: string;
+  message?: string;
 }
 
 // Job 相关类型

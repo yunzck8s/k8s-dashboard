@@ -32,7 +32,7 @@ export default function PodTerminal({ namespace, name, container }: PodTerminalP
         foreground: '#e2e8f0',
         cursor: '#f8fafc',
         cursorAccent: '#1e293b',
-        selection: 'rgba(59, 130, 246, 0.3)',
+        selectionBackground: 'rgba(59, 130, 246, 0.3)',
         black: '#1e293b',
         red: '#ef4444',
         green: '#22c55e',

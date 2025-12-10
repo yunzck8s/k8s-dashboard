@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { replicaSetApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { formatDistanceToNow } from 'date-fns';

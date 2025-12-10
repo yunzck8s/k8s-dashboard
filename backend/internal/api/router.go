@@ -104,6 +104,13 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.POST("/namespaces/:ns/deployments/:name/restart", h.RestartDeployment)
 		v1.POST("/namespaces/:ns/deployments/:name/rollback", h.RollbackDeployment)
 		v1.GET("/namespaces/:ns/deployments/:name/pods", h.GetDeploymentPods)
+		v1.GET("/namespaces/:ns/deployments/:name/events", h.GetDeploymentEvents)
+		v1.PUT("/namespaces/:ns/deployments/:name/strategy", h.UpdateDeploymentStrategy)
+		v1.GET("/namespaces/:ns/deployments/:name/revisions", h.GetDeploymentRevisions)
+		v1.POST("/namespaces/:ns/deployments/:name/pause", h.PauseDeployment)
+		v1.POST("/namespaces/:ns/deployments/:name/resume", h.ResumeDeployment)
+		v1.PUT("/namespaces/:ns/deployments/:name/image", h.UpdateDeploymentImage)
+		v1.PUT("/namespaces/:ns/deployments/:name/scheduling", h.UpdateDeploymentScheduling)
 
 		// StatefulSets
 		v1.GET("/statefulsets", h.ListAllStatefulSets)
@@ -111,7 +118,14 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.GET("/namespaces/:ns/statefulsets/:name", h.GetStatefulSet)
 		v1.DELETE("/namespaces/:ns/statefulsets/:name", h.DeleteStatefulSet)
 		v1.GET("/namespaces/:ns/statefulsets/:name/yaml", h.GetStatefulSetYAML)
+		v1.PUT("/namespaces/:ns/statefulsets/:name/yaml", h.UpdateStatefulSetYAML)
 		v1.POST("/namespaces/:ns/statefulsets/:name/scale", h.ScaleStatefulSet)
+		v1.POST("/namespaces/:ns/statefulsets/:name/restart", h.RestartStatefulSet)
+		v1.GET("/namespaces/:ns/statefulsets/:name/pods", h.GetStatefulSetPods)
+		v1.GET("/namespaces/:ns/statefulsets/:name/events", h.GetStatefulSetEvents)
+		v1.PUT("/namespaces/:ns/statefulsets/:name/strategy", h.UpdateStatefulSetStrategy)
+		v1.GET("/namespaces/:ns/statefulsets/:name/revisions", h.GetStatefulSetRevisions)
+		v1.POST("/namespaces/:ns/statefulsets/:name/rollback", h.RollbackStatefulSet)
 
 		// DaemonSets
 		v1.GET("/daemonsets", h.ListAllDaemonSets)
@@ -119,6 +133,11 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.GET("/namespaces/:ns/daemonsets/:name", h.GetDaemonSet)
 		v1.DELETE("/namespaces/:ns/daemonsets/:name", h.DeleteDaemonSet)
 		v1.GET("/namespaces/:ns/daemonsets/:name/yaml", h.GetDaemonSetYAML)
+		v1.PUT("/namespaces/:ns/daemonsets/:name/yaml", h.UpdateDaemonSetYAML)
+		v1.POST("/namespaces/:ns/daemonsets/:name/restart", h.RestartDaemonSet)
+		v1.GET("/namespaces/:ns/daemonsets/:name/pods", h.GetDaemonSetPods)
+		v1.GET("/namespaces/:ns/daemonsets/:name/events", h.GetDaemonSetEvents)
+		v1.PUT("/namespaces/:ns/daemonsets/:name/strategy", h.UpdateDaemonSetStrategy)
 
 		// Jobs
 		v1.GET("/jobs", h.ListAllJobs)

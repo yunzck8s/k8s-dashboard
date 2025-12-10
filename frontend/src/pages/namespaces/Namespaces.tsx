@@ -126,8 +126,8 @@ export default function Namespaces() {
                       </Link>
                     </td>
                     <td>
-                      <span className={clsx('badge', getStatusColor(ns.status.phase))}>
-                        {ns.status.phase || 'Unknown'}
+                      <span className={clsx('badge', getStatusColor(ns.status?.phase))}>
+                        {ns.status?.phase || 'Unknown'}
                       </span>
                     </td>
                     <td className="text-slate-400 max-w-xs truncate" title={labels}>
@@ -145,7 +145,7 @@ export default function Namespaces() {
                       })}
                     </td>
                     <td>
-                      {!isSystemNamespace(ns) && ns.status.phase !== 'Terminating' && (
+                      {!isSystemNamespace(ns) && ns.status?.phase !== 'Terminating' && (
                         <button
                           onClick={() => handleDelete(ns)}
                           disabled={deleteMutation.isPending}

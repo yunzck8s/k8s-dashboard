@@ -5,7 +5,6 @@ import { useAppStore } from '../../../store';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
-import type { StatefulSet } from '../../../types';
 
 export default function StatefulSets() {
   const { currentNamespace } = useAppStore();

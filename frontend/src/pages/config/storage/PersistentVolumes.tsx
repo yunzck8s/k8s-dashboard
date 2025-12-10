@@ -129,8 +129,8 @@ export default function PersistentVolumes() {
                     {pv.metadata.name}
                   </td>
                   <td>
-                    <span className={clsx('badge', getStatusColor(pv.status.phase))}>
-                      {pv.status.phase || 'Unknown'}
+                    <span className={clsx('badge', getStatusColor(pv.status?.phase))}>
+                      {pv.status?.phase || 'Unknown'}
                     </span>
                   </td>
                   <td className="text-slate-400">

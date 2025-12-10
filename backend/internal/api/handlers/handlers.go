@@ -22,6 +22,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/yaml"
@@ -1941,4 +1942,654 @@ func (h *Handler) GetAuditStats(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, stats)
+}
+
+// ========== StatefulSet 高级功能 ==========
+
+// RestartStatefulSet 重启 StatefulSet
+func (h *Handler) RestartStatefulSet(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 添加重启注解
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = make(map[string]string)
+	}
+	sts.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+
+	_, err = h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "restarted"})
+}
+
+// UpdateStatefulSetYAML 通过 YAML 更新 StatefulSet
+func (h *Handler) UpdateStatefulSetYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+
+	var req struct {
+		YAML string `json:"yaml"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var sts appsv1.StatefulSet
+	if err := yaml.Unmarshal([]byte(req.YAML), &sts); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, &sts, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// GetStatefulSetPods 获取 StatefulSet 关联的 Pods
+func (h *Handler) GetStatefulSetPods(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	selector := labels.Set(sts.Spec.Selector.MatchLabels).AsSelector()
+	pods, err := h.k8s.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: pods.Items, Total: len(pods.Items)})
+}
+
+// GetStatefulSetEvents 获取 StatefulSet 相关事件
+func (h *Handler) GetStatefulSetEvents(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=StatefulSet", name, namespace)
+	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fieldSelector,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: events.Items, Total: len(events.Items)})
+}
+
+// ========== DaemonSet 高级功能 ==========
+
+// RestartDaemonSet 重启 DaemonSet
+func (h *Handler) RestartDaemonSet(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 添加重启注解
+	if ds.Spec.Template.Annotations == nil {
+		ds.Spec.Template.Annotations = make(map[string]string)
+	}
+	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
+
+	_, err = h.k8s.Clientset.AppsV1().DaemonSets(namespace).Update(ctx, ds, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "restarted"})
+}
+
+// UpdateDaemonSetYAML 通过 YAML 更新 DaemonSet
+func (h *Handler) UpdateDaemonSetYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+
+	var req struct {
+		YAML string `json:"yaml"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var ds appsv1.DaemonSet
+	if err := yaml.Unmarshal([]byte(req.YAML), &ds); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Update(ctx, &ds, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// GetDaemonSetPods 获取 DaemonSet 关联的 Pods
+func (h *Handler) GetDaemonSetPods(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	selector := labels.Set(ds.Spec.Selector.MatchLabels).AsSelector()
+	pods, err := h.k8s.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: pods.Items, Total: len(pods.Items)})
+}
+
+// GetDaemonSetEvents 获取 DaemonSet 相关事件
+func (h *Handler) GetDaemonSetEvents(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=DaemonSet", name, namespace)
+	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fieldSelector,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: events.Items, Total: len(events.Items)})
+}
+
+// ========== Deployment 事件 ==========
+
+// GetDeploymentEvents 获取 Deployment 相关事件
+func (h *Handler) GetDeploymentEvents(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=Deployment", name, namespace)
+	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fieldSelector,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: events.Items, Total: len(events.Items)})
+}
+
+// ========== 阶段 2: 运维增强功能 ==========
+
+// UpdateDeploymentStrategy 更新 Deployment 滚动更新策略
+func (h *Handler) UpdateDeploymentStrategy(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		Type           string `json:"type"`           // RollingUpdate 或 Recreate
+		MaxUnavailable string `json:"maxUnavailable"` // 可以是数字或百分比
+		MaxSurge       string `json:"maxSurge"`       // 可以是数字或百分比
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 更新策略类型
+	if req.Type != "" {
+		dep.Spec.Strategy.Type = appsv1.DeploymentStrategyType(req.Type)
+	}
+
+	// 如果是 RollingUpdate，更新参数
+	if dep.Spec.Strategy.Type == appsv1.RollingUpdateDeploymentStrategyType {
+		if dep.Spec.Strategy.RollingUpdate == nil {
+			dep.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{}
+		}
+		if req.MaxUnavailable != "" {
+			val := intstr.Parse(req.MaxUnavailable)
+			dep.Spec.Strategy.RollingUpdate.MaxUnavailable = &val
+		}
+		if req.MaxSurge != "" {
+			val := intstr.Parse(req.MaxSurge)
+			dep.Spec.Strategy.RollingUpdate.MaxSurge = &val
+		}
+	}
+
+	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// UpdateStatefulSetStrategy 更新 StatefulSet 滚动更新策略
+func (h *Handler) UpdateStatefulSetStrategy(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		Type      string `json:"type"`      // RollingUpdate 或 OnDelete
+		Partition int32  `json:"partition"` // 分区值
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 更新策略类型
+	if req.Type != "" {
+		sts.Spec.UpdateStrategy.Type = appsv1.StatefulSetUpdateStrategyType(req.Type)
+	}
+
+	// 如果是 RollingUpdate，更新 partition
+	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
+		if sts.Spec.UpdateStrategy.RollingUpdate == nil {
+			sts.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+		}
+		sts.Spec.UpdateStrategy.RollingUpdate.Partition = &req.Partition
+	}
+
+	result, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// UpdateDaemonSetStrategy 更新 DaemonSet 滚动更新策略
+func (h *Handler) UpdateDaemonSetStrategy(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		Type           string `json:"type"`           // RollingUpdate 或 OnDelete
+		MaxUnavailable string `json:"maxUnavailable"` // 可以是数字或百分比
+		MaxSurge       string `json:"maxSurge"`       // 可以是数字或百分比
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 更新策略类型
+	if req.Type != "" {
+		ds.Spec.UpdateStrategy.Type = appsv1.DaemonSetUpdateStrategyType(req.Type)
+	}
+
+	// 如果是 RollingUpdate，更新参数
+	if ds.Spec.UpdateStrategy.Type == appsv1.RollingUpdateDaemonSetStrategyType {
+		if ds.Spec.UpdateStrategy.RollingUpdate == nil {
+			ds.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateDaemonSet{}
+		}
+		if req.MaxUnavailable != "" {
+			val := intstr.Parse(req.MaxUnavailable)
+			ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &val
+		}
+		if req.MaxSurge != "" {
+			val := intstr.Parse(req.MaxSurge)
+			ds.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &val
+		}
+	}
+
+	result, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Update(ctx, ds, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// GetStatefulSetRevisions 获取 StatefulSet 修订版本历史
+func (h *Handler) GetStatefulSetRevisions(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取 ControllerRevisions
+	selector := labels.Set(sts.Spec.Selector.MatchLabels).AsSelector()
+	revisions, err := h.k8s.Clientset.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 过滤出属于这个 StatefulSet 的修订版本
+	var stsRevisions []map[string]interface{}
+	for _, rev := range revisions.Items {
+		for _, ref := range rev.OwnerReferences {
+			if ref.Kind == "StatefulSet" && ref.Name == name {
+				stsRevisions = append(stsRevisions, map[string]interface{}{
+					"name":       rev.Name,
+					"revision":   rev.Revision,
+					"created":    rev.CreationTimestamp,
+					"isCurrent":  rev.Name == sts.Status.CurrentRevision,
+					"isUpdate":   rev.Name == sts.Status.UpdateRevision,
+				})
+				break
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items":           stsRevisions,
+		"total":           len(stsRevisions),
+		"currentRevision": sts.Status.CurrentRevision,
+		"updateRevision":  sts.Status.UpdateRevision,
+	})
+}
+
+// RollbackStatefulSet 回滚 StatefulSet 到指定版本
+func (h *Handler) RollbackStatefulSet(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		Revision int64 `json:"revision"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 获取目标版本的 ControllerRevision
+	selector := labels.Set(sts.Spec.Selector.MatchLabels).AsSelector()
+	revisions, err := h.k8s.Clientset.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var targetRevision *appsv1.ControllerRevision
+	for i := range revisions.Items {
+		rev := &revisions.Items[i]
+		if rev.Revision == req.Revision {
+			for _, ref := range rev.OwnerReferences {
+				if ref.Kind == "StatefulSet" && ref.Name == name {
+					targetRevision = rev
+					break
+				}
+			}
+		}
+	}
+
+	if targetRevision == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "revision not found"})
+		return
+	}
+
+	// 解析 ControllerRevision 中的 StatefulSet spec
+	var patchedSts appsv1.StatefulSet
+	if err := yaml.Unmarshal(targetRevision.Data.Raw, &patchedSts); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse revision data"})
+		return
+	}
+
+	// 更新 StatefulSet 的 Pod 模板
+	sts.Spec.Template = patchedSts.Spec.Template
+	result, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "rolled back", "statefulset": result})
+}
+
+// PauseDeployment 暂停 Deployment 更新
+func (h *Handler) PauseDeployment(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if dep.Spec.Paused {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment is already paused"})
+		return
+	}
+
+	dep.Spec.Paused = true
+	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "paused", "deployment": result})
+}
+
+// ResumeDeployment 恢复 Deployment 更新
+func (h *Handler) ResumeDeployment(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !dep.Spec.Paused {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "deployment is not paused"})
+		return
+	}
+
+	dep.Spec.Paused = false
+	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "resumed", "deployment": result})
+}
+
+// GetDeploymentRevisions 获取 Deployment 修订版本历史
+func (h *Handler) GetDeploymentRevisions(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(dep.Spec.Selector)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rsList, err := h.k8s.Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var revisions []map[string]interface{}
+	for _, rs := range rsList.Items {
+		// 检查是否属于这个 Deployment
+		isOwned := false
+		for _, ref := range rs.OwnerReferences {
+			if ref.Kind == "Deployment" && ref.Name == name {
+				isOwned = true
+				break
+			}
+		}
+		if !isOwned {
+			continue
+		}
+
+		revision := rs.Annotations["deployment.kubernetes.io/revision"]
+		revisions = append(revisions, map[string]interface{}{
+			"name":       rs.Name,
+			"revision":   revision,
+			"replicas":   rs.Status.Replicas,
+			"ready":      rs.Status.ReadyReplicas,
+			"created":    rs.CreationTimestamp,
+			"image":      rs.Spec.Template.Spec.Containers[0].Image,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": revisions,
+		"total": len(revisions),
+	})
+}
+
+// UpdateDeploymentImage 更新 Deployment 容器镜像
+func (h *Handler) UpdateDeploymentImage(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		Containers []struct {
+			Name  string `json:"name"`
+			Image string `json:"image"`
+		} `json:"containers"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 更新容器镜像
+	for _, container := range req.Containers {
+		for i := range dep.Spec.Template.Spec.Containers {
+			if dep.Spec.Template.Spec.Containers[i].Name == container.Name {
+				dep.Spec.Template.Spec.Containers[i].Image = container.Image
+				break
+			}
+		}
+	}
+
+	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "镜像更新成功"})
+}
+
+// UpdateDeploymentScheduling 更新 Deployment 调度配置
+func (h *Handler) UpdateDeploymentScheduling(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		NodeSelector map[string]string `json:"nodeSelector"`
+		Tolerations  []corev1.Toleration `json:"tolerations"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 更新调度配置
+	dep.Spec.Template.Spec.NodeSelector = req.NodeSelector
+	dep.Spec.Template.Spec.Tolerations = req.Tolerations
+
+	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "调度配置更新成功"})
 }

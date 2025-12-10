@@ -1,17 +1,15 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { podApi, eventApi } from '../../../api';
+import { podApi } from '../../../api';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
-import type { Pod, Event, ContainerStatus, PodPhase } from '../../../types';
+import type { Pod, Event, PodPhase } from '../../../types';
 import PodTerminal from '../../../components/terminal/PodTerminal';
 import {
   ArrowLeftIcon,
   TrashIcon,
-  DocumentTextIcon,
-  CommandLineIcon,
   ArrowPathIcon,
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
@@ -220,7 +218,7 @@ function OverviewTab({ pod }: { pod: Pod }) {
         <h3 className="text-lg font-semibold text-white mb-4">基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={pod.metadata.name} />
-          <InfoRow label="命名空间" value={pod.metadata.namespace} />
+          <InfoRow label="命名空间" value={pod.metadata.namespace || '-'} />
           <InfoRow label="UID" value={pod.metadata.uid} mono />
           <InfoRow
             label="创建时间"
@@ -233,7 +231,7 @@ function OverviewTab({ pod }: { pod: Pod }) {
           <InfoRow label="Pod IP" value={pod.status.podIP || '-'} mono />
           <InfoRow label="Host IP" value={pod.status.hostIP || '-'} mono />
           <InfoRow label="QoS 等级" value={pod.status.qosClass || '-'} />
-          <InfoRow label="重启策略" value={pod.spec.restartPolicy} />
+          <InfoRow label="重启策略" value={pod.spec.restartPolicy || '-'} />
           <InfoRow label="服务账户" value={pod.spec.serviceAccountName || 'default'} />
         </dl>
       </div>

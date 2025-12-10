@@ -62,7 +62,7 @@ export default function Ingresses() {
 
   // 获取 Address
   const getAddress = (ingress: Ingress) => {
-    const addresses = ingress.status.loadBalancer?.ingress
+    const addresses = ingress.status?.loadBalancer?.ingress
       ?.map((i) => i.ip || i.hostname)
       .filter(Boolean);
     return addresses?.join(', ') || '-';

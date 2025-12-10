@@ -139,7 +139,7 @@ export default function CronJobs() {
                         <button
                           onClick={() =>
                             triggerMutation.mutate({
-                              namespace: cronJob.metadata.namespace,
+                              namespace: cronJob.metadata.namespace!,
                               name: cronJob.metadata.name,
                             })
                           }
@@ -151,7 +151,7 @@ export default function CronJobs() {
                         <button
                           onClick={() =>
                             suspendMutation.mutate({
-                              namespace: cronJob.metadata.namespace,
+                              namespace: cronJob.metadata.namespace!,
                               name: cronJob.metadata.name,
                               suspend: !isSuspended,
                             })

@@ -113,9 +113,21 @@ export const deploymentApi = {
   updateYaml: (namespace: string, name: string, yaml: string) =>
     put<void>(`/namespaces/${namespace}/deployments/${name}/yaml`, { yaml }),
   getRevisions: (namespace: string, name: string) =>
-    get<ReplicaSet[]>(`/namespaces/${namespace}/deployments/${name}/revisions`),
+    get<{ items: Array<{ name: string; revision: string; replicas: number; ready: number; created: string; image: string }> }>(`/namespaces/${namespace}/deployments/${name}/revisions`),
   getPods: (namespace: string, name: string) =>
     get<ListResponse<Pod>>(`/namespaces/${namespace}/deployments/${name}/pods`),
+  getEvents: (namespace: string, name: string) =>
+    get<ListResponse<Event>>(`/namespaces/${namespace}/deployments/${name}/events`),
+  updateStrategy: (namespace: string, name: string, strategy: { type: string; maxUnavailable?: string; maxSurge?: string }) =>
+    put<void>(`/namespaces/${namespace}/deployments/${name}/strategy`, strategy),
+  pause: (namespace: string, name: string) =>
+    post<void>(`/namespaces/${namespace}/deployments/${name}/pause`),
+  resume: (namespace: string, name: string) =>
+    post<void>(`/namespaces/${namespace}/deployments/${name}/resume`),
+  updateImage: (namespace: string, name: string, containers: Array<{ name: string; image: string }>) =>
+    put<void>(`/namespaces/${namespace}/deployments/${name}/image`, { containers }),
+  updateScheduling: (namespace: string, name: string, data: { nodeSelector?: Record<string, string>; tolerations?: Array<{ key?: string; operator?: string; value?: string; effect?: string }> }) =>
+    put<void>(`/namespaces/${namespace}/deployments/${name}/scheduling`, data),
 };
 
 // ============ StatefulSet ============
@@ -142,6 +154,14 @@ export const statefulSetApi = {
     put<void>(`/namespaces/${namespace}/statefulsets/${name}/yaml`, { yaml }),
   getPods: (namespace: string, name: string) =>
     get<ListResponse<Pod>>(`/namespaces/${namespace}/statefulsets/${name}/pods`),
+  getEvents: (namespace: string, name: string) =>
+    get<ListResponse<Event>>(`/namespaces/${namespace}/statefulsets/${name}/events`),
+  updateStrategy: (namespace: string, name: string, strategy: { type: string; partition?: number }) =>
+    put<void>(`/namespaces/${namespace}/statefulsets/${name}/strategy`, strategy),
+  getRevisions: (namespace: string, name: string) =>
+    get<{ items: Array<{ revision: number; name: string; createdAt: string; current: boolean }> }>(`/namespaces/${namespace}/statefulsets/${name}/revisions`),
+  rollback: (namespace: string, name: string, revision: number) =>
+    post<void>(`/namespaces/${namespace}/statefulsets/${name}/rollback`, { revision }),
 };
 
 // ============ DaemonSet ============
@@ -158,12 +178,18 @@ export const daemonSetApi = {
     put<DaemonSet>(`/namespaces/${namespace}/daemonsets/${name}`, data),
   delete: (namespace: string, name: string) =>
     del<void>(`/namespaces/${namespace}/daemonsets/${name}`),
+  restart: (namespace: string, name: string) =>
+    post<void>(`/namespaces/${namespace}/daemonsets/${name}/restart`),
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/daemonsets/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
     put<void>(`/namespaces/${namespace}/daemonsets/${name}/yaml`, { yaml }),
   getPods: (namespace: string, name: string) =>
     get<ListResponse<Pod>>(`/namespaces/${namespace}/daemonsets/${name}/pods`),
+  getEvents: (namespace: string, name: string) =>
+    get<ListResponse<Event>>(`/namespaces/${namespace}/daemonsets/${name}/events`),
+  updateStrategy: (namespace: string, name: string, strategy: { type: string; maxUnavailable?: string; maxSurge?: string }) =>
+    put<void>(`/namespaces/${namespace}/daemonsets/${name}/strategy`, strategy),
 };
 
 // ============ Job ============

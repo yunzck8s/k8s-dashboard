@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { statefulSetApi, podApi } from '../../../api';
+import { statefulSetApi } from '../../../api';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
-import type { StatefulSet, Pod } from '../../../types';
+import type { StatefulSet, Pod, Event } from '../../../types';
+import UpdateStrategyEditor from '../../../components/workloads/UpdateStrategyEditor';
+import RevisionHistory from '../../../components/workloads/RevisionHistory';
 import {
   ArrowLeftIcon,
   TrashIcon,
   ClipboardDocumentIcon,
   PlusIcon,
   MinusIcon,
+  ArrowPathIcon,
+  PencilSquareIcon,
+  CheckIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 type TabType = 'overview' | 'pods' | 'yaml' | 'events';
@@ -21,6 +27,8 @@ export default function StatefulSetDetail() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showScaleModal, setShowScaleModal] = useState(false);
   const [newReplicas, setNewReplicas] = useState(0);
+  const [isEditingYaml, setIsEditingYaml] = useState(false);
+  const [editedYaml, setEditedYaml] = useState('');
   const queryClient = useQueryClient();
 
   // 获取 StatefulSet 详情
@@ -37,18 +45,18 @@ export default function StatefulSetDetail() {
     enabled: !!namespace && !!name && activeTab === 'yaml',
   });
 
-  // 获取关联的 Pods（通过标签选择器过滤）
+  // 获取关联的 Pods（使用后端 API）
   const { data: podsData } = useQuery({
     queryKey: ['statefulset-pods', namespace, name],
-    queryFn: async () => {
-      const allPods = await podApi.list(namespace!);
-      // 根据 StatefulSet 名称过滤 Pods
-      const filteredPods = allPods.items.filter(pod =>
-        pod.metadata.name.startsWith(name! + '-')
-      );
-      return { items: filteredPods };
-    },
+    queryFn: () => statefulSetApi.getPods(namespace!, name!),
     enabled: !!namespace && !!name && activeTab === 'pods',
+  });
+
+  // 获取事件
+  const { data: eventsData } = useQuery({
+    queryKey: ['statefulset-events', namespace, name],
+    queryFn: () => statefulSetApi.getEvents(namespace!, name!),
+    enabled: !!namespace && !!name && activeTab === 'events',
   });
 
   // 删除 StatefulSet
@@ -60,6 +68,14 @@ export default function StatefulSetDetail() {
     },
   });
 
+  // 重启 StatefulSet
+  const restartMutation = useMutation({
+    mutationFn: () => statefulSetApi.restart(namespace!, name!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['statefulset', namespace, name] });
+    },
+  });
+
   // 扩缩容
   const scaleMutation = useMutation({
     mutationFn: (replicas: number) =>
@@ -67,6 +83,16 @@ export default function StatefulSetDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['statefulset', namespace, name] });
       setShowScaleModal(false);
+    },
+  });
+
+  // 更新 YAML
+  const updateYamlMutation = useMutation({
+    mutationFn: (yaml: string) => statefulSetApi.updateYaml(namespace!, name!, yaml),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['statefulset', namespace, name] });
+      queryClient.invalidateQueries({ queryKey: ['statefulset-yaml', namespace, name] });
+      setIsEditingYaml(false);
     },
   });
 
@@ -130,6 +156,18 @@ export default function StatefulSetDetail() {
           </button>
           <button
             onClick={() => {
+              if (confirm('确定要重启此 StatefulSet 吗？')) {
+                restartMutation.mutate();
+              }
+            }}
+            className="btn btn-secondary"
+            disabled={restartMutation.isPending}
+          >
+            <ArrowPathIcon className={clsx('w-4 h-4 mr-2', restartMutation.isPending && 'animate-spin')} />
+            重启
+          </button>
+          <button
+            onClick={() => {
               if (confirm('确定要删除此 StatefulSet 吗？')) {
                 deleteMutation.mutate();
               }
@@ -165,10 +203,24 @@ export default function StatefulSetDetail() {
 
       {/* 标签页内容 */}
       <div>
-        {activeTab === 'overview' && <OverviewTab statefulSet={statefulSet} />}
+        {activeTab === 'overview' && <OverviewTab statefulSet={statefulSet} namespace={namespace!} name={name!} />}
         {activeTab === 'pods' && <PodsTab pods={podsData?.items || []} namespace={namespace!} />}
-        {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-        {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
+        {activeTab === 'yaml' && (
+          <YamlTab
+            yaml={yamlData || ''}
+            isEditing={isEditingYaml}
+            editedYaml={editedYaml}
+            onStartEdit={() => {
+              setEditedYaml(yamlData || '');
+              setIsEditingYaml(true);
+            }}
+            onCancelEdit={() => setIsEditingYaml(false)}
+            onSaveEdit={() => updateYamlMutation.mutate(editedYaml)}
+            onYamlChange={setEditedYaml}
+            isSaving={updateYamlMutation.isPending}
+          />
+        )}
+        {activeTab === 'events' && <EventsTab events={eventsData?.items || []} />}
       </div>
 
       {/* 扩缩容模态框 */}
@@ -220,7 +272,13 @@ export default function StatefulSetDetail() {
 }
 
 // 概览标签页
-function OverviewTab({ statefulSet }: { statefulSet: StatefulSet }) {
+function OverviewTab({ statefulSet, namespace, name }: { statefulSet: StatefulSet; namespace: string; name: string }) {
+  // 获取更新策略
+  const currentStrategy = {
+    type: (statefulSet.spec.updateStrategy?.type || 'RollingUpdate') as 'RollingUpdate' | 'OnDelete',
+    partition: statefulSet.spec.updateStrategy?.rollingUpdate?.partition ?? 0,
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 基本信息 */}
@@ -228,7 +286,7 @@ function OverviewTab({ statefulSet }: { statefulSet: StatefulSet }) {
         <h3 className="text-lg font-semibold text-white mb-4">基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={statefulSet.metadata.name} />
-          <InfoRow label="命名空间" value={statefulSet.metadata.namespace} />
+          <InfoRow label="命名空间" value={statefulSet.metadata.namespace || '-'} />
           <InfoRow label="UID" value={statefulSet.metadata.uid} mono />
           <InfoRow
             label="创建时间"
@@ -240,7 +298,6 @@ function OverviewTab({ statefulSet }: { statefulSet: StatefulSet }) {
           <InfoRow label="副本数" value={`${statefulSet.spec.replicas || 0}`} />
           <InfoRow label="服务名称" value={statefulSet.spec.serviceName || '-'} />
           <InfoRow label="Pod 管理策略" value={statefulSet.spec.podManagementPolicy || 'OrderedReady'} />
-          <InfoRow label="更新策略" value={statefulSet.spec.updateStrategy?.type || 'RollingUpdate'} />
         </dl>
       </div>
 
@@ -256,6 +313,25 @@ function OverviewTab({ statefulSet }: { statefulSet: StatefulSet }) {
           <InfoRow label="更新修订版本" value={statefulSet.status.updateRevision || '-'} />
           <InfoRow label="观察代数" value={`${statefulSet.status.observedGeneration || 0}`} />
         </dl>
+      </div>
+
+      {/* 更新策略编辑器 */}
+      <div className="lg:col-span-2">
+        <UpdateStrategyEditor
+          namespace={namespace}
+          name={name}
+          resourceType="StatefulSet"
+          currentStrategy={currentStrategy}
+        />
+      </div>
+
+      {/* 修订历史 */}
+      <div className="lg:col-span-2">
+        <RevisionHistory
+          namespace={namespace}
+          name={name}
+          resourceType="StatefulSet"
+        />
       </div>
 
       {/* 标签 */}
@@ -467,31 +543,119 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
 }
 
 // YAML 标签页
-function YamlTab({ yaml }: { yaml: string }) {
+function YamlTab({
+  yaml,
+  isEditing,
+  editedYaml,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onYamlChange,
+  isSaving,
+}: {
+  yaml: string;
+  isEditing: boolean;
+  editedYaml: string;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onYamlChange: (yaml: string) => void;
+  isSaving: boolean;
+}) {
   const copyYaml = () => {
-    navigator.clipboard.writeText(yaml);
+    navigator.clipboard.writeText(isEditing ? editedYaml : yaml);
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={copyYaml} className="btn btn-secondary">
-          <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
-          复制 YAML
-        </button>
+      <div className="flex justify-end gap-2">
+        {isEditing ? (
+          <>
+            <button onClick={onCancelEdit} className="btn btn-secondary" disabled={isSaving}>
+              <XMarkIcon className="w-4 h-4 mr-2" />
+              取消
+            </button>
+            <button onClick={onSaveEdit} className="btn btn-primary" disabled={isSaving}>
+              <CheckIcon className="w-4 h-4 mr-2" />
+              {isSaving ? '保存中...' : '保存'}
+            </button>
+          </>
+        ) : (
+          <>
+            <button onClick={copyYaml} className="btn btn-secondary">
+              <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
+              复制 YAML
+            </button>
+            <button onClick={onStartEdit} className="btn btn-primary">
+              <PencilSquareIcon className="w-4 h-4 mr-2" />
+              编辑
+            </button>
+          </>
+        )}
       </div>
       <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+        {isEditing ? (
+          <textarea
+            value={editedYaml}
+            onChange={(e) => onYamlChange(e.target.value)}
+            className="w-full h-[500px] bg-transparent text-sm text-slate-300 font-mono resize-none focus:outline-none"
+            spellCheck={false}
+          />
+        ) : (
+          <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+        )}
       </div>
     </div>
   );
 }
 
 // 事件标签页
-function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+function EventsTab({ events }: { events: Event[] }) {
   return (
-    <div className="card p-6 text-center">
-      <p className="text-slate-400">事件功能正在开发中...</p>
+    <div className="card overflow-hidden">
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>类型</th>
+              <th>原因</th>
+              <th>消息</th>
+              <th>次数</th>
+              <th>最后发生时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.map((event, index) => (
+              <tr key={event.metadata.uid || index}>
+                <td>
+                  <span
+                    className={clsx(
+                      'badge',
+                      event.type === 'Warning' ? 'badge-warning' : 'badge-success'
+                    )}
+                  >
+                    {event.type}
+                  </span>
+                </td>
+                <td className="text-slate-300">{event.reason}</td>
+                <td className="text-slate-400 max-w-md truncate">{event.message}</td>
+                <td className="text-slate-400">{event.count || 1}</td>
+                <td className="text-slate-400">
+                  {event.lastTimestamp
+                    ? formatDistanceToNow(new Date(event.lastTimestamp), {
+                        addSuffix: true,
+                        locale: zhCN,
+                      })
+                    : '-'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {events.length === 0 && (
+        <div className="text-center py-12 text-slate-400">暂无事件</div>
+      )}
     </div>
   );
 }

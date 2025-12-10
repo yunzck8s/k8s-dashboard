@@ -213,16 +213,6 @@ export default function Nodes() {
     return roles.length > 0 ? roles.join(', ') : 'worker';
   };
 
-  // 格式化内存
-  const formatMemory = (value?: string) => {
-    if (!value) return '-';
-    const ki = parseInt(value);
-    if (isNaN(ki)) return value;
-    if (ki > 1024 * 1024) return `${(ki / 1024 / 1024).toFixed(1)} Gi`;
-    if (ki > 1024) return `${(ki / 1024).toFixed(1)} Mi`;
-    return `${ki} Ki`;
-  };
-
   return (
     <div className="space-y-6">
       {/* 页面头部 */}
