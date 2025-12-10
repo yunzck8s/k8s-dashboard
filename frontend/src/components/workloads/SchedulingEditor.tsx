@@ -39,11 +39,11 @@ export default function SchedulingEditor({
     if (isOpen) {
       // 转换 nodeSelector 对象为数组形式便于编辑
       setEditedNodeSelector(
-        Object.entries(nodeSelector).map(([key, value]) => ({ key, value }))
+        Object.entries(nodeSelector || {}).map(([key, value]) => ({ key, value }))
       );
-      setEditedTolerations(tolerations.map(t => ({ ...t })));
+      setEditedTolerations((tolerations || []).map(t => ({ ...t })));
     }
-  }, [isOpen, nodeSelector, tolerations]);
+  }, [isOpen]); // 只依赖 isOpen，避免无限循环
 
   // 节点选择器操作
   const addNodeSelector = () => {
@@ -87,9 +87,23 @@ export default function SchedulingEditor({
         newNodeSelector[key.trim()] = value.trim();
       }
     });
+
+    // 清理 tolerations，移除空值字段
+    const cleanedTolerations = editedTolerations
+      .filter(t => t.key || t.operator === 'Exists')
+      .map(t => {
+        const cleaned: Toleration = {};
+        if (t.key) cleaned.key = t.key;
+        if (t.operator) cleaned.operator = t.operator;
+        if (t.operator !== 'Exists' && t.value) cleaned.value = t.value;
+        if (t.effect) cleaned.effect = t.effect;
+        if (t.tolerationSeconds !== undefined) cleaned.tolerationSeconds = t.tolerationSeconds;
+        return cleaned;
+      });
+
     onSave({
       nodeSelector: Object.keys(newNodeSelector).length > 0 ? newNodeSelector : undefined,
-      tolerations: editedTolerations.filter(t => t.key || t.operator === 'Exists'),
+      tolerations: cleanedTolerations.length > 0 ? cleanedTolerations : undefined,
     });
   };
 
@@ -148,8 +162,11 @@ export default function SchedulingEditor({
                   </p>
                   <button
                     type="button"
-                    onClick={addNodeSelector}
-                    className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
+                    onClick={() => {
+                      console.log('Adding node selector');
+                      addNodeSelector();
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
                   >
                     <PlusIcon className="w-4 h-4" />
                     添加
@@ -209,8 +226,11 @@ export default function SchedulingEditor({
                   </p>
                   <button
                     type="button"
-                    onClick={addToleration}
-                    className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
+                    onClick={() => {
+                      console.log('Adding toleration');
+                      addToleration();
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
                   >
                     <PlusIcon className="w-4 h-4" />
                     添加

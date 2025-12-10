@@ -113,6 +113,9 @@ export default function DeploymentDetail() {
       queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
       setShowEditImageModal(false);
     },
+    onError: (error: Error) => {
+      alert(`更新镜像失败: ${error.message}`);
+    },
   });
 
   // 更新调度配置
@@ -122,6 +125,9 @@ export default function DeploymentDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
       setShowSchedulingEditor(false);
+    },
+    onError: (error: Error) => {
+      alert(`更新调度配置失败: ${error.message}`);
     },
   });
 
