@@ -26,6 +26,29 @@ const phaseColors: Record<PodPhase, string> = {
   Unknown: 'badge-default',
 };
 
+// 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
+function getPodStatusColor(pod: Pod): string {
+  const phase = pod.status.phase;
+
+  // 对于 Running 状态，检查容器是否真的准备好
+  if (phase === 'Running') {
+    const containerStatuses = pod.status.containerStatuses ?? [];
+    const ready = containerStatuses.filter((cs) => cs.ready).length;
+    const total = containerStatuses.length;
+
+    // 如果不是所有容器都 ready，显示为警告状态（黄色）
+    if (total > 0 && ready < total) {
+      return 'badge-warning';
+    }
+
+    // 所有容器都 ready，显示为成功状态（绿色）
+    return 'badge-success';
+  }
+
+  // 其他状态使用默认颜色
+  return phaseColors[phase] || 'badge-default';
+}
+
 export default function PodDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -113,7 +136,7 @@ export default function PodDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-white">{name}</h1>
-              <span className={clsx('badge', phaseColors[pod.status.phase])}>
+              <span className={clsx('badge', getPodStatusColor(pod))}>
                 {pod.status.phase}
               </span>
             </div>

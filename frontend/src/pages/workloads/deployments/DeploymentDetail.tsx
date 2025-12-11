@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deploymentApi } from '../../../api';
 import { formatDistanceToNow } from 'date-fns';
@@ -34,12 +34,21 @@ type TabType = 'overview' | 'pods' | 'yaml' | 'events';
 
 export default function DeploymentDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showScaleModal, setShowScaleModal] = useState(false);
+  const [showRestartModal, setShowRestartModal] = useState(false);
   const [showEditImageModal, setShowEditImageModal] = useState(false);
   const [showSchedulingEditor, setShowSchedulingEditor] = useState(false);
   const [newReplicas, setNewReplicas] = useState(0);
   const queryClient = useQueryClient();
+
+  // 从 URL 参数读取当前标签，默认为 'overview'
+  const activeTab = (searchParams.get('tab') as TabType) || 'overview';
+
+  // 设置标签并同步到 URL 参数
+  const setActiveTab = (tab: TabType) => {
+    setSearchParams({ tab });
+  };
 
   // 获取 Deployment 详情
   const { data: deployment, isLoading, error, refetch } = useQuery({
@@ -60,6 +69,7 @@ export default function DeploymentDetail() {
     queryKey: ['deployment-pods', namespace, name],
     queryFn: () => deploymentApi.getPods(namespace!, name!),
     enabled: !!namespace && !!name && activeTab === 'pods',
+    refetchInterval: 5000, // 每5秒自动刷新一次，便于观察 Pod 状态变化
   });
 
   // 删除 Deployment
@@ -86,6 +96,10 @@ export default function DeploymentDetail() {
     mutationFn: () => deploymentApi.restart(namespace!, name!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
+      queryClient.invalidateQueries({ queryKey: ['deployment-pods', namespace, name] });
+      setShowRestartModal(false);
+      // 重启成功后自动切换到 pods 标签，让用户看到新的 pods
+      setActiveTab('pods');
     },
   });
 
@@ -193,11 +207,7 @@ export default function DeploymentDetail() {
               扩缩容
             </button>
             <button
-              onClick={() => {
-                if (confirm('确定要重启此 Deployment 吗？这将滚动重启所有 Pod。')) {
-                  restartMutation.mutate();
-                }
-              }}
+              onClick={() => setShowRestartModal(true)}
               disabled={restartMutation.isPending}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -330,6 +340,92 @@ export default function DeploymentDetail() {
                 disabled={scaleMutation.isPending}
               >
                 确认
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 重启确认模态框 */}
+      {showRestartModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card p-6 w-[500px]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <ExclamationTriangleIcon className="w-6 h-6 text-amber-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">确认重启 Deployment</h3>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <p className="text-slate-300">
+                您即将重启 Deployment <span className="font-semibold text-white">{name}</span>，这将触发滚动重启所有 Pod。
+              </p>
+
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                <h4 className="text-sm font-medium text-slate-400 mb-3">当前状态</h4>
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-slate-400">命名空间</dt>
+                    <dd className="text-slate-200 font-medium">{namespace}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-400">期望副本数</dt>
+                    <dd className="text-slate-200 font-medium">{deployment.spec.replicas || 0}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-400">就绪副本数</dt>
+                    <dd className="text-slate-200 font-medium">
+                      {deployment.status.readyReplicas || 0}/{deployment.status.replicas || 0}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-slate-400">更新策略</dt>
+                    <dd className="text-slate-200 font-medium">
+                      {deployment.spec.strategy?.type || 'RollingUpdate'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div className="flex items-start gap-2 text-sm text-amber-400 bg-amber-500/5 rounded-lg p-3 border border-amber-500/20">
+                <InformationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium mb-1">重启过程说明：</p>
+                  <ul className="list-disc list-inside space-y-1 text-amber-300/80">
+                    <li>将为 Pod 模板添加重启时间戳注解</li>
+                    <li>K8s 将按照更新策略滚动重启所有 Pod</li>
+                    <li>在重启期间服务可能会出现短暂的中断</li>
+                    <li>整个过程预计需要几秒到几分钟</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRestartModal(false)}
+                className="btn btn-secondary flex-1"
+                disabled={restartMutation.isPending}
+              >
+                取消
+              </button>
+              <button
+                onClick={() => restartMutation.mutate()}
+                className="btn bg-amber-600 hover:bg-amber-500 text-white flex-1 disabled:opacity-50"
+                disabled={restartMutation.isPending}
+              >
+                {restartMutation.isPending ? (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 animate-spin mr-2" />
+                    重启中...
+                  </>
+                ) : (
+                  <>
+                    <ArrowPathIcon className="w-4 h-4 mr-2" />
+                    确认重启
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -541,6 +637,32 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
 
 // Pods 标签页
 function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
+  // 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
+  const getPodStatusColor = (pod: Pod): string => {
+    const phase = pod.status.phase;
+
+    // 对于 Running 状态，检查容器是否真的准备好
+    if (phase === 'Running') {
+      const containerStatuses = pod.status.containerStatuses ?? [];
+      const ready = containerStatuses.filter((cs) => cs.ready).length;
+      const total = containerStatuses.length;
+
+      // 如果不是所有容器都 ready，显示为警告状态（黄色）
+      if (total > 0 && ready < total) {
+        return 'badge-warning';
+      }
+
+      // 所有容器都 ready，显示为成功状态（绿色）
+      return 'badge-success';
+    }
+
+    // 其他状态
+    if (phase === 'Succeeded') return 'badge-info';
+    if (phase === 'Failed') return 'badge-error';
+    if (phase === 'Pending') return 'badge-warning';
+    return 'badge-default';
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="table-container">
@@ -572,12 +694,7 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
                     </Link>
                   </td>
                   <td>
-                    <span
-                      className={clsx(
-                        'badge',
-                        pod.status.phase === 'Running' ? 'badge-success' : 'badge-warning'
-                      )}
-                    >
+                    <span className={clsx('badge', getPodStatusColor(pod))}>
                       {pod.status.phase}
                     </span>
                   </td>

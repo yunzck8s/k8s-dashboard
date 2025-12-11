@@ -107,9 +107,10 @@ func (c *Client) QueryRange(query string, start, end time.Time, step string) (*Q
 
 // ClusterMetrics 集群指标概览
 type ClusterMetrics struct {
-	CPU    ResourceMetric `json:"cpu"`
-	Memory ResourceMetric `json:"memory"`
-	Pods   ResourceMetric `json:"pods"`
+	CPU           ResourceMetric `json:"cpu"`
+	Memory        ResourceMetric `json:"memory"`        // 容器内存（K8s 视角，working_set）
+	NodeMemory    ResourceMetric `json:"nodeMemory"`    // 节点内存（OS 视角，实际可用）
+	Pods          ResourceMetric `json:"pods"`
 }
 
 // ResourceMetric 资源指标
@@ -148,8 +149,9 @@ func (c *Client) GetClusterMetrics() (*ClusterMetrics, error) {
 		}
 	}
 
-	// CPU 总量 (cores) - 使用 kube_node_status_capacity
-	cpuTotalResp, err := c.Query(`sum(kube_node_status_capacity{resource="cpu"})`)
+	// CPU 总量 (cores) - 使用 kube_node_status_allocatable (可分配 CPU)
+	// 这样计算的使用率会更准确，因为 capacity 包含了系统保留的 CPU
+	cpuTotalResp, err := c.Query(`sum(kube_node_status_allocatable{resource="cpu"})`)
 	if err == nil && len(cpuTotalResp.Data.Result) > 0 {
 		if val, ok := cpuTotalResp.Data.Result[0].Value[1].(string); ok {
 			fmt.Sscanf(val, "%f", &metrics.CPU.Total)
@@ -167,8 +169,9 @@ func (c *Client) GetClusterMetrics() (*ClusterMetrics, error) {
 		}
 	}
 
-	// 内存总量 (GB) - 使用 kube_node_status_capacity
-	memTotalResp, err := c.Query(`sum(kube_node_status_capacity{resource="memory"})`)
+	// 内存总量 (GB) - 使用 kube_node_status_allocatable (可分配内存)
+	// 这样计算的使用率会更准确，因为 capacity 包含了系统保留的内存
+	memTotalResp, err := c.Query(`sum(kube_node_status_allocatable{resource="memory"})`)
 	if err == nil && len(memTotalResp.Data.Result) > 0 {
 		if val, ok := memTotalResp.Data.Result[0].Value[1].(string); ok {
 			var bytes float64
@@ -178,6 +181,28 @@ func (c *Client) GetClusterMetrics() (*ClusterMetrics, error) {
 	}
 	metrics.Memory.Unit = "GB"
 
+	// 节点内存使用量 (GB) - OS 视角
+	// 使用 node_memory 指标，计算实际使用的内存（不包括可回收的 cache）
+	nodeMemUsedResp, err := c.Query(`sum(node_memory_MemTotal_bytes) - sum(node_memory_MemAvailable_bytes)`)
+	if err == nil && len(nodeMemUsedResp.Data.Result) > 0 {
+		if val, ok := nodeMemUsedResp.Data.Result[0].Value[1].(string); ok {
+			var bytes float64
+			fmt.Sscanf(val, "%f", &bytes)
+			metrics.NodeMemory.Used = bytes / 1024 / 1024 / 1024
+		}
+	}
+
+	// 节点内存总量 (GB) - 与容器内存使用相同的总量
+	nodeMemTotalResp, err := c.Query(`sum(node_memory_MemTotal_bytes)`)
+	if err == nil && len(nodeMemTotalResp.Data.Result) > 0 {
+		if val, ok := nodeMemTotalResp.Data.Result[0].Value[1].(string); ok {
+			var bytes float64
+			fmt.Sscanf(val, "%f", &bytes)
+			metrics.NodeMemory.Total = bytes / 1024 / 1024 / 1024
+		}
+	}
+	metrics.NodeMemory.Unit = "GB"
+
 	// Pod 数量 - 使用 kube_pod_status_phase
 	podUsedResp, err := c.Query(`count(kube_pod_status_phase{phase="Running"})`)
 	if err == nil && len(podUsedResp.Data.Result) > 0 {
@@ -186,8 +211,9 @@ func (c *Client) GetClusterMetrics() (*ClusterMetrics, error) {
 		}
 	}
 
-	// Pod 容量 - 使用 kube_node_status_capacity
-	podCapacityResp, err := c.Query(`sum(kube_node_status_capacity{resource="pods"})`)
+	// Pod 容量 - 使用 kube_node_status_allocatable (可分配 Pod 容量)
+	// 这样计算的使用率会更准确，因为 capacity 可能包含了系统保留的 Pod 容量
+	podCapacityResp, err := c.Query(`sum(kube_node_status_allocatable{resource="pods"})`)
 	if err == nil && len(podCapacityResp.Data.Result) > 0 {
 		if val, ok := podCapacityResp.Data.Result[0].Value[1].(string); ok {
 			fmt.Sscanf(val, "%f", &metrics.Pods.Total)

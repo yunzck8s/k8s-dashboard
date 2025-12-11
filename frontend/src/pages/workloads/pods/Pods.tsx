@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { podApi } from '../../../api';
@@ -5,6 +6,7 @@ import { useAppStore } from '../../../store';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
+import Pagination from '../../../components/common/Pagination';
 import type { Pod, PodPhase } from '../../../types';
 
 // Pod 状态颜色映射
@@ -15,6 +17,29 @@ const phaseColors: Record<PodPhase, string> = {
   Failed: 'badge-error',
   Unknown: 'badge-default',
 };
+
+// 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
+function getPodStatusColor(pod: Pod): string {
+  const phase = pod.status.phase;
+
+  // 对于 Running 状态，检查容器是否真的准备好
+  if (phase === 'Running') {
+    const containerStatuses = pod.status.containerStatuses ?? [];
+    const ready = containerStatuses.filter((cs) => cs.ready).length;
+    const total = containerStatuses.length;
+
+    // 如果不是所有容器都 ready，显示为警告状态（黄色）
+    if (total > 0 && ready < total) {
+      return 'badge-warning';
+    }
+
+    // 所有容器都 ready，显示为成功状态（绿色）
+    return 'badge-success';
+  }
+
+  // 其他状态使用默认颜色
+  return phaseColors[phase] || 'badge-default';
+}
 
 // 获取 Pod 状态
 function getPodStatus(pod: Pod): { phase: PodPhase; reason?: string } {
@@ -152,6 +177,15 @@ function formatMemory(bytes: number): string {
 export default function Pods() {
   const { currentNamespace } = useAppStore();
 
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // 当命名空间变化时重置分页
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentNamespace]);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['pods', currentNamespace],
     queryFn: () =>
@@ -201,6 +235,25 @@ export default function Pods() {
 
   const pods = data?.items ?? [];
 
+  // 分页计算
+  const totalItems = pods.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentPods = pods.slice(startIndex, endIndex);
+
+  // 处理页码变化
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 处理每页数量变化
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // 重置到第一页
+  };
+
   return (
     <div className="space-y-6">
       {/* 页面头部 */}
@@ -208,8 +261,13 @@ export default function Pods() {
         <div>
           <h1 className="text-2xl font-bold text-white">Pods</h1>
           <p className="text-slate-400 mt-1">
-            共 {pods.length} 个 Pod
+            共 {totalItems} 个 Pod
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
+            {totalPages > 1 && (
+              <span className="ml-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                (第 {currentPage}/{totalPages} 页)
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -237,7 +295,7 @@ export default function Pods() {
               </tr>
             </thead>
             <tbody>
-              {pods.map((pod) => {
+              {currentPods.map((pod) => {
                 const status = getPodStatus(pod);
                 const resources = getPodResources(pod);
                 const podKey = `${pod.metadata.namespace}/${pod.metadata.name}`;
@@ -261,7 +319,7 @@ export default function Pods() {
                       </td>
                     )}
                     <td>
-                      <span className={clsx('badge', phaseColors[status.phase])}>
+                      <span className={clsx('badge', getPodStatusColor(pod))}>
                         {status.reason || status.phase}
                       </span>
                     </td>
@@ -308,10 +366,25 @@ export default function Pods() {
             </tbody>
           </table>
         </div>
+
+        {/* 空状态 */}
         {pods.length === 0 && (
           <div className="text-center py-12 text-slate-400">
             没有找到 Pod
           </div>
+        )}
+
+        {/* 分页 */}
+        {pods.length > 0 && totalPages > 1 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
         )}
       </div>
     </div>

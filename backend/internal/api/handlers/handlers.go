@@ -76,9 +76,10 @@ type EventSummary struct {
 }
 
 type ResourceUsage struct {
-	CPU    UsageMetric `json:"cpu"`
-	Memory UsageMetric `json:"memory"`
-	Pods   UsageMetric `json:"pods"`
+	CPU        UsageMetric `json:"cpu"`
+	Memory     UsageMetric `json:"memory"`      // 容器内存（K8s 视角）
+	NodeMemory UsageMetric `json:"nodeMemory"`  // 节点内存（OS 视角）
+	Pods       UsageMetric `json:"pods"`
 }
 
 type UsageMetric struct {
@@ -100,7 +101,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	}
 
 	nodeCount := ResourceCount{Total: len(nodes.Items)}
-	var totalCPU, usedCPU, totalMemory, usedMemory, totalPods, usedPods float64
+	var totalCPU, usedCPU, totalMemory, usedMemory, totalNodeMemory, usedNodeMemory, totalPods, usedPods float64
 
 	for _, node := range nodes.Items {
 		ready := false
@@ -200,12 +201,16 @@ func (h *Handler) GetOverview(c *gin.Context) {
 		if err == nil {
 			usedCPU = clusterMetrics.CPU.Used
 			usedMemory = clusterMetrics.Memory.Used
+			usedNodeMemory = clusterMetrics.NodeMemory.Used
 			// 如果 VM 返回了总量数据，也使用它
 			if clusterMetrics.CPU.Total > 0 {
 				totalCPU = clusterMetrics.CPU.Total
 			}
 			if clusterMetrics.Memory.Total > 0 {
 				totalMemory = clusterMetrics.Memory.Total
+			}
+			if clusterMetrics.NodeMemory.Total > 0 {
+				totalNodeMemory = clusterMetrics.NodeMemory.Total
 			}
 			if clusterMetrics.Pods.Total > 0 {
 				totalPods = clusterMetrics.Pods.Total
@@ -242,9 +247,10 @@ func (h *Handler) GetOverview(c *gin.Context) {
 		Namespaces:  len(namespaces.Items),
 		Events:      eventSummary,
 		Resources: ResourceUsage{
-			CPU:    UsageMetric{Used: usedCPU, Total: totalCPU, Unit: "cores"},
-			Memory: UsageMetric{Used: usedMemory, Total: totalMemory, Unit: "GB"},
-			Pods:   UsageMetric{Used: usedPods, Total: totalPods, Unit: "pods"},
+			CPU:        UsageMetric{Used: usedCPU, Total: totalCPU, Unit: "cores"},
+			Memory:     UsageMetric{Used: usedMemory, Total: totalMemory, Unit: "GB"},
+			NodeMemory: UsageMetric{Used: usedNodeMemory, Total: totalNodeMemory, Unit: "GB"},
+			Pods:       UsageMetric{Used: usedPods, Total: totalPods, Unit: "pods"},
 		},
 	})
 }

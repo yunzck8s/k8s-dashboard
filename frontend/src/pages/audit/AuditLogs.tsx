@@ -9,12 +9,18 @@ import {
   ArrowPathIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
   UserIcon,
   DocumentTextIcon,
   ServerIcon,
+  EyeIcon,
+  PlusCircleIcon,
+  PencilSquareIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 
 // 操作类型映射
@@ -69,6 +75,7 @@ export default function AuditLogs() {
   const [actionFilter, setActionFilter] = useState('');
   const [resourceFilter, setResourceFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   // 计算时间范围
   const getTimeRange = () => {
@@ -155,6 +162,62 @@ export default function AuditLogs() {
       return <CheckCircleIcon className="w-4 h-4 text-green-400" />;
     }
     return <XCircleIcon className="w-4 h-4 text-red-400" />;
+  };
+
+  // 获取操作图标
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'GET':
+        return <EyeIcon className="w-4 h-4" />;
+      case 'POST':
+        return <PlusCircleIcon className="w-4 h-4" />;
+      case 'PUT':
+      case 'PATCH':
+        return <PencilSquareIcon className="w-4 h-4" />;
+      case 'DELETE':
+        return <TrashIcon className="w-4 h-4" />;
+      default:
+        return <DocumentTextIcon className="w-4 h-4" />;
+    }
+  };
+
+  // 生成操作描述
+  const getActionDescription = (log: any) => {
+    // 优先使用后端生成的 message，它包含了更精确的操作描述（如"重启"、"扩缩容"等）
+    if (log.message) {
+      const user = log.user || '未知用户';
+      return `${user} ${log.message}`;
+    }
+
+    // 兜底逻辑：使用前端映射
+    const user = log.user || '未知用户';
+    const action = actionLabels[log.action] || log.action;
+    const resource = resourceLabels[log.resource] || log.resource;
+    const name = log.resourceName || '未命名资源';
+    const namespace = log.namespace ? ` (${log.namespace})` : '';
+
+    return `${user} ${action}了 ${resource} "${name}"${namespace}`;
+  };
+
+  // 切换行展开状态
+  const toggleRowExpand = (id: number) => {
+    const newSet = new Set(expandedRows);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setExpandedRows(newSet);
+  };
+
+  // 格式化 JSON
+  const formatJSON = (str: string) => {
+    try {
+      const obj = JSON.parse(str);
+      return JSON.stringify(obj, null, 2);
+    } catch {
+      return str;
+    }
   };
 
   return (
@@ -365,68 +428,193 @@ export default function AuditLogs() {
 
       {/* 日志列表 */}
       <div className="card overflow-hidden">
-        <div className="table-container">
-          <table>
+        <div className="overflow-x-auto">
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>时间</th>
-                <th>操作</th>
-                <th>资源</th>
-                <th>名称</th>
-                <th>命名空间</th>
-                <th>用户</th>
-                <th>状态</th>
-                <th>耗时</th>
-                <th>来源IP</th>
+              <tr className="text-left text-slate-400 text-sm border-b border-slate-700">
+                <th className="pb-3 px-4 w-8"></th>
+                <th className="pb-3 px-2">时间</th>
+                <th className="pb-3 px-2">操作描述</th>
+                <th className="pb-3 px-2">状态</th>
+                <th className="pb-3 px-2">耗时</th>
+                <th className="pb-3 px-2">来源</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="whitespace-nowrap">
-                    <div className="flex flex-col">
-                      <span className="text-slate-300 text-sm">
-                        {formatTime(log.timestamp)}
+                <>
+                  <tr
+                    key={log.id}
+                    className="border-t border-slate-700 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                    onClick={() => toggleRowExpand(log.id)}
+                  >
+                    <td className="py-3 px-4">
+                      <button className="text-slate-400 hover:text-slate-300">
+                        {expandedRows.has(log.id) ? (
+                          <ChevronUpIcon className="w-4 h-4" />
+                        ) : (
+                          <ChevronDownIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="py-3 px-2 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-slate-300 text-sm">
+                          {formatTime(log.timestamp)}
+                        </span>
+                        <span className="text-slate-500 text-xs">
+                          {formatRelativeTime(log.timestamp)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex items-start gap-3">
+                        <div className={clsx(
+                          'mt-0.5 p-1.5 rounded',
+                          log.action === 'DELETE' && 'bg-red-500/10 text-red-400',
+                          log.action === 'POST' && 'bg-green-500/10 text-green-400',
+                          (log.action === 'PUT' || log.action === 'PATCH') && 'bg-yellow-500/10 text-yellow-400',
+                          log.action === 'GET' && 'bg-blue-500/10 text-blue-400'
+                        )}>
+                          {getActionIcon(log.action)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-slate-200 text-sm leading-relaxed">
+                            {getActionDescription(log)}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-1.5">
+                        {getStatusIcon(log.statusCode)}
+                        <span className={clsx(
+                          'text-sm font-medium',
+                          getStatusColor(log.statusCode)
+                        )}>
+                          {log.statusCode}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 whitespace-nowrap">
+                      <span className={clsx(
+                        'text-sm',
+                        log.duration > 1000 ? 'text-yellow-400' :
+                        log.duration > 3000 ? 'text-red-400' : 'text-slate-400'
+                      )}>
+                        {log.duration}ms
                       </span>
-                      <span className="text-slate-500 text-xs">
-                        {formatRelativeTime(log.timestamp)}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={clsx('badge', actionColors[log.action] || 'badge-default')}>
-                      {actionLabels[log.action] || log.action}
-                    </span>
-                  </td>
-                  <td className="text-slate-300">
-                    {resourceLabels[log.resource] || log.resource}
-                  </td>
-                  <td className="text-blue-400 font-medium max-w-[200px]">
-                    <span className="truncate block" title={log.resourceName}>
-                      {log.resourceName || '-'}
-                    </span>
-                  </td>
-                  <td>
-                    {log.namespace ? (
-                      <span className="badge badge-default">{log.namespace}</span>
-                    ) : (
-                      <span className="text-slate-500">-</span>
-                    )}
-                  </td>
-                  <td className="text-slate-400">{log.user}</td>
-                  <td>
-                    <div className="flex items-center gap-1">
-                      {getStatusIcon(log.statusCode)}
-                      <span className={getStatusColor(log.statusCode)}>
-                        {log.statusCode}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="text-slate-400 whitespace-nowrap">
-                    {log.duration}ms
-                  </td>
-                  <td className="text-slate-500 text-sm">{log.clientIP}</td>
-                </tr>
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex flex-col">
+                        <span className="text-slate-400 text-xs font-mono">
+                          {log.clientIP}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* 展开的详情行 */}
+                  {expandedRows.has(log.id) && (
+                    <tr className="border-t border-slate-700 bg-slate-800/30">
+                      <td colSpan={6} className="px-4 py-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
+                          {/* 基本信息 */}
+                          <div className="space-y-3">
+                            <h4 className="text-slate-300 font-medium mb-2 flex items-center gap-2">
+                              <DocumentTextIcon className="w-4 h-4" />
+                              基本信息
+                            </h4>
+                            <div className="space-y-2 bg-slate-900/50 rounded-lg p-3">
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">用户:</span>
+                                <span className="text-slate-300 font-medium">{log.user}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">操作类型:</span>
+                                <span className={clsx('badge', actionColors[log.action] || 'badge-default')}>
+                                  {actionLabels[log.action] || log.action}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">资源类型:</span>
+                                <span className="text-slate-300">{resourceLabels[log.resource] || log.resource}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">资源名称:</span>
+                                <span className="text-blue-400 font-mono text-xs">{log.resourceName || '-'}</span>
+                              </div>
+                              {log.namespace && (
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">命名空间:</span>
+                                  <span className="badge badge-default">{log.namespace}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">集群:</span>
+                                <span className="text-slate-300">{log.cluster || '-'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 请求信息 */}
+                          <div className="space-y-3">
+                            <h4 className="text-slate-300 font-medium mb-2 flex items-center gap-2">
+                              <ServerIcon className="w-4 h-4" />
+                              请求信息
+                            </h4>
+                            <div className="space-y-2 bg-slate-900/50 rounded-lg p-3">
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">客户端 IP:</span>
+                                <span className="text-slate-300 font-mono text-xs">{log.clientIP}</span>
+                              </div>
+                              {log.userAgent && (
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-slate-500">User Agent:</span>
+                                  <span className="text-slate-400 text-xs font-mono break-all">
+                                    {log.userAgent}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">响应状态:</span>
+                                <div className="flex items-center gap-2">
+                                  {getStatusIcon(log.statusCode)}
+                                  <span className={getStatusColor(log.statusCode)}>
+                                    {log.statusCode}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">请求耗时:</span>
+                                <span className={clsx(
+                                  'font-medium',
+                                  log.duration > 1000 ? 'text-yellow-400' :
+                                  log.duration > 3000 ? 'text-red-400' : 'text-green-400'
+                                )}>
+                                  {log.duration}ms
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 请求体 */}
+                          {log.requestBody && (
+                            <div className="lg:col-span-2 space-y-2">
+                              <h4 className="text-slate-300 font-medium flex items-center gap-2">
+                                <DocumentTextIcon className="w-4 h-4" />
+                                请求体
+                              </h4>
+                              <pre className="bg-slate-900 rounded-lg p-3 text-xs text-slate-300 font-mono overflow-x-auto max-h-64">
+                                {formatJSON(log.requestBody)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>

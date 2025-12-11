@@ -479,6 +479,32 @@ function OverviewTab({ statefulSet, namespace, name }: { statefulSet: StatefulSe
 
 // Pods 标签页
 function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
+  // 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
+  const getPodStatusColor = (pod: Pod): string => {
+    const phase = pod.status.phase;
+
+    // 对于 Running 状态，检查容器是否真的准备好
+    if (phase === 'Running') {
+      const containerStatuses = pod.status.containerStatuses ?? [];
+      const ready = containerStatuses.filter((cs) => cs.ready).length;
+      const total = containerStatuses.length;
+
+      // 如果不是所有容器都 ready，显示为警告状态（黄色）
+      if (total > 0 && ready < total) {
+        return 'badge-warning';
+      }
+
+      // 所有容器都 ready，显示为成功状态（绿色）
+      return 'badge-success';
+    }
+
+    // 其他状态
+    if (phase === 'Succeeded') return 'badge-info';
+    if (phase === 'Failed') return 'badge-error';
+    if (phase === 'Pending') return 'badge-warning';
+    return 'badge-default';
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="table-container">
@@ -510,12 +536,7 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
                     </Link>
                   </td>
                   <td>
-                    <span
-                      className={clsx(
-                        'badge',
-                        pod.status.phase === 'Running' ? 'badge-success' : 'badge-warning'
-                      )}
-                    >
+                    <span className={clsx('badge', getPodStatusColor(pod))}>
                       {pod.status.phase}
                     </span>
                   </td>

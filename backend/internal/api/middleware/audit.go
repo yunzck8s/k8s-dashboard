@@ -144,7 +144,7 @@ func AuditMiddleware(auditClient *audit.Client) gin.HandlerFunc {
 		}
 
 		// 生成操作描述
-		message := generateActionMessage(c.Request.Method, resource, resourceName, namespace)
+		message := generateActionMessage(c.Request.Method, c.Request.URL.Path, resource, resourceName, namespace)
 
 		// 创建审计日志
 		log := &audit.AuditLog{
@@ -174,7 +174,20 @@ func AuditMiddleware(auditClient *audit.Client) gin.HandlerFunc {
 }
 
 // 生成操作描述
-func generateActionMessage(method, resource, name, namespace string) string {
+func generateActionMessage(method, path, resource, name, namespace string) string {
+	// 首先检查是否是特殊操作
+	specialAction := detectSpecialAction(path)
+	if specialAction != "" {
+		if name != "" {
+			if namespace != "" {
+				return specialAction + " " + resource + " " + namespace + "/" + name
+			}
+			return specialAction + " " + resource + " " + name
+		}
+		return specialAction + " " + resource
+	}
+
+	// 普通操作
 	var action string
 	switch method {
 	case "POST":
@@ -196,4 +209,27 @@ func generateActionMessage(method, resource, name, namespace string) string {
 		return action + " " + resource + " " + name
 	}
 	return action + " " + resource
+}
+
+// 从路径中识别特殊操作
+func detectSpecialAction(path string) string {
+	if strings.Contains(path, "/restart") {
+		return "重启"
+	}
+	if strings.Contains(path, "/scale") {
+		return "扩缩容"
+	}
+	if strings.Contains(path, "/rollback") {
+		return "回滚"
+	}
+	if strings.Contains(path, "/logs") {
+		return "查看日志"
+	}
+	if strings.Contains(path, "/exec") {
+		return "执行命令"
+	}
+	if strings.Contains(path, "/yaml") {
+		return "编辑YAML"
+	}
+	return ""
 }

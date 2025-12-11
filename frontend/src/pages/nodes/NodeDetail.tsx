@@ -347,6 +347,32 @@ function OverviewTab({ node }: { node: Node }) {
 
 // Pods 标签页
 function PodsTab({ pods }: { pods: Pod[] }) {
+  // 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
+  const getPodStatusColor = (pod: Pod): string => {
+    const phase = pod.status.phase;
+
+    // 对于 Running 状态，检查容器是否真的准备好
+    if (phase === 'Running') {
+      const containerStatuses = pod.status.containerStatuses ?? [];
+      const ready = containerStatuses.filter((cs) => cs.ready).length;
+      const total = containerStatuses.length;
+
+      // 如果不是所有容器都 ready，显示为警告状态（黄色）
+      if (total > 0 && ready < total) {
+        return 'badge-warning';
+      }
+
+      // 所有容器都 ready，显示为成功状态（绿色）
+      return 'badge-success';
+    }
+
+    // 其他状态
+    if (phase === 'Succeeded') return 'badge-info';
+    if (phase === 'Failed') return 'badge-error';
+    if (phase === 'Pending') return 'badge-warning';
+    return 'badge-default';
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="table-container">
@@ -381,12 +407,7 @@ function PodsTab({ pods }: { pods: Pod[] }) {
                     <span className="badge badge-default">{pod.metadata.namespace}</span>
                   </td>
                   <td>
-                    <span
-                      className={clsx(
-                        'badge',
-                        pod.status.phase === 'Running' ? 'badge-success' : 'badge-warning'
-                      )}
-                    >
+                    <span className={clsx('badge', getPodStatusColor(pod))}>
                       {pod.status.phase}
                     </span>
                   </td>
@@ -422,18 +443,57 @@ function MetricsTab({ metrics }: { metrics?: any }) {
     );
   }
 
+  const cpuPercentage = metrics.cpu?.percentage || 0;
+  const memoryPercentage = metrics.memory?.percentage || 0;
+  const cpuUsage = metrics.cpu?.usage || 0;
+  const cpuCapacity = metrics.cpu?.capacity || 1;
+  const memoryUsage = metrics.memory?.usage || 0;
+  const memoryCapacity = metrics.memory?.capacity || 1;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="card p-6">
         <h3 className="text-lg font-semibold text-white mb-4">CPU 使用率</h3>
-        <div className="text-4xl font-bold text-blue-400">
-          {metrics.cpuUsage?.toFixed(1) || 0}%
+        <div className="text-4xl font-bold text-blue-400 mb-4">
+          {cpuPercentage.toFixed(1)}%
+        </div>
+        <div className="text-sm text-slate-400">
+          <div className="flex justify-between mb-1">
+            <span>使用量:</span>
+            <span className="font-mono">{(cpuUsage / 1000).toFixed(2)} cores</span>
+          </div>
+          <div className="flex justify-between">
+            <span>总容量:</span>
+            <span className="font-mono">{(cpuCapacity / 1000).toFixed(2)} cores</span>
+          </div>
+        </div>
+        <div className="w-full bg-slate-700 rounded-full h-2 mt-4">
+          <div
+            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${Math.min(cpuPercentage, 100)}%` }}
+          />
         </div>
       </div>
       <div className="card p-6">
         <h3 className="text-lg font-semibold text-white mb-4">内存使用率</h3>
-        <div className="text-4xl font-bold text-green-400">
-          {metrics.memoryUsage?.toFixed(1) || 0}%
+        <div className="text-4xl font-bold text-green-400 mb-4">
+          {memoryPercentage.toFixed(1)}%
+        </div>
+        <div className="text-sm text-slate-400">
+          <div className="flex justify-between mb-1">
+            <span>使用量:</span>
+            <span className="font-mono">{(memoryUsage / 1024 / 1024 / 1024).toFixed(2)} GB</span>
+          </div>
+          <div className="flex justify-between">
+            <span>总容量:</span>
+            <span className="font-mono">{(memoryCapacity / 1024 / 1024 / 1024).toFixed(2)} GB</span>
+          </div>
+        </div>
+        <div className="w-full bg-slate-700 rounded-full h-2 mt-4">
+          <div
+            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${Math.min(memoryPercentage, 100)}%` }}
+          />
         </div>
       </div>
     </div>
