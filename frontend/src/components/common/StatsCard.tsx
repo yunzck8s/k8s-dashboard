@@ -221,7 +221,9 @@ export default function StatsCard({
             border: `1px solid ${styles.border}`,
           }}
         >
-          <Icon className="w-6 h-6 relative z-10" style={{ color: styles.iconColor }} />
+          <div className="relative w-6 h-6 z-10" style={{ color: styles.iconColor }}>
+            <Icon className="w-6 h-6" />
+          </div>
           {/* 图标发光效果 */}
           <div
             className="absolute inset-0 opacity-50"
