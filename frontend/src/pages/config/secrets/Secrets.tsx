@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { secretApi } from '../../../api';
@@ -5,9 +6,17 @@ import { useAppStore } from '../../../store';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
+import Pagination from '../../../components/common/Pagination';
 
 export default function Secrets() {
   const { currentNamespace } = useAppStore();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // 命名空间变化时重置页码
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentNamespace]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['secrets', currentNamespace],
@@ -38,6 +47,22 @@ export default function Secrets() {
   }
 
   const secrets = data?.items ?? [];
+
+  // 分页逻辑
+  const totalItems = secrets.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentSecrets = secrets.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   // 获取类型颜色
   const getTypeColor = (type?: string) => {
@@ -91,7 +116,7 @@ export default function Secrets() {
               </tr>
             </thead>
             <tbody>
-              {secrets.map((secret) => (
+              {currentSecrets.map((secret) => (
                 <tr key={secret.metadata.uid}>
                   <td>
                     <Link
@@ -129,6 +154,18 @@ export default function Secrets() {
           <div className="text-center py-12 text-slate-400">没有找到 Secret</div>
         )}
       </div>
+
+      {/* 分页 */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
     </div>
   );
 }

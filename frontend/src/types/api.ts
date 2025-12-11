@@ -33,7 +33,8 @@ export interface EventSummary {
 
 export interface ResourceUsage {
   cpu: UsageMetric;
-  memory: UsageMetric;
+  memory: UsageMetric;      // 容器内存（K8s 视角）
+  nodeMemory: UsageMetric;  // 节点内存（OS 视角）
   pods: UsageMetric;
 }
 

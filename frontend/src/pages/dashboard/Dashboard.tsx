@@ -263,9 +263,10 @@ export default function Dashboard() {
             资源使用情况
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium text-slate-400 mb-4">CPU</h4>
+            <h4 className="text-sm font-medium text-slate-400 mb-2">CPU 使用率</h4>
+            <p className="text-xs text-slate-500 mb-3">容器 CPU 占用</p>
             <ResourceChart
               used={overview?.resources.cpu.used ?? 0}
               total={overview?.resources.cpu.total ?? 100}
@@ -273,7 +274,8 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium text-slate-400 mb-4">内存</h4>
+            <h4 className="text-sm font-medium text-slate-400 mb-2">容器内存</h4>
+            <p className="text-xs text-slate-500 mb-3">K8s Working Set</p>
             <ResourceChart
               used={overview?.resources.memory.used ?? 0}
               total={overview?.resources.memory.total ?? 100}
@@ -281,7 +283,17 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium text-slate-400 mb-4">Pod 容量</h4>
+            <h4 className="text-sm font-medium text-slate-400 mb-2">节点内存</h4>
+            <p className="text-xs text-slate-500 mb-3">OS 可用内存</p>
+            <ResourceChart
+              used={overview?.resources.nodeMemory?.used ?? 0}
+              total={overview?.resources.nodeMemory?.total ?? 100}
+              unit={overview?.resources.nodeMemory?.unit ?? 'GB'}
+            />
+          </div>
+          <div className="flex flex-col items-center">
+            <h4 className="text-sm font-medium text-slate-400 mb-2">Pod 容量</h4>
+            <p className="text-xs text-slate-500 mb-3">运行中的 Pod</p>
             <ResourceChart
               used={overview?.resources.pods.used ?? 0}
               total={overview?.resources.pods.total ?? 100}

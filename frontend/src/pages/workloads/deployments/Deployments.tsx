@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { deploymentApi } from '../../../api';
@@ -5,9 +6,17 @@ import { useAppStore } from '../../../store';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
+import Pagination from '../../../components/common/Pagination';
 
 export default function Deployments() {
   const { currentNamespace } = useAppStore();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // 命名空间变化时重置页码
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentNamespace]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['deployments', currentNamespace],
@@ -38,6 +47,22 @@ export default function Deployments() {
   }
 
   const deployments = data?.items ?? [];
+
+  // 分页逻辑
+  const totalItems = deployments.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentDeployments = deployments.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -72,7 +97,7 @@ export default function Deployments() {
               </tr>
             </thead>
             <tbody>
-              {deployments.map((deployment) => {
+              {currentDeployments.map((deployment) => {
                 const isHealthy =
                   deployment.status.readyReplicas === deployment.status.replicas &&
                   (deployment.status.replicas ?? 0) > 0;
@@ -127,6 +152,18 @@ export default function Deployments() {
           <div className="text-center py-12 text-slate-400">没有找到 Deployment</div>
         )}
       </div>
+
+      {/* 分页 */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
     </div>
   );
 }

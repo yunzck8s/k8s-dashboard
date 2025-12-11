@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { nodeApi, podApi } from '../../api';
@@ -5,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Node } from '../../types';
+import Pagination from '../../components/common/Pagination';
 
 // 解析 CPU 值（转换为毫核）
 function parseCpu(value: string): number {
@@ -131,6 +133,9 @@ function ResourceBar({
 }
 
 export default function Nodes() {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['nodes'],
     queryFn: () => nodeApi.list(),
@@ -197,6 +202,22 @@ export default function Nodes() {
 
   const nodes = data?.items ?? [];
 
+  // 分页逻辑
+  const totalItems = nodes.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentNodes = nodes.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // 切换页面大小时重置到第一页
+  };
+
   // 获取节点状态
   const getNodeStatus = (node: Node) => {
     const readyCondition = node.status.conditions?.find((c) => c.type === 'Ready');
@@ -243,7 +264,7 @@ export default function Nodes() {
               </tr>
             </thead>
             <tbody>
-              {nodes.map((node) => {
+              {currentNodes.map((node) => {
                 const isReady = getNodeStatus(node);
                 const isUnschedulable = node.spec.unschedulable;
                 const nodeName = node.metadata.name;
@@ -322,6 +343,18 @@ export default function Nodes() {
           <div className="text-center py-12 text-slate-400">没有找到节点</div>
         )}
       </div>
+
+      {/* 分页 */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,52 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# 文档
+*.md
+docs/
+DESIGN_SYSTEM.md
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+
+# 后端
+backend/tmp/
+backend/vendor/
+backend/*.db
+backend/*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 测试
+*.test
+coverage/
+*.out
+
+# 日志
+*.log
+logs/
+
+# 部署
+deploy/kubernetes/
+deploy/helm/
+
+# 其他
+tmp/
+temp/
+*.tmp
+.cache/

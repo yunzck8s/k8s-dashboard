@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { serviceApi } from '../../../api';
@@ -6,9 +7,17 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Service } from '../../../types';
+import Pagination from '../../../components/common/Pagination';
 
 export default function Services() {
   const { currentNamespace } = useAppStore();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // 命名空间变化时重置页码
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentNamespace]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['services', currentNamespace],
@@ -39,6 +48,22 @@ export default function Services() {
   }
 
   const services = data?.items ?? [];
+
+  // 分页逻辑
+  const totalItems = services.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentServices = services.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   // 获取服务类型颜色
   const getTypeColor = (type?: string) => {
@@ -100,7 +125,7 @@ export default function Services() {
               </tr>
             </thead>
             <tbody>
-              {services.map((service) => {
+              {currentServices.map((service) => {
                 const externalIPs = service.status?.loadBalancer?.ingress
                   ?.map((i) => i.ip || i.hostname)
                   .join(', ') || service.spec.externalIPs?.join(', ') || '-';
@@ -147,6 +172,18 @@ export default function Services() {
           <div className="text-center py-12 text-slate-400">没有找到 Service</div>
         )}
       </div>
+
+      {/* 分页 */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
     </div>
   );
 }

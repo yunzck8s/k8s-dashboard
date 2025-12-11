@@ -1,0 +1,216 @@
+name: 构建并推送 Docker 镜像
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: '是否推送镜像'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  # Docker Hub 镜像名称（修改为你的 Docker Hub 用户名）
+  DOCKERHUB_IMAGE: your-dockerhub-username/k8s-dashboard
+  # GitHub Container Registry 镜像名称
+  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/k8s-dashboard
+
+jobs:
+  build:
+    name: 构建 Docker 镜像
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      # 检出代码
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # 设置 QEMU（用于多平台构建）
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 设置 Docker Buildx
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      # 登录 Docker Hub（仅在推送时）
+      - name: 登录 Docker Hub
+        if: github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 登录 GitHub Container Registry（仅在推送时）
+      - name: 登录 GitHub Container Registry
+        if: github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 提取 Docker 元数据（标签、注解）
+      - name: 提取 Docker 元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.DOCKERHUB_IMAGE }}
+            ${{ env.GHCR_IMAGE }}
+          tags: |
+            # 分支名称
+            type=ref,event=branch
+            # PR 编号
+            type=ref,event=pr
+            # Git 标签（语义化版本）
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # 短 commit SHA
+            type=sha,prefix={{branch}}-
+            # latest 标签（仅主分支）
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=K8s Dashboard
+            org.opencontainers.image.description=Kubernetes Dashboard with Mission Control Theme
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+
+      # 构建并推送 Docker 镜像
+      - name: 构建并推送 Docker 镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./deploy/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+      # 输出镜像信息
+      - name: 输出镜像信息
+        run: |
+          echo "## 🐳 Docker 镜像构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**构建信息:**" >> $GITHUB_STEP_SUMMARY
+          echo "- 提交: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 分支: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- 平台: \`linux/amd64, linux/arm64\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**镜像标签:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" != "pull_request" ] && [ "${{ github.event.inputs.push_image }}" != "false" ]; then
+            echo "✅ 镜像已推送到镜像仓库" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ 镜像仅构建未推送（PR 或手动触发）" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # 安全扫描（使用 Trivy）
+      - name: 运行 Trivy 安全扫描
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.GHCR_IMAGE }}:${{ steps.meta.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      # 上传扫描结果到 GitHub Security
+      - name: 上传 Trivy 扫描结果
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  # 测试镜像
+  test:
+    name: 测试 Docker 镜像
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request' && (github.event.inputs.push_image != 'false')
+
+    steps:
+      - name: 登录 GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 提取镜像标签
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=${{ github.ref_name }}-${{ github.sha }}
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: 拉取并测试镜像
+        run: |
+          echo "测试镜像: ${{ env.GHCR_IMAGE }}:${{ steps.meta.outputs.version }}"
+          docker pull ${{ env.GHCR_IMAGE }}:${{ steps.meta.outputs.version }}
+
+          # 启动容器
+          docker run -d --name k8s-dashboard -p 8080:8080 \
+            ${{ env.GHCR_IMAGE }}:${{ steps.meta.outputs.version }}
+
+          # 等待服务启动
+          echo "等待服务启动..."
+          sleep 10
+
+          # 健康检查
+          echo "执行健康检查..."
+          if curl -f http://localhost:8080/health; then
+            echo "✅ 健康检查通过"
+          else
+            echo "❌ 健康检查失败"
+            docker logs k8s-dashboard
+            exit 1
+          fi
+
+          # 清理
+          docker stop k8s-dashboard
+          docker rm k8s-dashboard
+
+      - name: 测试结果
+        if: always()
+        run: |
+          echo "## 🧪 镜像测试完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ $? -eq 0 ]; then
+            echo "✅ 镜像测试通过" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ 镜像测试失败" >> $GITHUB_STEP_SUMMARY
+          fi
