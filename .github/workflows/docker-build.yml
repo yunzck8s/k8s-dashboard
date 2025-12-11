@@ -22,8 +22,8 @@ on:
           - 'false'
 
 env:
-  # Docker Hub 镜像名称（修改为你的 Docker Hub 用户名）
-  DOCKERHUB_IMAGE: your-dockerhub-username/k8s-dashboard
+  # Docker Hub 镜像名称
+  DOCKERHUB_IMAGE: zunshen/k8s-dashboard
   # GitHub Container Registry 镜像名称
   GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/k8s-dashboard
 
