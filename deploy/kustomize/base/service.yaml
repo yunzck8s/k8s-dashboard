@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-dashboard
+  namespace: k8s-dashboard
+  labels:
+    app.kubernetes.io/name: k8s-dashboard
+    app.kubernetes.io/component: dashboard
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: k8s-dashboard
+    app.kubernetes.io/component: dashboard

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-dashboard-config
+  namespace: k8s-dashboard
+data:
+  # 开发环境特定配置
+  LOG_LEVEL: "debug"
+  LOG_FORMAT: "text"
+
+  # 开发环境数据库
+  POSTGRES_HOST: "postgresql-dev.k8s-dashboard.svc.cluster.local"
+  POSTGRES_DB: "k8s_dashboard_dev"
+
+  # 开发环境 VictoriaMetrics
+  VICTORIA_METRICS_URL: "http://victoria-metrics-dev.monitoring.svc.cluster.local:8428"

@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: k8s-dashboard
+  namespace: k8s-dashboard
+spec:
+  rules:
+    - host: dashboard-dev.example.com  # 修改为实际的开发环境域名
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: k8s-dashboard
+                port:
+                  name: http

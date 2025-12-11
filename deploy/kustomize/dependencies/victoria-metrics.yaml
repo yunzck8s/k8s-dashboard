@@ -1,0 +1,129 @@
+# VictoriaMetrics 示例部署
+# 这是一个简化的单节点部署，生产环境建议使用 victoria-metrics-operator 或集群模式
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: victoria-metrics-pvc
+  namespace: monitoring
+  labels:
+    app: victoria-metrics
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  # storageClassName: your-storage-class  # 根据实际情况指定
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victoria-metrics
+  namespace: monitoring
+  labels:
+    app: victoria-metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: victoria-metrics
+  template:
+    metadata:
+      labels:
+        app: victoria-metrics
+    spec:
+      containers:
+        - name: victoria-metrics
+          image: victoriametrics/victoria-metrics:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - -storageDataPath=/storage
+            - -retentionPeriod=90d  # 数据保留 90 天
+            - -httpListenAddr=:8428
+            - -memory.allowedPercent=60
+          ports:
+            - name: http
+              containerPort: 8428
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /storage
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: victoria-metrics-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victoria-metrics
+  namespace: monitoring
+  labels:
+    app: victoria-metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8428
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: victoria-metrics
+
+---
+# 可选：Ingress 用于外部访问
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: victoria-metrics
+#   namespace: monitoring
+#   labels:
+#     app: victoria-metrics
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#     - host: vm.example.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: victoria-metrics
+#                 port:
+#                   name: http

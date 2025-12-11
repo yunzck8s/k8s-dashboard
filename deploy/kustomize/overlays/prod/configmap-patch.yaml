@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-dashboard-config
+  namespace: k8s-dashboard
+data:
+  # 生产环境特定配置
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # 生产环境数据库
+  POSTGRES_HOST: "postgresql.k8s-dashboard.svc.cluster.local"
+  POSTGRES_DB: "k8s_dashboard"
+  POSTGRES_SSLMODE: "require"  # 生产环境启用 SSL
+
+  # 生产环境 VictoriaMetrics
+  VICTORIA_METRICS_URL: "http://victoria-metrics.monitoring.svc.cluster.local:8428"
+
+  # 审计日志配置（生产环境保留更长时间）
+  AUDIT_LOG_MAX_AGE: "90"
+  AUDIT_LOG_MAX_BACKUPS: "30"
