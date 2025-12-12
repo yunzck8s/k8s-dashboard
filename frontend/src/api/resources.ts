@@ -36,6 +36,8 @@ import type {
   AuditLog,
   Alert,
   AlertSummary,
+  AlertAcknowledgement,
+  Silence,
   ClusterInfo,
 } from '../types/api';
 
@@ -520,14 +522,37 @@ export const auditApi = {
 
 // ============ 告警 ============
 export const alertApi = {
-  list: (params?: ListParams & { severity?: string; acknowledged?: boolean }) =>
-    get<ListResponse<Alert>>('/alerts', buildParams(params)),
+  list: (params?: { severity?: string; namespace?: string; alertname?: string; state?: string }) =>
+    get<ListResponse<Alert>>('/alerts', params as Record<string, unknown>),
+  get: (fingerprint: string) =>
+    get<Alert>(`/alerts/${fingerprint}`),
   getSummary: () =>
     get<AlertSummary>('/alerts/summary'),
-  acknowledge: (id: string) =>
-    post<void>(`/alerts/${id}/acknowledge`),
-  acknowledgeAll: () =>
-    post<void>('/alerts/acknowledge-all'),
+  getNames: () =>
+    get<{ items: string[] }>('/alerts/names'),
+  acknowledge: (fingerprint: string, data: { comment: string; expiresAt?: string }) =>
+    post<void>(`/alerts/${fingerprint}/acknowledge`, data),
+  unacknowledge: (fingerprint: string) =>
+    del<void>(`/alerts/${fingerprint}/acknowledge`),
+  getAcknowledgement: (fingerprint: string) =>
+    get<AlertAcknowledgement>(`/alerts/${fingerprint}/acknowledgement`),
+};
+
+// ============ 静默规则 ============
+export const silenceApi = {
+  list: (params?: { state?: string }) =>
+    get<ListResponse<Silence>>('/silences', params as Record<string, unknown>),
+  get: (id: number) =>
+    get<Silence>(`/silences/${id}`),
+  create: (data: {
+    matchers: Array<{ name: string; value: string; isRegex: boolean; isEqual: boolean }>;
+    startsAt: string;
+    endsAt: string;
+    comment: string;
+  }) =>
+    post<Silence>('/silences', data),
+  delete: (id: number) =>
+    del<void>(`/silences/${id}`),
 };
 
 // ============ 多集群 ============

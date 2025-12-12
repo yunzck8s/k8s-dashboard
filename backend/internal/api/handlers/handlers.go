@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/k8s-dashboard/backend/internal/alertmanager"
+	"github.com/k8s-dashboard/backend/internal/alerts"
 	"github.com/k8s-dashboard/backend/internal/audit"
 	"github.com/k8s-dashboard/backend/internal/k8s"
 	"github.com/k8s-dashboard/backend/internal/metrics"
@@ -30,19 +31,21 @@ import (
 
 // Handler API 处理器
 type Handler struct {
-	k8s     *k8s.Client
-	metrics *metrics.Client
-	alerts  *alertmanager.Client
-	audit   *audit.Client
+	k8s          *k8s.Client
+	metrics      *metrics.Client
+	alerts       *alertmanager.Client
+	alertService *alerts.Service
+	audit        *audit.Client
 }
 
 // NewHandler 创建处理器
-func NewHandler(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, auditClient *audit.Client) *Handler {
+func NewHandler(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client) *Handler {
 	return &Handler{
-		k8s:     k8sClient,
-		metrics: metricsClient,
-		alerts:  alertClient,
-		audit:   auditClient,
+		k8s:          k8sClient,
+		metrics:      metricsClient,
+		alerts:       alertClient,
+		alertService: alertService,
+		audit:        auditClient,
 	}
 }
 
@@ -1842,14 +1845,22 @@ func (h *Handler) ListAllPodMetricsVM(c *gin.Context) {
 
 // ========== Alerts (Alertmanager) ==========
 
-// ListAlerts 获取所有活跃告警
+// ListAlerts 获取告警列表（支持过滤）
 func (h *Handler) ListAlerts(c *gin.Context) {
 	if h.alerts == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alertmanager not configured"})
 		return
 	}
 
-	alerts, err := h.alerts.GetActiveAlerts()
+	// 解析过滤参数
+	filter := alertmanager.AlertFilter{
+		Severity:  c.Query("severity"),
+		Namespace: c.Query("namespace"),
+		AlertName: c.Query("alertname"),
+		State:     c.DefaultQuery("state", "active"), // 默认只显示活跃告警
+	}
+
+	alerts, err := h.alerts.GetFilteredAlerts(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1858,6 +1869,46 @@ func (h *Handler) ListAlerts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"items": alerts,
 		"total": len(alerts),
+	})
+}
+
+// GetAlertDetail 获取告警详情
+func (h *Handler) GetAlertDetail(c *gin.Context) {
+	if h.alerts == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alertmanager not configured"})
+		return
+	}
+
+	fingerprint := c.Param("fingerprint")
+	if fingerprint == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint is required"})
+		return
+	}
+
+	alert, err := h.alerts.GetAlertByFingerprint(fingerprint)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, alert)
+}
+
+// GetAlertNames 获取告警名称列表（用于过滤器）
+func (h *Handler) GetAlertNames(c *gin.Context) {
+	if h.alerts == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alertmanager not configured"})
+		return
+	}
+
+	names, err := h.alerts.GetAlertNames()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": names,
 	})
 }
 
@@ -1875,6 +1926,213 @@ func (h *Handler) GetAlertSummary(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, summary)
+}
+
+// AcknowledgeAlert 确认告警
+func (h *Handler) AcknowledgeAlert(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	fingerprint := c.Param("fingerprint")
+	if fingerprint == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint is required"})
+		return
+	}
+
+	var req struct {
+		Comment   string     `json:"comment"`
+		ExpiresAt *time.Time `json:"expiresAt"`
+	}
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// 从上下文获取用户（如果有认证）
+	user := "anonymous"
+	if val, exists := c.Get("user"); exists {
+		if u, ok := val.(string); ok {
+			user = u
+		}
+	}
+
+	if err := h.alertService.AcknowledgeAlert(fingerprint, user, req.Comment, req.ExpiresAt); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Alert acknowledged"})
+}
+
+// UnacknowledgeAlert 取消确认告警
+func (h *Handler) UnacknowledgeAlert(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	fingerprint := c.Param("fingerprint")
+	if fingerprint == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint is required"})
+		return
+	}
+
+	if err := h.alertService.UnacknowledgeAlert(fingerprint); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Alert unacknowledged"})
+}
+
+// GetAlertAcknowledgement 获取告警确认记录
+func (h *Handler) GetAlertAcknowledgement(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	fingerprint := c.Param("fingerprint")
+	if fingerprint == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint is required"})
+		return
+	}
+
+	ack, err := h.alertService.GetAcknowledgement(fingerprint)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if ack == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "acknowledgement not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, ack)
+}
+
+// ========== 静默规则 ==========
+
+// ListSilences 列出静默规则
+func (h *Handler) ListSilences(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	state := c.Query("state")
+
+	silences, err := h.alertService.ListSilences(state)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"items": silences,
+		"total": len(silences),
+	})
+}
+
+// GetSilence 获取单个静默规则
+func (h *Handler) GetSilence(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid silence id"})
+		return
+	}
+
+	silence, err := h.alertService.GetSilence(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if silence == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "silence not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, silence)
+}
+
+// CreateSilence 创建静默规则
+func (h *Handler) CreateSilence(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	var req struct {
+		Matchers  []map[string]interface{} `json:"matchers"`
+		StartsAt  time.Time                `json:"startsAt"`
+		EndsAt    time.Time                `json:"endsAt"`
+		Comment   string                   `json:"comment"`
+	}
+
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	// 验证参数
+	if len(req.Matchers) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "matchers is required"})
+		return
+	}
+	if req.EndsAt.Before(req.StartsAt) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "endsAt must be after startsAt"})
+		return
+	}
+	if req.Comment == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "comment is required"})
+		return
+	}
+
+	// 从上下文获取用户（如果有认证）
+	user := "anonymous"
+	if val, exists := c.Get("user"); exists {
+		if u, ok := val.(string); ok {
+			user = u
+		}
+	}
+
+	silence, err := h.alertService.CreateSilence(req.Matchers, req.StartsAt, req.EndsAt, user, req.Comment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, silence)
+}
+
+// DeleteSilence 删除静默规则
+func (h *Handler) DeleteSilence(c *gin.Context) {
+	if h.alertService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alert service not configured"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid silence id"})
+		return
+	}
+
+	if err := h.alertService.DeleteSilence(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "silence deleted"})
 }
 
 // 编译时检查，确保类型实现

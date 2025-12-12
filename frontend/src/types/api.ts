@@ -203,6 +203,45 @@ export interface AlertSummary {
   info: number;
 }
 
+// 告警过滤参数
+export interface AlertFilter {
+  severity?: string;
+  namespace?: string;
+  alertname?: string;
+  state?: string;
+}
+
+// 告警确认
+export interface AlertAcknowledgement {
+  id: number;
+  alertFingerprint: string;
+  acknowledgedBy: string;
+  acknowledgedAt: string;
+  comment: string;
+  expiresAt?: string;
+}
+
+// 静默规则
+export interface Silence {
+  id: number;
+  silenceId: string;
+  matchers: SilenceMatcher[];
+  startsAt: string;
+  endsAt: string;
+  createdBy: string;
+  comment: string;
+  state: 'active' | 'pending' | 'expired';
+  createdAt: string;
+}
+
+// 静默匹配器
+export interface SilenceMatcher {
+  name: string;
+  value: string;
+  isRegex: boolean;
+  isEqual: boolean; // true = =, false = !=
+}
+
 // 集群信息
 export interface ClusterInfo {
   name: string;

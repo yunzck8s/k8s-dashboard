@@ -1,6 +1,7 @@
 package alertmanager
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -141,19 +142,50 @@ func (c *Client) GetAlertSummary() (*AlertSummary, error) {
 	return summary, nil
 }
 
+// AlertFilter 告警过滤条件
+type AlertFilter struct {
+	Severity  string // critical, warning, info
+	Namespace string
+	AlertName string
+	State     string // active, suppressed, unprocessed
+}
+
 // GetActiveAlerts 获取活跃告警（按严重级别排序）
 func (c *Client) GetActiveAlerts() ([]Alert, error) {
+	return c.GetFilteredAlerts(AlertFilter{State: "active"})
+}
+
+// GetFilteredAlerts 获取过滤后的告警（按严重级别排序）
+func (c *Client) GetFilteredAlerts(filter AlertFilter) ([]Alert, error) {
 	alerts, err := c.GetAlerts()
 	if err != nil {
 		return nil, err
 	}
 
-	// 过滤活跃告警并排序
-	var activeAlerts []Alert
+	// 过滤告警
+	var filteredAlerts []Alert
 	for _, alert := range alerts {
-		if alert.Status.State == "active" {
-			activeAlerts = append(activeAlerts, alert)
+		// 状态过滤（默认只显示活跃告警）
+		if filter.State != "" && alert.Status.State != filter.State {
+			continue
 		}
+
+		// 严重级别过滤
+		if filter.Severity != "" && alert.Labels["severity"] != filter.Severity {
+			continue
+		}
+
+		// 命名空间过滤
+		if filter.Namespace != "" && alert.Labels["namespace"] != filter.Namespace {
+			continue
+		}
+
+		// 告警名称过滤
+		if filter.AlertName != "" && alert.Labels["alertname"] != filter.AlertName {
+			continue
+		}
+
+		filteredAlerts = append(filteredAlerts, alert)
 	}
 
 	// 按严重级别排序: critical > warning > info
@@ -163,15 +195,189 @@ func (c *Client) GetActiveAlerts() ([]Alert, error) {
 		"info":     2,
 	}
 
-	for i := 0; i < len(activeAlerts)-1; i++ {
-		for j := i + 1; j < len(activeAlerts); j++ {
-			si := severityOrder[activeAlerts[i].Labels["severity"]]
-			sj := severityOrder[activeAlerts[j].Labels["severity"]]
+	for i := 0; i < len(filteredAlerts)-1; i++ {
+		for j := i + 1; j < len(filteredAlerts); j++ {
+			si := severityOrder[filteredAlerts[i].Labels["severity"]]
+			sj := severityOrder[filteredAlerts[j].Labels["severity"]]
 			if si > sj {
-				activeAlerts[i], activeAlerts[j] = activeAlerts[j], activeAlerts[i]
+				filteredAlerts[i], filteredAlerts[j] = filteredAlerts[j], filteredAlerts[i]
 			}
 		}
 	}
 
-	return activeAlerts, nil
+	return filteredAlerts, nil
 }
+
+// GetAlertByFingerprint 根据 fingerprint 获取单个告警
+func (c *Client) GetAlertByFingerprint(fingerprint string) (*Alert, error) {
+	alerts, err := c.GetAlerts()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, alert := range alerts {
+		if alert.Fingerprint == fingerprint {
+			return &alert, nil
+		}
+	}
+
+	return nil, fmt.Errorf("告警未找到: %s", fingerprint)
+}
+
+// GetAlertNames 获取所有告警名称（用于过滤器下拉选项）
+func (c *Client) GetAlertNames() ([]string, error) {
+	alerts, err := c.GetAlerts()
+	if err != nil {
+		return nil, err
+	}
+
+	nameMap := make(map[string]bool)
+	for _, alert := range alerts {
+		if name := alert.Labels["alertname"]; name != "" {
+			nameMap[name] = true
+		}
+	}
+
+	names := make([]string, 0, len(nameMap))
+	for name := range nameMap {
+		names = append(names, name)
+	}
+
+	return names, nil
+}
+
+// ========== 静默管理 ==========
+
+// Silence 静默规则结构
+type Silence struct {
+	ID        string                   `json:"id"`
+	Matchers  []Matcher                `json:"matchers"`
+	StartsAt  time.Time                `json:"startsAt"`
+	EndsAt    time.Time                `json:"endsAt"`
+	CreatedBy string                   `json:"createdBy"`
+	Comment   string                   `json:"comment"`
+	Status    SilenceStatus            `json:"status"`
+}
+
+// Matcher 标签匹配器
+type Matcher struct {
+	Name    string `json:"name"`
+	Value   string `json:"value"`
+	IsRegex bool   `json:"isRegex"`
+	IsEqual bool   `json:"isEqual"` // true = =, false = !=
+}
+
+// SilenceStatus 静默状态
+type SilenceStatus struct {
+	State string `json:"state"` // active, pending, expired
+}
+
+// GetSilences 获取所有静默规则
+func (c *Client) GetSilences() ([]Silence, error) {
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/api/v2/silences", c.baseURL))
+	if err != nil {
+		return nil, fmt.Errorf("获取静默规则失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	var silences []Silence
+	if err := json.Unmarshal(body, &silences); err != nil {
+		return nil, fmt.Errorf("解析静默规则失败: %w", err)
+	}
+
+	return silences, nil
+}
+
+// GetSilence 获取单个静默规则
+func (c *Client) GetSilence(id string) (*Silence, error) {
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/api/v2/silence/%s", c.baseURL, id))
+	if err != nil {
+		return nil, fmt.Errorf("获取静默规则失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return nil, fmt.Errorf("静默规则不存在: %s", id)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	var silence Silence
+	if err := json.Unmarshal(body, &silence); err != nil {
+		return nil, fmt.Errorf("解析静默规则失败: %w", err)
+	}
+
+	return &silence, nil
+}
+
+// CreateSilence 创建静默规则
+func (c *Client) CreateSilence(silence *Silence) (string, error) {
+	data, err := json.Marshal(silence)
+	if err != nil {
+		return "", fmt.Errorf("序列化静默规则失败: %w", err)
+	}
+
+	resp, err := c.httpClient.Post(
+		fmt.Sprintf("%s/api/v2/silences", c.baseURL),
+		"application/json",
+		bytes.NewBuffer(data),
+	)
+	if err != nil {
+		return "", fmt.Errorf("创建静默规则失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("创建静默规则失败: %s", string(body))
+	}
+
+	// 读取返回的 silence ID
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	var result struct {
+		SilenceID string `json:"silenceID"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("解析响应失败: %w", err)
+	}
+
+	return result.SilenceID, nil
+}
+
+// DeleteSilence 删除静默规则
+func (c *Client) DeleteSilence(id string) error {
+	req, err := http.NewRequest(
+		"DELETE",
+		fmt.Sprintf("%s/api/v2/silence/%s", c.baseURL, id),
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("删除静默规则失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("删除静默规则失败: %s", string(body))
+	}
+
+	return nil
+}
+

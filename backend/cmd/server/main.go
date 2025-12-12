@@ -14,6 +14,7 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/k8s-dashboard/backend/internal/alertmanager"
+	"github.com/k8s-dashboard/backend/internal/alerts"
 	"github.com/k8s-dashboard/backend/internal/api"
 	"github.com/k8s-dashboard/backend/internal/audit"
 	"github.com/k8s-dashboard/backend/internal/auth"
@@ -77,6 +78,7 @@ func main() {
 	var db *sql.DB
 	var auditClient *audit.Client
 	var authClient *auth.Client
+	var alertService *alerts.Service
 
 	// 尝试连接数据库
 	db, err = connectDB(pgHost, pgPort, pgUser, pgPassword, pgDB)
@@ -94,10 +96,19 @@ func main() {
 		if err != nil {
 			log.Printf("Warning: 认证模块初始化失败: %v", err)
 		}
+
+		// 初始化告警服务
+		alertRepo, err := alerts.NewRepository(pgHost, pgPort, pgUser, pgPassword, pgDB)
+		if err != nil {
+			log.Printf("Warning: 告警数据仓库初始化失败: %v", err)
+		} else {
+			alertService = alerts.NewService(alertRepo, alertClient)
+			log.Printf("告警服务初始化成功")
+		}
 	}
 
 	// 创建路由
-	router := api.NewRouter(k8sClient, metricsClient, alertClient, auditClient, authClient)
+	router := api.NewRouter(k8sClient, metricsClient, alertClient, alertService, auditClient, authClient)
 
 	// 配置 HTTP 服务器
 	port := os.Getenv("PORT")

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/k8s-dashboard/backend/internal/alertmanager"
+	"github.com/k8s-dashboard/backend/internal/alerts"
 	"github.com/k8s-dashboard/backend/internal/api/handlers"
 	"github.com/k8s-dashboard/backend/internal/api/middleware"
 	"github.com/k8s-dashboard/backend/internal/audit"
@@ -16,7 +17,7 @@ import (
 )
 
 // NewRouter 创建 HTTP 路由
-func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, auditClient *audit.Client, authClient *auth.Client) *gin.Engine {
+func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.New()
@@ -42,7 +43,7 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 	})
 
 	// 创建处理器
-	h := handlers.NewHandler(k8sClient, metricsClient, alertClient, auditClient)
+	h := handlers.NewHandler(k8sClient, metricsClient, alertClient, alertService, auditClient)
 	authHandler := handlers.NewAuthHandler(authClient)
 
 	// ========== 公开 API（不需要认证）==========
@@ -75,6 +76,17 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		// 告警 (Alertmanager)
 		v1.GET("/alerts", h.ListAlerts)
 		v1.GET("/alerts/summary", h.GetAlertSummary)
+		v1.GET("/alerts/names", h.GetAlertNames)
+		v1.GET("/alerts/:fingerprint", h.GetAlertDetail)
+		v1.POST("/alerts/:fingerprint/acknowledge", h.AcknowledgeAlert)
+		v1.DELETE("/alerts/:fingerprint/acknowledge", h.UnacknowledgeAlert)
+		v1.GET("/alerts/:fingerprint/acknowledgement", h.GetAlertAcknowledgement)
+
+		// 静默规则
+		v1.GET("/silences", h.ListSilences)
+		v1.POST("/silences", h.CreateSilence)
+		v1.GET("/silences/:id", h.GetSilence)
+		v1.DELETE("/silences/:id", h.DeleteSilence)
 
 		// Namespaces (使用不同的路径避免冲突)
 		v1.GET("/namespaces", h.ListNamespaces)
