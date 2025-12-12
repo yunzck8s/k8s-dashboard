@@ -12,7 +12,6 @@ resources:
   - secret.yaml
   - deployment.yaml
   - service.yaml
-  - ingress.yaml
 
 # 通用标签
 labels:

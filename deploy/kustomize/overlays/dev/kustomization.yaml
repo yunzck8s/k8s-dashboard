@@ -10,16 +10,12 @@ labels:
   - pairs:
       environment: dev
 
-# ConfigMap 和 Ingress 补丁
-patches:
-  - path: configmap-patch.yaml
-  - path: ingress-patch.yaml
 
 # 镜像配置
 images:
   - name: k8s-dashboard
-    newName: k8s-dashboard
-    newTag: dev
+    newName: zunshen/k8s-dashboard
+    newTag: latest
 
 # 副本数
 replicas:
