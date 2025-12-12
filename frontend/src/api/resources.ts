@@ -265,7 +265,7 @@ export const serviceApi = {
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/services/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
-    put<void>(`/namespaces/${namespace}/services/${name}/yaml`, { yaml }),
+    putYaml<Service>(`/namespaces/${namespace}/services/${name}/yaml`, yaml),
   getEndpoints: (namespace: string, name: string) =>
     get<Pod[]>(`/namespaces/${namespace}/services/${name}/endpoints`),
 };
@@ -287,7 +287,7 @@ export const ingressApi = {
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/ingresses/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
-    put<void>(`/namespaces/${namespace}/ingresses/${name}/yaml`, { yaml }),
+    putYaml<Ingress>(`/namespaces/${namespace}/ingresses/${name}/yaml`, yaml),
 };
 
 // ============ ConfigMap ============

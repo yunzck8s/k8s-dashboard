@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { secretApi } from '../../../api';
 import { useAppStore } from '../../../store';
@@ -7,11 +7,15 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import Pagination from '../../../components/common/Pagination';
+import SecretForm from '../../../components/config/SecretForm';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 export default function Secrets() {
   const { currentNamespace } = useAppStore();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const queryClient = useQueryClient();
 
   // 命名空间变化时重置页码
   useEffect(() => {
@@ -25,6 +29,18 @@ export default function Secrets() {
         ? secretApi.listAll()
         : secretApi.list(currentNamespace),
     refetchInterval: 30000,
+  });
+
+  // 创建 Secret
+  const createMutation = useMutation({
+    mutationFn: (secret: any) => secretApi.create(currentNamespace, secret),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['secrets'] });
+      setShowCreateModal(false);
+    },
+    onError: (error: Error) => {
+      alert(`创建失败: ${error.message}`);
+    },
   });
 
   if (isLoading) {
@@ -97,9 +113,21 @@ export default function Secrets() {
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
         </div>
-        <button onClick={() => refetch()} className="btn btn-secondary">
-          刷新
-        </button>
+        <div className="flex items-center gap-3">
+          {/* 创建按钮 */}
+          {currentNamespace !== 'all' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
+            >
+              <PlusIcon className="w-5 h-5" />
+              创建 Secret
+            </button>
+          )}
+          <button onClick={() => refetch()} className="btn btn-secondary">
+            刷新
+          </button>
+        </div>
       </div>
 
       {/* Secret 列表 */}
@@ -166,6 +194,15 @@ export default function Secrets() {
           onPageSizeChange={handlePageSizeChange}
         />
       )}
+
+      {/* 创建 Secret 表单 */}
+      <SecretForm
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={(secret) => createMutation.mutateAsync(secret)}
+        namespace={currentNamespace}
+        isPending={createMutation.isPending}
+      />
     </div>
   );
 }

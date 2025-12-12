@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { serviceApi } from '../../../api';
 import { useAppStore } from '../../../store';
@@ -8,11 +8,15 @@ import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Service } from '../../../types';
 import Pagination from '../../../components/common/Pagination';
+import ServiceForm from '../../../components/network/ServiceForm';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 export default function Services() {
   const { currentNamespace } = useAppStore();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const queryClient = useQueryClient();
 
   // 命名空间变化时重置页码
   useEffect(() => {
@@ -26,6 +30,18 @@ export default function Services() {
         ? serviceApi.listAll()
         : serviceApi.list(currentNamespace),
     refetchInterval: 30000,
+  });
+
+  // 创建 Service
+  const createMutation = useMutation({
+    mutationFn: (service: any) => serviceApi.create(currentNamespace, service),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+      setShowCreateModal(false);
+    },
+    onError: (error: Error) => {
+      alert(`创建失败: ${error.message}`);
+    },
   });
 
   if (isLoading) {
@@ -104,9 +120,21 @@ export default function Services() {
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
         </div>
-        <button onClick={() => refetch()} className="btn btn-secondary">
-          刷新
-        </button>
+        <div className="flex items-center gap-3">
+          {/* 创建按钮 */}
+          {currentNamespace !== 'all' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
+            >
+              <PlusIcon className="w-5 h-5" />
+              创建 Service
+            </button>
+          )}
+          <button onClick={() => refetch()} className="btn btn-secondary">
+            刷新
+          </button>
+        </div>
       </div>
 
       {/* Service 列表 */}
@@ -184,6 +212,15 @@ export default function Services() {
           onPageSizeChange={handlePageSizeChange}
         />
       )}
+
+      {/* 创建 Service 表单 */}
+      <ServiceForm
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={(service) => createMutation.mutateAsync(service)}
+        namespace={currentNamespace}
+        isPending={createMutation.isPending}
+      />
     </div>
   );
 }

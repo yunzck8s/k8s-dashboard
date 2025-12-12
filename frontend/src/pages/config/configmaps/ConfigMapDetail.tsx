@@ -42,11 +42,11 @@ export default function ConfigMapDetail() {
     enabled: !!namespace && !!name,
   });
 
-  // 获取 ConfigMap YAML
-  const { data: yamlData } = useQuery({
+  // 获取 ConfigMap YAML（移除 activeTab 限制，以便在任何标签页都能编辑）
+  const { data: yamlData, refetch: refetchYaml } = useQuery({
     queryKey: ['configmap-yaml', namespace, name],
     queryFn: () => configMapApi.getYaml(namespace!, name!),
-    enabled: !!namespace && !!name && activeTab === 'yaml',
+    enabled: !!namespace && !!name,
   });
 
   // 删除 ConfigMap
@@ -331,8 +331,8 @@ function YamlTab({ yaml }: { yaml: string }) {
           复制 YAML
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-y-auto">
+        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );

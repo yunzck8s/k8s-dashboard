@@ -168,14 +168,21 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.GET("/services", h.ListAllServices)
 		v1.GET("/namespaces/:ns/services", h.ListServices)
 		v1.GET("/namespaces/:ns/services/:name", h.GetService)
+		v1.POST("/namespaces/:ns/services", h.CreateService)
+		v1.PUT("/namespaces/:ns/services/:name", h.UpdateService)
 		v1.DELETE("/namespaces/:ns/services/:name", h.DeleteService)
 		v1.GET("/namespaces/:ns/services/:name/yaml", h.GetServiceYAML)
+		v1.PUT("/namespaces/:ns/services/:name/yaml", h.UpdateServiceYAML)
 
 		// Ingresses
 		v1.GET("/ingresses", h.ListAllIngresses)
 		v1.GET("/namespaces/:ns/ingresses", h.ListIngresses)
 		v1.GET("/namespaces/:ns/ingresses/:name", h.GetIngress)
+		v1.POST("/namespaces/:ns/ingresses", h.CreateIngress)
+		v1.PUT("/namespaces/:ns/ingresses/:name", h.UpdateIngress)
 		v1.DELETE("/namespaces/:ns/ingresses/:name", h.DeleteIngress)
+		v1.GET("/namespaces/:ns/ingresses/:name/yaml", h.GetIngressYAML)
+		v1.PUT("/namespaces/:ns/ingresses/:name/yaml", h.UpdateIngressYAML)
 
 		// ConfigMaps
 		v1.GET("/configmaps", h.ListAllConfigMaps)

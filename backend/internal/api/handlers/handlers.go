@@ -1041,6 +1041,70 @@ func (h *Handler) GetServiceYAML(c *gin.Context) {
 	c.String(http.StatusOK, string(yamlBytes))
 }
 
+func (h *Handler) CreateService(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	var svc corev1.Service
+	if err := c.ShouldBindJSON(&svc); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	svc.Namespace = namespace
+	created, err := h.k8s.Clientset.CoreV1().Services(namespace).Create(ctx, &svc, metav1.CreateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, created)
+}
+
+func (h *Handler) UpdateService(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	var svc corev1.Service
+	if err := c.ShouldBindJSON(&svc); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	svc.Namespace = namespace
+	svc.Name = name
+	updated, err := h.k8s.Clientset.CoreV1().Services(namespace).Update(ctx, &svc, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *Handler) UpdateServiceYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var svc corev1.Service
+	if err := yaml.Unmarshal(body, &svc); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	svc.Namespace = namespace
+	svc.Name = name
+
+	updated, err := h.k8s.Clientset.CoreV1().Services(namespace).Update(ctx, &svc, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
 // ========== Ingresses ==========
 
 func (h *Handler) ListAllIngresses(c *gin.Context) {
@@ -1086,6 +1150,88 @@ func (h *Handler) DeleteIngress(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *Handler) CreateIngress(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	var ing networkingv1.Ingress
+	if err := c.ShouldBindJSON(&ing); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	ing.Namespace = namespace
+	created, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Create(ctx, &ing, metav1.CreateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, created)
+}
+
+func (h *Handler) UpdateIngress(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	var ing networkingv1.Ingress
+	if err := c.ShouldBindJSON(&ing); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	ing.Namespace = namespace
+	ing.Name = name
+	updated, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Update(ctx, &ing, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+func (h *Handler) GetIngressYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	ing, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	ing.ManagedFields = nil
+	yamlBytes, err := yaml.Marshal(ing)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.String(http.StatusOK, string(yamlBytes))
+}
+
+func (h *Handler) UpdateIngressYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var ing networkingv1.Ingress
+	if err := yaml.Unmarshal(body, &ing); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ing.Namespace = namespace
+	ing.Name = name
+
+	updated, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Update(ctx, &ing, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
 }
 
 // ========== ConfigMaps ==========

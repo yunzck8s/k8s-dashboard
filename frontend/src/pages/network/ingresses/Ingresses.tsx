@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ingressApi } from '../../../api';
 import { useAppStore } from '../../../store';
@@ -8,11 +8,15 @@ import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Ingress } from '../../../types';
 import Pagination from '../../../components/common/Pagination';
+import IngressForm from '../../../components/network/IngressForm';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 export default function Ingresses() {
   const { currentNamespace } = useAppStore();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const queryClient = useQueryClient();
 
   // 命名空间变化时重置页码
   useEffect(() => {
@@ -26,6 +30,18 @@ export default function Ingresses() {
         ? ingressApi.listAll()
         : ingressApi.list(currentNamespace),
     refetchInterval: 30000,
+  });
+
+  // 创建 Ingress
+  const createMutation = useMutation({
+    mutationFn: (ingress: any) => ingressApi.create(currentNamespace, ingress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ingresses'] });
+      setShowCreateModal(false);
+    },
+    onError: (error: Error) => {
+      alert(`创建失败: ${error.message}`);
+    },
   });
 
   if (isLoading) {
@@ -109,9 +125,21 @@ export default function Ingresses() {
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
         </div>
-        <button onClick={() => refetch()} className="btn btn-secondary">
-          刷新
-        </button>
+        <div className="flex items-center gap-3">
+          {/* 创建按钮 */}
+          {currentNamespace !== 'all' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+            >
+              <PlusIcon className="w-5 h-5" />
+              创建 Ingress
+            </button>
+          )}
+          <button onClick={() => refetch()} className="btn btn-secondary">
+            刷新
+          </button>
+        </div>
       </div>
 
       {/* Ingress 列表 */}
@@ -210,6 +238,15 @@ export default function Ingresses() {
           onPageSizeChange={handlePageSizeChange}
         />
       )}
+
+      {/* 创建 Ingress 表单 */}
+      <IngressForm
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={(ingress) => createMutation.mutateAsync(ingress)}
+        namespace={currentNamespace}
+        isPending={createMutation.isPending}
+      />
     </div>
   );
 }
