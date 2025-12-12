@@ -113,7 +113,7 @@ export const deploymentApi = {
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/deployments/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
-    put<void>(`/namespaces/${namespace}/deployments/${name}/yaml`, { yaml }),
+    putYaml<Deployment>(`/namespaces/${namespace}/deployments/${name}/yaml`, yaml),
   getRevisions: (namespace: string, name: string) =>
     get<{ items: Array<{ name: string; revision: string; replicas: number; ready: number; created: string; image: string }> }>(`/namespaces/${namespace}/deployments/${name}/revisions`),
   getPods: (namespace: string, name: string) =>
@@ -153,7 +153,7 @@ export const statefulSetApi = {
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/statefulsets/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
-    put<void>(`/namespaces/${namespace}/statefulsets/${name}/yaml`, { yaml }),
+    putYaml<StatefulSet>(`/namespaces/${namespace}/statefulsets/${name}/yaml`, yaml),
   getPods: (namespace: string, name: string) =>
     get<ListResponse<Pod>>(`/namespaces/${namespace}/statefulsets/${name}/pods`),
   getEvents: (namespace: string, name: string) =>
@@ -185,7 +185,7 @@ export const daemonSetApi = {
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/daemonsets/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
-    put<void>(`/namespaces/${namespace}/daemonsets/${name}/yaml`, { yaml }),
+    putYaml<DaemonSet>(`/namespaces/${namespace}/daemonsets/${name}/yaml`, yaml),
   getPods: (namespace: string, name: string) =>
     get<ListResponse<Pod>>(`/namespaces/${namespace}/daemonsets/${name}/pods`),
   getEvents: (namespace: string, name: string) =>

@@ -24,6 +24,7 @@ import {
   CloudIcon,
   UsersIcon,
   CheckBadgeIcon,
+  ChartBarSquareIcon,
 } from '@heroicons/react/24/outline';
 
 interface NavItem {
@@ -85,6 +86,7 @@ const navigation: NavItem[] = [
     ],
   },
   { name: '事件', path: '/events', icon: ClipboardDocumentListIcon },
+  { name: '状态观测', path: '/observation', icon: ChartBarSquareIcon },
   { name: '告警', path: '/alerts', icon: BellAlertIcon },
   { name: '集群', path: '/clusters', icon: Squares2X2Icon },
   { name: '审计日志', path: '/audit', icon: DocumentTextIcon },

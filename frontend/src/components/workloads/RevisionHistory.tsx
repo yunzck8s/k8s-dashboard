@@ -188,10 +188,10 @@ export default function RevisionHistory({
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
                     <span>
-                      {formatDistanceToNow(new Date(rev.createdAt), {
+                      {rev.createdAt ? formatDistanceToNow(new Date(rev.createdAt), {
                         addSuffix: true,
                         locale: zhCN,
-                      })}
+                      }) : '时间未知'}
                     </span>
                     {rev.image && (
                       <span className="truncate max-w-[200px]" title={rev.image}>

@@ -14,6 +14,7 @@ import (
 	"github.com/k8s-dashboard/backend/internal/auth"
 	"github.com/k8s-dashboard/backend/internal/k8s"
 	"github.com/k8s-dashboard/backend/internal/metrics"
+	"github.com/k8s-dashboard/backend/internal/observation"
 )
 
 // NewRouter 创建 HTTP 路由
@@ -45,6 +46,10 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 	// 创建处理器
 	h := handlers.NewHandler(k8sClient, metricsClient, alertClient, alertService, auditClient)
 	authHandler := handlers.NewAuthHandler(authClient)
+
+	// 创建观测服务和处理器
+	observationService := observation.NewService(k8sClient, metricsClient, alertClient)
+	observationHandler := handlers.NewObservationHandler(observationService)
 
 	// ========== 公开 API（不需要认证）==========
 	publicAPI := r.Group("/api/v1")
@@ -252,6 +257,15 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		// 审计日志
 		v1.GET("/audit", h.ListAuditLogs)
 		v1.GET("/audit/stats", h.GetAuditStats)
+
+		// 集群观测
+		v1.GET("/observation/summary", observationHandler.GetObservationSummary)
+		v1.GET("/observation/pods/anomaly", observationHandler.GetPodAnomalies)
+		v1.GET("/observation/nodes/anomaly", observationHandler.GetNodeAnomalies)
+		v1.GET("/observation/resources/excess", observationHandler.GetResourceExcess)
+		v1.GET("/observation/trends/resource", observationHandler.GetResourceTrend)
+		v1.GET("/observation/trends/alerts", observationHandler.GetAlertTrend)
+		v1.GET("/observation/trends/restarts", observationHandler.GetRestartTrend)
 
 		// 审批管理
 		v1.GET("/approvals", authHandler.ListApprovals)

@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import type { StatefulSet, Pod, Event } from '../../../types';
 import UpdateStrategyEditor from '../../../components/workloads/UpdateStrategyEditor';
 import RevisionHistory from '../../../components/workloads/RevisionHistory';
+import YamlEditorModal from '../../../components/common/YamlEditorModal';
 import {
   ArrowLeftIcon,
   TrashIcon,
@@ -16,8 +17,10 @@ import {
   MinusIcon,
   ArrowPathIcon,
   PencilSquareIcon,
+  PencilIcon,
   CheckIcon,
   XMarkIcon,
+  ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
 
 type TabType = 'overview' | 'pods' | 'yaml' | 'events';
@@ -27,8 +30,7 @@ export default function StatefulSetDetail() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showScaleModal, setShowScaleModal] = useState(false);
   const [newReplicas, setNewReplicas] = useState(0);
-  const [isEditingYaml, setIsEditingYaml] = useState(false);
-  const [editedYaml, setEditedYaml] = useState('');
+  const [showYamlEditor, setShowYamlEditor] = useState(false);
   const queryClient = useQueryClient();
 
   // 获取 StatefulSet 详情
@@ -42,7 +44,7 @@ export default function StatefulSetDetail() {
   const { data: yamlData } = useQuery({
     queryKey: ['statefulset-yaml', namespace, name],
     queryFn: () => statefulSetApi.getYaml(namespace!, name!),
-    enabled: !!namespace && !!name && activeTab === 'yaml',
+    enabled: !!namespace && !!name,
   });
 
   // 获取关联的 Pods（使用后端 API）
@@ -92,7 +94,10 @@ export default function StatefulSetDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['statefulset', namespace, name] });
       queryClient.invalidateQueries({ queryKey: ['statefulset-yaml', namespace, name] });
-      setIsEditingYaml(false);
+      setShowYamlEditor(false);
+    },
+    onError: (error: Error) => {
+      alert(`更新失败: ${error.message}`);
     },
   });
 
@@ -131,71 +136,98 @@ export default function StatefulSetDetail() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/workloads/statefulsets" className="btn btn-secondary p-2">
-            <ArrowLeftIcon className="w-5 h-5" />
+          <Link
+            to="/workloads/statefulsets"
+            className="group p-2 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-slate-600 rounded-lg transition-all duration-200 hover:scale-105"
+          >
+            <ArrowLeftIcon className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{name}</h1>
-              <span className={clsx('badge', isHealthy ? 'badge-success' : 'badge-warning')}>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">{name}</h1>
+              <span className={clsx(
+                'px-3 py-1 rounded-full text-xs font-semibold tracking-wide backdrop-blur-sm',
+                isHealthy
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10'
+              )}>
                 {statefulSet.status.readyReplicas || 0}/{statefulSet.status.replicas || 0} Ready
               </span>
             </div>
-            <p className="text-slate-400 mt-1">命名空间: {namespace}</p>
+            <p className="text-slate-400 mt-1.5 text-sm font-medium">命名空间: <span className="text-slate-300">{namespace}</span></p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              setNewReplicas(statefulSet.spec.replicas || 0);
-              setShowScaleModal(true);
-            }}
-            className="btn btn-secondary"
-          >
-            扩缩容
-          </button>
-          <button
-            onClick={() => {
-              if (confirm('确定要重启此 StatefulSet 吗？')) {
-                restartMutation.mutate();
-              }
-            }}
-            className="btn btn-secondary"
-            disabled={restartMutation.isPending}
-          >
-            <ArrowPathIcon className={clsx('w-4 h-4 mr-2', restartMutation.isPending && 'animate-spin')} />
-            重启
-          </button>
+        <div className="flex items-center gap-2">
+          {/* 主要操作按钮组 */}
+          <div className="flex items-center bg-slate-800/60 backdrop-blur-sm rounded-lg border border-slate-700/50 shadow-xl overflow-hidden">
+            <button
+              onClick={() => {
+                setNewReplicas(statefulSet.spec.replicas || 0);
+                setShowScaleModal(true);
+              }}
+              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white transition-all duration-200 border-r border-slate-700/50 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/10 to-blue-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowsPointingOutIcon className="w-4 h-4 relative z-10 group-hover:scale-110 transition-transform" />
+              <span className="relative z-10">扩缩容</span>
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('确定要重启此 StatefulSet 吗？')) {
+                  restartMutation.mutate();
+                }
+              }}
+              disabled={restartMutation.isPending}
+              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/0 via-cyan-600/10 to-cyan-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowPathIcon className={clsx('w-4 h-4 relative z-10 group-hover:scale-110 transition-transform', restartMutation.isPending && 'animate-spin')} />
+              <span className="relative z-10">重启</span>
+            </button>
+          </div>
+
+          {/* 删除按钮 */}
           <button
             onClick={() => {
               if (confirm('确定要删除此 StatefulSet 吗？')) {
                 deleteMutation.mutate();
               }
             }}
-            className="btn btn-danger"
             disabled={deleteMutation.isPending}
+            className="group relative flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-semibold shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 overflow-hidden"
           >
-            <TrashIcon className="w-4 h-4 mr-2" />
-            删除
+            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <TrashIcon className="w-4 h-4 relative z-10" />
+            <span className="relative z-10">删除</span>
           </button>
         </div>
       </div>
 
-      {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
-        <nav className="flex gap-4">
+      {/* 标签页导航 - 现代胶囊式设计 */}
+      <div className="relative">
+        {/* 背景装饰 */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 via-slate-800/10 to-slate-800/30 rounded-xl blur-xl" />
+        <nav className="relative flex gap-2 p-1.5 bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
-                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                'relative px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300',
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  ? 'text-white shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
               )}
             >
-              {tab.label}
+              {/* 激活状态背景 */}
+              {activeTab === tab.id && (
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 rounded-lg shadow-lg shadow-blue-500/30" />
+              )}
+              {/* 激活状态光晕 */}
+              {activeTab === tab.id && (
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-blue-300/20 to-cyan-400/20 rounded-lg blur-md" />
+              )}
+              <span className="relative z-10">{tab.label}</span>
             </button>
           ))}
         </nav>
@@ -208,16 +240,7 @@ export default function StatefulSetDetail() {
         {activeTab === 'yaml' && (
           <YamlTab
             yaml={yamlData || ''}
-            isEditing={isEditingYaml}
-            editedYaml={editedYaml}
-            onStartEdit={() => {
-              setEditedYaml(yamlData || '');
-              setIsEditingYaml(true);
-            }}
-            onCancelEdit={() => setIsEditingYaml(false)}
-            onSaveEdit={() => updateYamlMutation.mutate(editedYaml)}
-            onYamlChange={setEditedYaml}
-            isSaving={updateYamlMutation.isPending}
+            onEditYaml={() => setShowYamlEditor(true)}
           />
         )}
         {activeTab === 'events' && <EventsTab events={eventsData?.items || []} />}
@@ -267,6 +290,16 @@ export default function StatefulSetDetail() {
           </div>
         </div>
       )}
+
+      <YamlEditorModal
+        isOpen={showYamlEditor}
+        onClose={() => setShowYamlEditor(false)}
+        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        initialYaml={yamlData || ''}
+        resourceType="StatefulSet"
+        title={`编辑 StatefulSet - ${name}`}
+        isPending={updateYamlMutation.isPending}
+      />
     </div>
   );
 }
@@ -564,67 +597,49 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
 }
 
 // YAML 标签页
-function YamlTab({
-  yaml,
-  isEditing,
-  editedYaml,
-  onStartEdit,
-  onCancelEdit,
-  onSaveEdit,
-  onYamlChange,
-  isSaving,
-}: {
-  yaml: string;
-  isEditing: boolean;
-  editedYaml: string;
-  onStartEdit: () => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
-  onYamlChange: (yaml: string) => void;
-  isSaving: boolean;
-}) {
+function YamlTab({ yaml, onEditYaml }: { yaml: string; onEditYaml: () => void }) {
+  const [copied, setCopied] = useState(false);
+
   const copyYaml = () => {
-    navigator.clipboard.writeText(isEditing ? editedYaml : yaml);
+    navigator.clipboard.writeText(yaml);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end gap-2">
-        {isEditing ? (
-          <>
-            <button onClick={onCancelEdit} className="btn btn-secondary" disabled={isSaving}>
-              <XMarkIcon className="w-4 h-4 mr-2" />
-              取消
-            </button>
-            <button onClick={onSaveEdit} className="btn btn-primary" disabled={isSaving}>
-              <CheckIcon className="w-4 h-4 mr-2" />
-              {isSaving ? '保存中...' : '保存'}
-            </button>
-          </>
-        ) : (
-          <>
-            <button onClick={copyYaml} className="btn btn-secondary">
-              <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
-              复制 YAML
-            </button>
-            <button onClick={onStartEdit} className="btn btn-primary">
-              <PencilSquareIcon className="w-4 h-4 mr-2" />
-              编辑
-            </button>
-          </>
-        )}
+    <div className="relative">
+      {/* 浮动工具栏 - 毛玻璃效果 */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-1 px-2 py-1.5 bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-lg shadow-lg">
+        {/* 复制按钮 */}
+        <button
+          onClick={copyYaml}
+          className="group relative p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 hover:scale-105"
+          title="复制 YAML"
+        >
+          <ClipboardDocumentIcon className="w-4 h-4" />
+          {copied && (
+            <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-green-500 text-white text-xs rounded whitespace-nowrap">
+              已复制
+            </span>
+          )}
+        </button>
+
+        {/* 分隔线 */}
+        <div className="w-px h-4 bg-slate-700/50" />
+
+        {/* 编辑按钮 */}
+        <button
+          onClick={onEditYaml}
+          className="group relative p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 hover:scale-105"
+          title="编辑 YAML"
+        >
+          <PencilIcon className="w-4 h-4" />
+        </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        {isEditing ? (
-          <textarea
-            value={editedYaml}
-            onChange={(e) => onYamlChange(e.target.value)}
-            className="w-full h-[500px] bg-transparent text-sm text-slate-300 font-mono resize-none focus:outline-none"
-            spellCheck={false}
-          />
-        ) : (
-          <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
-        )}
+
+      {/* YAML 代码块 */}
+      <div className="card p-6 bg-slate-900 max-h-[600px] overflow-y-auto border border-slate-800/50">
+        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words leading-relaxed">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );

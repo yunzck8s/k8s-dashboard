@@ -544,6 +544,8 @@ export interface IngressStatus {
 
 // ConfigMap 相关类型
 export interface ConfigMap {
+  apiVersion?: string;
+  kind?: string;
   metadata: ObjectMeta;
   data?: Record<string, string>;
   binaryData?: Record<string, string>;
@@ -552,6 +554,8 @@ export interface ConfigMap {
 
 // Secret 相关类型
 export interface Secret {
+  apiVersion?: string;
+  kind?: string;
   metadata: ObjectMeta;
   type?: string;
   data?: Record<string, string>;

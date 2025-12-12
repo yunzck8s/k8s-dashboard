@@ -11,11 +11,13 @@ import RevisionHistory from '../../../components/workloads/RevisionHistory';
 import ActionDropdown from '../../../components/common/ActionDropdown';
 import EditImageModal from '../../../components/workloads/EditImageModal';
 import SchedulingEditor from '../../../components/workloads/SchedulingEditor';
+import YamlEditorModal from '../../../components/common/YamlEditorModal';
 import {
   ArrowLeftIcon,
   TrashIcon,
   ArrowPathIcon,
   ClipboardDocumentIcon,
+  PencilIcon,
   PlusIcon,
   MinusIcon,
   PauseIcon,
@@ -39,6 +41,7 @@ export default function DeploymentDetail() {
   const [showRestartModal, setShowRestartModal] = useState(false);
   const [showEditImageModal, setShowEditImageModal] = useState(false);
   const [showSchedulingEditor, setShowSchedulingEditor] = useState(false);
+  const [showYamlEditor, setShowYamlEditor] = useState(false);
   const [newReplicas, setNewReplicas] = useState(0);
   const queryClient = useQueryClient();
 
@@ -61,7 +64,7 @@ export default function DeploymentDetail() {
   const { data: yamlData } = useQuery({
     queryKey: ['deployment-yaml', namespace, name],
     queryFn: () => deploymentApi.getYaml(namespace!, name!),
-    enabled: !!namespace && !!name && activeTab === 'yaml',
+    enabled: !!namespace && !!name,
   });
 
   // 获取关联的 Pods
@@ -145,6 +148,18 @@ export default function DeploymentDetail() {
     },
   });
 
+  const updateYamlMutation = useMutation({
+    mutationFn: (yaml: string) => deploymentApi.updateYaml(namespace!, name!, yaml),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deployment', namespace, name] });
+      queryClient.invalidateQueries({ queryKey: ['deployment-yaml', namespace, name] });
+      setShowYamlEditor(false);
+    },
+    onError: (error: Error) => {
+      alert(`更新失败: ${error.message}`);
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -180,39 +195,49 @@ export default function DeploymentDetail() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/workloads/deployments" className="btn btn-secondary p-2">
-            <ArrowLeftIcon className="w-5 h-5" />
+          <Link
+            to="/workloads/deployments"
+            className="group p-2 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-slate-600 rounded-lg transition-all duration-200 hover:scale-105"
+          >
+            <ArrowLeftIcon className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{name}</h1>
-              <span className={clsx('badge', isHealthy ? 'badge-success' : 'badge-warning')}>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">{name}</h1>
+              <span className={clsx(
+                'px-3 py-1 rounded-full text-xs font-semibold tracking-wide backdrop-blur-sm',
+                isHealthy
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10'
+              )}>
                 {deployment.status.readyReplicas || 0}/{deployment.status.replicas || 0} Ready
               </span>
             </div>
-            <p className="text-slate-400 mt-1">命名空间: {namespace}</p>
+            <p className="text-slate-400 mt-1.5 text-sm font-medium">命名空间: <span className="text-slate-300">{namespace}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {/* 主要操作按钮组 */}
-          <div className="flex items-center bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div className="flex items-center bg-slate-800/60 backdrop-blur-sm rounded-lg border border-slate-700/50 shadow-xl overflow-hidden">
             <button
               onClick={() => {
                 setNewReplicas(deployment.spec.replicas || 0);
                 setShowScaleModal(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors border-r border-slate-700"
+              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white transition-all duration-200 border-r border-slate-700/50 overflow-hidden"
             >
-              <ArrowsPointingOutIcon className="w-4 h-4" />
-              扩缩容
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/10 to-blue-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowsPointingOutIcon className="w-4 h-4 relative z-10 group-hover:scale-110 transition-transform" />
+              <span className="relative z-10">扩缩容</span>
             </button>
             <button
               onClick={() => setShowRestartModal(true)}
               disabled={restartMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
             >
-              <ArrowPathIcon className={clsx('w-4 h-4', restartMutation.isPending && 'animate-spin')} />
-              重启
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/0 via-cyan-600/10 to-cyan-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowPathIcon className={clsx('w-4 h-4 relative z-10 group-hover:scale-110 transition-transform', restartMutation.isPending && 'animate-spin')} />
+              <span className="relative z-10">重启</span>
             </button>
           </div>
 
@@ -221,29 +246,32 @@ export default function DeploymentDetail() {
             <button
               onClick={() => resumeMutation.mutate()}
               disabled={resumeMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              className="group relative flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-lg text-sm font-semibold shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 overflow-hidden"
             >
-              <PlayIcon className="w-4 h-4" />
-              恢复发布
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <PlayIcon className="w-4 h-4 relative z-10" />
+              <span className="relative z-10">恢复发布</span>
             </button>
           ) : (
             <button
               onClick={() => pauseMutation.mutate()}
               disabled={pauseMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              className="group relative flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-lg text-sm font-semibold shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 overflow-hidden"
             >
-              <PauseIcon className="w-4 h-4" />
-              暂停发布
+              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <PauseIcon className="w-4 h-4 relative z-10" />
+              <span className="relative z-10">暂停发布</span>
             </button>
           )}
 
           {/* 更多操作下拉菜单 */}
           <ActionDropdown
             trigger={
-              <button className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors">
-                <Cog6ToothIcon className="w-4 h-4" />
-                配置
-                <EllipsisVerticalIcon className="w-4 h-4" />
+              <button className="group relative flex items-center gap-2 px-3 py-2.5 bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 hover:border-slate-600 rounded-lg text-sm font-medium text-slate-300 hover:text-white shadow-lg transition-all duration-200 hover:scale-105 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/20 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Cog6ToothIcon className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
+                <span className="relative z-10">配置</span>
+                <EllipsisVerticalIcon className="w-4 h-4 relative z-10" />
               </button>
             }
             items={[
@@ -273,21 +301,31 @@ export default function DeploymentDetail() {
         </div>
       </div>
 
-      {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
-        <nav className="flex gap-4">
+      {/* 标签页导航 - 现代胶囊式设计 */}
+      <div className="relative">
+        {/* 背景装饰 */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 via-slate-800/10 to-slate-800/30 rounded-xl blur-xl" />
+        <nav className="relative flex gap-2 p-1.5 bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
-                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                'relative px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300',
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  ? 'text-white shadow-lg'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
               )}
             >
-              {tab.label}
+              {/* 激活状态背景 */}
+              {activeTab === tab.id && (
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 rounded-lg shadow-lg shadow-blue-500/30" />
+              )}
+              {/* 激活状态光晕 */}
+              {activeTab === tab.id && (
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-400/20 via-blue-300/20 to-cyan-400/20 rounded-lg blur-md" />
+              )}
+              <span className="relative z-10">{tab.label}</span>
             </button>
           ))}
         </nav>
@@ -297,7 +335,12 @@ export default function DeploymentDetail() {
       <div>
         {activeTab === 'overview' && <OverviewTab deployment={deployment} namespace={namespace!} name={name!} />}
         {activeTab === 'pods' && <PodsTab pods={podsData?.items || []} namespace={namespace!} />}
-        {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
+        {activeTab === 'yaml' && (
+          <YamlTab
+            yaml={yamlData || ''}
+            onEditYaml={() => setShowYamlEditor(true)}
+          />
+        )}
         {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
       </div>
 
@@ -452,6 +495,16 @@ export default function DeploymentDetail() {
         nodeSelector={deployment.spec.template.spec.nodeSelector}
         tolerations={deployment.spec.template.spec.tolerations}
         isPending={updateSchedulingMutation.isPending}
+      />
+
+      <YamlEditorModal
+        isOpen={showYamlEditor}
+        onClose={() => setShowYamlEditor(false)}
+        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        initialYaml={yamlData || ''}
+        resourceType="Deployment"
+        title={`编辑 Deployment - ${name}`}
+        isPending={updateYamlMutation.isPending}
       />
     </div>
   );
@@ -722,21 +775,49 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
 }
 
 // YAML 标签页
-function YamlTab({ yaml }: { yaml: string }) {
+function YamlTab({ yaml, onEditYaml }: { yaml: string; onEditYaml: () => void }) {
+  const [copied, setCopied] = useState(false);
+
   const copyYaml = () => {
     navigator.clipboard.writeText(yaml);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={copyYaml} className="btn btn-secondary">
-          <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
-          复制 YAML
+    <div className="relative">
+      {/* 浮动工具栏 - 毛玻璃效果 */}
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-1 px-2 py-1.5 bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-lg shadow-lg">
+        {/* 复制按钮 */}
+        <button
+          onClick={copyYaml}
+          className="group relative p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 hover:scale-105"
+          title="复制 YAML"
+        >
+          <ClipboardDocumentIcon className="w-4 h-4" />
+          {copied && (
+            <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-green-500 text-white text-xs rounded whitespace-nowrap">
+              已复制
+            </span>
+          )}
+        </button>
+
+        {/* 分隔线 */}
+        <div className="w-px h-4 bg-slate-700/50" />
+
+        {/* 编辑按钮 */}
+        <button
+          onClick={onEditYaml}
+          className="group relative p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 hover:scale-105"
+          title="编辑 YAML"
+        >
+          <PencilIcon className="w-4 h-4" />
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+
+      {/* YAML 代码块 */}
+      <div className="card p-6 bg-slate-900 max-h-[600px] overflow-y-auto border border-slate-800/50">
+        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words leading-relaxed">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );

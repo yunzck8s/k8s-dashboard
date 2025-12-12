@@ -44,14 +44,29 @@ export default function DaemonSets() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">DaemonSets</h1>
-          <p className="text-slate-400 mt-1">
-            共 {daemonSets.length} 个 DaemonSet
-            {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
+            DaemonSets
+          </h1>
+          <p className="text-slate-400 mt-2 text-sm font-medium">
+            共 <span className="text-green-400 font-semibold">{daemonSets.length}</span> 个 DaemonSet
+            {currentNamespace !== 'all' && (
+              <>
+                {' '}在 <span className="text-emerald-400 font-semibold">{currentNamespace}</span> 命名空间
+              </>
+            )}
           </p>
         </div>
-        <button onClick={() => refetch()} className="btn btn-secondary">
-          刷新
+        <button
+          onClick={() => refetch()}
+          className="group relative px-5 py-2.5 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-green-500/50 rounded-lg text-sm font-semibold text-slate-300 hover:text-white shadow-lg hover:shadow-green-500/20 transition-all duration-300 overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-green-600/0 via-green-600/10 to-green-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <span className="relative z-10 flex items-center gap-2">
+            <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            刷新
+          </span>
         </button>
       </div>
 

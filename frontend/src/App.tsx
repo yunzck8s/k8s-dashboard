@@ -41,6 +41,7 @@ import Settings from './pages/settings/Settings';
 import Events from './pages/events/Events';
 import AuditLogs from './pages/audit/AuditLogs';
 import Alerts from './pages/alerts/Alerts';
+import ClusterObservation from './pages/observation/ClusterObservation';
 import NotFound from './pages/NotFound';
 import Users from './pages/admin/Users';
 import Approvals from './pages/admin/Approvals';
@@ -136,6 +137,9 @@ function App() {
 
             {/* 事件 */}
             <Route path="events" element={<Events />} />
+
+            {/* 状态观测 */}
+            <Route path="observation" element={<ClusterObservation />} />
 
             {/* 审计日志 */}
             <Route path="audit" element={<AuditLogs />} />
