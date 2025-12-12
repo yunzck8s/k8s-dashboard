@@ -96,6 +96,16 @@ export async function del<T>(url: string): Promise<T> {
   return response.data;
 }
 
+// 发送 YAML 内容（Content-Type: text/yaml）
+export async function putYaml<T>(url: string, yamlContent: string): Promise<T> {
+  const response = await api.put<T>(url, yamlContent, {
+    headers: {
+      'Content-Type': 'text/yaml',
+    },
+  });
+  return response.data;
+}
+
 // WebSocket 连接
 export function createWebSocket(path: string): WebSocket {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

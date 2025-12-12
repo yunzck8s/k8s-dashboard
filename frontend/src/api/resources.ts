@@ -1,4 +1,4 @@
-import { get, post, put, del } from './client';
+import { get, post, put, del, putYaml } from './client';
 import type {
   Pod,
   Deployment,
@@ -306,6 +306,8 @@ export const configMapApi = {
     del<void>(`/namespaces/${namespace}/configmaps/${name}`),
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/configmaps/${name}/yaml`),
+  updateYaml: (namespace: string, name: string, yaml: string) =>
+    putYaml<ConfigMap>(`/namespaces/${namespace}/configmaps/${name}/yaml`, yaml),
 };
 
 // ============ Secret ============
@@ -324,6 +326,8 @@ export const secretApi = {
     del<void>(`/namespaces/${namespace}/secrets/${name}`),
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/secrets/${name}/yaml`),
+  updateYaml: (namespace: string, name: string, yaml: string) =>
+    putYaml<Secret>(`/namespaces/${namespace}/secrets/${name}/yaml`, yaml),
 };
 
 // ============ PersistentVolume ============

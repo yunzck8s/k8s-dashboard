@@ -184,6 +184,8 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.POST("/namespaces/:ns/configmaps", h.CreateConfigMap)
 		v1.PUT("/namespaces/:ns/configmaps/:name", h.UpdateConfigMap)
 		v1.DELETE("/namespaces/:ns/configmaps/:name", h.DeleteConfigMap)
+		v1.GET("/namespaces/:ns/configmaps/:name/yaml", h.GetConfigMapYAML)
+		v1.PUT("/namespaces/:ns/configmaps/:name/yaml", h.UpdateConfigMapYAML)
 
 		// Secrets
 		v1.GET("/secrets", h.ListAllSecrets)
@@ -192,6 +194,8 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.POST("/namespaces/:ns/secrets", h.CreateSecret)
 		v1.PUT("/namespaces/:ns/secrets/:name", h.UpdateSecret)
 		v1.DELETE("/namespaces/:ns/secrets/:name", h.DeleteSecret)
+		v1.GET("/namespaces/:ns/secrets/:name/yaml", h.GetSecretYAML)
+		v1.PUT("/namespaces/:ns/secrets/:name/yaml", h.UpdateSecretYAML)
 
 		// PersistentVolumes
 		v1.GET("/persistentvolumes", h.ListPersistentVolumes)

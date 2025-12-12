@@ -1167,6 +1167,56 @@ func (h *Handler) DeleteConfigMap(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
+func (h *Handler) GetConfigMapYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	// 获取 ConfigMap
+	cm, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 转换为 YAML
+	yamlBytes, err := yaml.Marshal(cm)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Data(http.StatusOK, "text/yaml", yamlBytes)
+}
+
+func (h *Handler) UpdateConfigMapYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+
+	// 读取 YAML 内容
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 解析 YAML 为 ConfigMap 对象
+	var cm corev1.ConfigMap
+	if err := yaml.Unmarshal(body, &cm); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid YAML: " + err.Error()})
+		return
+	}
+
+	// 更新 ConfigMap
+	result, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Update(ctx, &cm, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 // ========== Secrets ==========
 
 func (h *Handler) ListAllSecrets(c *gin.Context) {
@@ -1244,6 +1294,56 @@ func (h *Handler) DeleteSecret(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *Handler) GetSecretYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	// 获取 Secret
+	secret, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 转换为 YAML
+	yamlBytes, err := yaml.Marshal(secret)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Data(http.StatusOK, "text/yaml", yamlBytes)
+}
+
+func (h *Handler) UpdateSecretYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+
+	// 读取 YAML 内容
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 解析 YAML 为 Secret 对象
+	var secret corev1.Secret
+	if err := yaml.Unmarshal(body, &secret); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid YAML: " + err.Error()})
+		return
+	}
+
+	// 更新 Secret
+	result, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Update(ctx, &secret, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }
 
 // ========== PersistentVolumes ==========
