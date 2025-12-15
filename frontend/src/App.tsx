@@ -42,6 +42,7 @@ import Events from './pages/events/Events';
 import AuditLogs from './pages/audit/AuditLogs';
 import Alerts from './pages/alerts/Alerts';
 import ClusterObservation from './pages/observation/ClusterObservation';
+import AgentPage from './pages/agent';
 import NotFound from './pages/NotFound';
 import Users from './pages/admin/Users';
 import Approvals from './pages/admin/Approvals';
@@ -146,6 +147,9 @@ function App() {
 
             {/* 告警 */}
             <Route path="alerts" element={<Alerts />} />
+
+            {/* AI 助手 */}
+            <Route path="agent" element={<AgentPage />} />
 
             {/* 管理（需要 admin 角色） */}
             <Route path="admin">

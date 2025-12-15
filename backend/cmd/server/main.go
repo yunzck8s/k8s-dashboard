@@ -108,7 +108,7 @@ func main() {
 	}
 
 	// 创建路由
-	router := api.NewRouter(k8sClient, metricsClient, alertClient, alertService, auditClient, authClient)
+	router := api.NewRouter(k8sClient, metricsClient, alertClient, alertService, auditClient, authClient, db)
 
 	// 配置 HTTP 服务器
 	port := os.Getenv("PORT")

@@ -1,11 +1,16 @@
 package api
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/k8s-dashboard/backend/internal/agent"
+	"github.com/k8s-dashboard/backend/internal/agent/provider"
 	"github.com/k8s-dashboard/backend/internal/alertmanager"
 	"github.com/k8s-dashboard/backend/internal/alerts"
 	"github.com/k8s-dashboard/backend/internal/api/handlers"
@@ -18,7 +23,7 @@ import (
 )
 
 // NewRouter 创建 HTTP 路由
-func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *gin.Engine {
+func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client, db *sql.DB) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.New()
@@ -50,6 +55,74 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 	// 创建观测服务和处理器
 	observationService := observation.NewService(k8sClient, metricsClient, alertClient)
 	observationHandler := handlers.NewObservationHandler(observationService)
+
+	// 创建 AI Agent
+	// 1. 初始化 Provider 配置（从环境变量）
+	agentConfig := &agent.AgentConfig{
+		Providers: map[string]provider.ProviderConfig{
+			"openai": {
+				Enabled: os.Getenv("OPENAI_API_KEY") != "",
+				APIKey:  os.Getenv("OPENAI_API_KEY"),
+			},
+			"deepseek": {
+				Enabled: os.Getenv("DEEPSEEK_API_KEY") != "",
+				APIKey:  os.Getenv("DEEPSEEK_API_KEY"),
+			},
+			"qwen": {
+				Enabled: os.Getenv("QWEN_API_KEY") != "",
+				APIKey:  os.Getenv("QWEN_API_KEY"),
+			},
+			"doubao": {
+				Enabled: os.Getenv("DOUBAO_API_KEY") != "",
+				APIKey:  os.Getenv("DOUBAO_API_KEY"),
+			},
+		},
+		DefaultProvider: "openai",
+		DefaultModel:    "gpt-4o",
+	}
+
+	// 2. 创建 ConfigStore 并从数据库加载配置
+	var configStore *agent.ConfigStore
+	if db != nil {
+		var err error
+		configStore, err = agent.NewConfigStore(db)
+		if err != nil {
+			log.Printf("Warning: 创建 Agent 配置存储失败: %v", err)
+		} else {
+			// 从数据库加载已保存的配置
+			savedConfigs, err := configStore.LoadAllProviderConfigs()
+			if err != nil {
+				log.Printf("Warning: 加载已保存的 Agent 配置失败: %v", err)
+			} else {
+				// 合并配置：数据库配置优先，但如果环境变量存在则使用环境变量
+				for providerName, savedConfig := range savedConfigs {
+					envKey := ""
+					switch providerName {
+					case "openai":
+						envKey = os.Getenv("OPENAI_API_KEY")
+					case "deepseek":
+						envKey = os.Getenv("DEEPSEEK_API_KEY")
+					case "qwen":
+						envKey = os.Getenv("QWEN_API_KEY")
+					case "doubao":
+						envKey = os.Getenv("DOUBAO_API_KEY")
+					}
+
+					// 如果环境变量不存在，使用数据库中的配置
+					if envKey == "" {
+						agentConfig.Providers[providerName] = savedConfig
+						log.Printf("从数据库加载 %s 配置", providerName)
+					} else {
+						log.Printf("使用环境变量配置 %s", providerName)
+					}
+				}
+			}
+		}
+	}
+
+	// 3. 创建 Agent（传入 ConfigStore）
+	aiAgent := agent.NewAgent(k8sClient, agentConfig, configStore)
+	agentHandler := handlers.NewAgentHandler(aiAgent)
 
 	// ========== 公开 API（不需要认证）==========
 	publicAPI := r.Group("/api/v1")
@@ -273,6 +346,18 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.GET("/approvals/:id", authHandler.GetApproval)
 		v1.POST("/approvals/:id/approve", authHandler.ApproveRequest)
 		v1.POST("/approvals/:id/reject", authHandler.RejectRequest)
+
+		// AI Agent
+		v1.GET("/agent/providers", agentHandler.GetProviders)
+		v1.GET("/agent/tools", agentHandler.GetTools)
+		v1.GET("/agent/config", agentHandler.GetConfig)
+		v1.PUT("/agent/config", agentHandler.UpdateConfig)
+		v1.GET("/agent/sessions", agentHandler.ListSessions)
+		v1.GET("/agent/sessions/:id", agentHandler.GetSession)
+		v1.DELETE("/agent/sessions/:id", agentHandler.DeleteSession)
+		v1.GET("/agent/sessions/:id/export", agentHandler.ExportSession)
+		v1.POST("/agent/chat", agentHandler.Chat)
+		v1.POST("/agent/test-provider", agentHandler.TestProvider)
 	}
 
 	// ========== 管理员 API（需要 admin 角色）==========
@@ -297,10 +382,17 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 
 	// WebSocket 路由
 	ws := r.Group("/ws")
+
+	// 如果 authClient 不为空，启用 WebSocket 认证中间件
+	if authClient != nil {
+		ws.Use(middleware.WebSocketAuthMiddleware(authClient))
+	}
+
 	{
 		ws.GET("/logs", h.StreamPodLogs)
 		ws.GET("/exec", h.ExecPod)
 		ws.GET("/watch", h.WatchResources)
+		ws.GET("/agent/chat", agentHandler.ChatWebSocket)
 	}
 
 	// 静态文件服务（前端）

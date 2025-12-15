@@ -194,3 +194,47 @@ func GetCurrentUser(c *gin.Context) *auth.User {
 
 	return user
 }
+
+// WebSocketAuthMiddleware WebSocket 认证中间件（从查询参数获取 Token）
+func WebSocketAuthMiddleware(authClient *auth.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 如果认证客户端未初始化，跳过认证
+		if authClient == nil {
+			c.Next()
+			return
+		}
+
+		// 从查询参数获取 Token
+		tokenString := c.Query("token")
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供认证信息"})
+			c.Abort()
+			return
+		}
+
+		// 验证 Token
+		user, err := authClient.ValidateToken(tokenString)
+		if err != nil {
+			status := http.StatusUnauthorized
+			message := "认证失败"
+
+			switch err {
+			case auth.ErrTokenExpired:
+				message = "Token 已过期，请重新登录"
+			case auth.ErrInvalidToken:
+				message = "无效的 Token"
+			case auth.ErrUserDisabled:
+				message = "用户已被禁用"
+				status = http.StatusForbidden
+			}
+
+			c.JSON(status, gin.H{"error": message})
+			c.Abort()
+			return
+		}
+
+		// 将用户信息存入上下文
+		c.Set(ContextUserKey, user)
+		c.Next()
+	}
+}

@@ -14,7 +14,6 @@ import {
   FolderIcon,
   BellAlertIcon,
   ClipboardDocumentListIcon,
-  Squares2X2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   RectangleStackIcon,
@@ -25,6 +24,7 @@ import {
   UsersIcon,
   CheckBadgeIcon,
   ChartBarSquareIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 
 interface NavItem {
@@ -88,7 +88,7 @@ const navigation: NavItem[] = [
   { name: '事件', path: '/events', icon: ClipboardDocumentListIcon },
   { name: '状态观测', path: '/observation', icon: ChartBarSquareIcon },
   { name: '告警', path: '/alerts', icon: BellAlertIcon },
-  { name: '集群', path: '/clusters', icon: Squares2X2Icon },
+  { name: 'AI 助手', path: '/agent', icon: SparklesIcon },
   { name: '审计日志', path: '/audit', icon: DocumentTextIcon },
   {
     name: '管理',
