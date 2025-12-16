@@ -7,11 +7,12 @@ import (
 
 // Message 聊天消息
 type Message struct {
-	ID        string     `json:"id"`
-	Role      string     `json:"role"` // user, assistant, system, tool
-	Content   string     `json:"content"`
-	ToolCalls []ToolCall `json:"toolCalls,omitempty"`
-	CreatedAt time.Time  `json:"createdAt"`
+	ID         string     `json:"id"`
+	Role       string     `json:"role"` // user, assistant, system, tool
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"toolCalls,omitempty"`
+	ToolCallID string     `json:"toolCallId,omitempty"` // 用于 role=tool 的消息
+	CreatedAt  time.Time  `json:"createdAt"`
 }
 
 // ToolCall 工具调用
@@ -72,6 +73,9 @@ type LLMProvider interface {
 
 	// ChatWithTools 带工具调用的对话
 	ChatWithTools(ctx context.Context, messages []Message, tools []Tool, opts ...Option) (*ToolCallResponse, error)
+
+	// ChatStreamWithTools 流式带工具调用的对话
+	ChatStreamWithTools(ctx context.Context, messages []Message, tools []Tool, opts ...Option) (<-chan StreamChunk, error)
 
 	// Info 获取提供商信息
 	Info() ProviderInfo

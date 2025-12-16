@@ -242,6 +242,125 @@ func (p *OpenAIProvider) ChatWithTools(ctx context.Context, messages []Message, 
 	return result, nil
 }
 
+// ChatStreamWithTools 流式带工具调用的对话
+func (p *OpenAIProvider) ChatStreamWithTools(ctx context.Context, messages []Message, tools []Tool, opts ...Option) (<-chan StreamChunk, error) {
+	if !p.enabled {
+		return nil, errors.New("OpenAI provider is not enabled")
+	}
+
+	options := ApplyOptions(opts...)
+	openaiMessages := convertToOpenAIMessages(messages, options.SystemPrompt)
+
+	// 转换工具定义
+	openaiTools := make([]openai.Tool, len(tools))
+	for i, t := range tools {
+		openaiTools[i] = openai.Tool{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  t.Parameters,
+			},
+		}
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model:       "gpt-4o",
+		Messages:    openaiMessages,
+		Tools:       openaiTools,
+		Temperature: float32(options.Temperature),
+		MaxTokens:   options.MaxTokens,
+		Stream:      true,
+	}
+
+	stream, err := p.client.CreateChatCompletionStream(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI stream error: %w", err)
+	}
+
+	chunks := make(chan StreamChunk)
+
+	go func() {
+		defer close(chunks)
+		defer stream.Close()
+
+		// 用于累积工具调用
+		toolCallsMap := make(map[int]*ToolCall)
+
+		for {
+			response, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				// 流结束，检查是否有工具调用
+				if len(toolCallsMap) > 0 {
+					for _, tc := range toolCallsMap {
+						// 解析累积的 JSON 参数
+						if rawArgs, ok := tc.Arguments["_raw"]; ok {
+							var args map[string]interface{}
+							if err := json.Unmarshal([]byte(rawArgs.(string)), &args); err == nil {
+								tc.Arguments = args
+							} else {
+								delete(tc.Arguments, "_raw")
+							}
+						}
+						chunks <- StreamChunk{Type: "tool_call", ToolCall: tc}
+					}
+				}
+				chunks <- StreamChunk{Type: "done"}
+				return
+			}
+			if err != nil {
+				chunks <- StreamChunk{Type: "error", Error: err.Error()}
+				return
+			}
+
+			if len(response.Choices) > 0 {
+				delta := response.Choices[0].Delta
+
+				// 处理文本内容
+				if delta.Content != "" {
+					chunks <- StreamChunk{Type: "content", Content: delta.Content}
+				}
+
+				// 处理工具调用（流式累积）
+				for _, tc := range delta.ToolCalls {
+					idx := tc.Index
+					if idx == nil {
+						continue
+					}
+
+					if _, exists := toolCallsMap[*idx]; !exists {
+						toolCallsMap[*idx] = &ToolCall{
+							ID:        tc.ID,
+							Name:      tc.Function.Name,
+							Arguments: make(map[string]interface{}),
+							Status:    "pending",
+						}
+					}
+
+					// 累积工具调用 ID 和名称
+					if tc.ID != "" {
+						toolCallsMap[*idx].ID = tc.ID
+					}
+					if tc.Function.Name != "" {
+						toolCallsMap[*idx].Name = tc.Function.Name
+					}
+
+					// 累积参数（JSON 字符串形式）
+					if tc.Function.Arguments != "" {
+						if existing, ok := toolCallsMap[*idx].Arguments["_raw"]; ok {
+							toolCallsMap[*idx].Arguments["_raw"] = existing.(string) + tc.Function.Arguments
+						} else {
+							toolCallsMap[*idx].Arguments["_raw"] = tc.Function.Arguments
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	return chunks, nil
+}
+
 // convertToOpenAIMessages 转换消息格式
 func convertToOpenAIMessages(messages []Message, systemPrompt string) []openai.ChatCompletionMessage {
 	var result []openai.ChatCompletionMessage

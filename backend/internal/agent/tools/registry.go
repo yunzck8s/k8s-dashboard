@@ -32,12 +32,12 @@ type ToolHandler func(ctx context.Context, args map[string]interface{}) (string,
 
 // K8sTool K8s 工具定义
 type K8sTool struct {
-	Name        string
-	Description string
-	Category    ToolCategory
-	RiskLevel   RiskLevel
-	Parameters  provider.ToolParameters
-	Handler     ToolHandler
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Category    ToolCategory        `json:"category"`
+	RiskLevel   RiskLevel           `json:"riskLevel"`
+	Parameters  provider.ToolParameters `json:"-"` // 不序列化 Parameters
+	Handler     ToolHandler         `json:"-"` // 不序列化 Handler
 }
 
 // Registry 工具注册表

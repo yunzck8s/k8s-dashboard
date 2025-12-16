@@ -16,10 +16,18 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const messageBufferRef = useRef<string>('');
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
+
+  // 使用 ref 存储回调函数，避免重新创建连接
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   // 连接 WebSocket
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    // 如果已经连接或正在连接中，直接返回
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
     }
 
@@ -43,32 +51,32 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           case 'session':
             if (message.sessionId) {
               sessionIdRef.current = message.sessionId;
-              options.onSessionCreated?.(message.sessionId);
+              optionsRef.current.onSessionCreated?.(message.sessionId);
             }
             break;
 
           case 'chunk':
             if (message.content) {
               messageBufferRef.current += message.content;
-              options.onMessage?.(messageBufferRef.current);
+              optionsRef.current.onMessage?.(messageBufferRef.current);
             }
             break;
 
           case 'tool_call':
             if (message.toolCall) {
-              options.onToolCall?.(message.toolCall);
+              optionsRef.current.onToolCall?.(message.toolCall);
             }
             break;
 
           case 'tool_result':
             if (message.toolResult) {
-              options.onToolResult?.(message.toolResult);
+              optionsRef.current.onToolResult?.(message.toolResult);
             }
             break;
 
           case 'approval_request':
             if (message.approvalRequest) {
-              options.onApprovalRequest?.(message.approvalRequest);
+              optionsRef.current.onApprovalRequest?.(message.approvalRequest);
             }
             break;
 
@@ -79,30 +87,41 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
           case 'error':
             setIsLoading(false);
-            options.onError?.(message.error || 'Unknown error');
+            optionsRef.current.onError?.(message.error || 'Unknown error');
             messageBufferRef.current = '';
             break;
         }
       } catch (error) {
         console.error('[AgentChat] Failed to parse message:', error);
-        options.onError?.('Failed to parse server message');
+        optionsRef.current.onError?.('Failed to parse server message');
       }
     };
 
     ws.onerror = (error) => {
       console.error('[AgentChat] WebSocket error:', error);
-      options.onError?.('WebSocket connection error');
+      // 连接错误不需要显示在聊天界面，因为头部已经有连接状态指示器
+      // 只在控制台记录日志，避免干扰用户
       setIsConnected(false);
     };
 
-    ws.onclose = () => {
-      console.log('[AgentChat] WebSocket closed');
+    ws.onclose = (event) => {
+      console.log('[AgentChat] WebSocket closed, code:', event.code);
       setIsConnected(false);
       wsRef.current = null;
+
+      // 自动重连（如果组件仍然挂载且不是正常关闭）
+      if (mountedRef.current && event.code !== 1000) {
+        console.log('[AgentChat] Will reconnect in 2 seconds...');
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (mountedRef.current) {
+            connect();
+          }
+        }, 2000);
+      }
     };
 
     wsRef.current = ws;
-  }, [options]);
+  }, []);
 
   // 断开连接
   const disconnect = useCallback(() => {
@@ -117,7 +136,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const sendMessage = useCallback(
     (content: string, provider?: string, model?: string) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        options.onError?.('WebSocket is not connected');
+        optionsRef.current.onError?.('WebSocket is not connected');
         return;
       }
 
@@ -133,14 +152,14 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       setIsLoading(true);
       messageBufferRef.current = '';
     },
-    [options]
+    []
   );
 
   // 发送审批响应
   const sendApproval = useCallback(
     (toolCallId: string, approved: boolean) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        options.onError?.('WebSocket is not connected');
+        optionsRef.current.onError?.('WebSocket is not connected');
         return;
       }
 
@@ -152,7 +171,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       wsRef.current.send(JSON.stringify(message));
     },
-    [options]
+    []
   );
 
   // 取消当前操作
@@ -171,8 +190,14 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
   // 组件挂载时自动连接
   useEffect(() => {
+    mountedRef.current = true;
     connect();
     return () => {
+      mountedRef.current = false;
+      // 清理重连定时器
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       disconnect();
     };
   }, [connect, disconnect]);

@@ -157,7 +157,7 @@ func (a *Agent) Chat(ctx context.Context, req *ChatRequest) (*ChatResponse, erro
 	}, nil
 }
 
-// ChatWithTools 带工具调用的聊天
+// ChatWithTools 带工具调用的聊天（流式输出）
 func (a *Agent) ChatWithTools(ctx context.Context, session *Session, userMessage string) (<-chan ServerMessage, error) {
 	// 获取 Provider
 	p, ok := a.providers.Get(session.Provider)
@@ -182,40 +182,85 @@ func (a *Agent) ChatWithTools(ctx context.Context, session *Session, userMessage
 		// 获取工具定义
 		providerTools := a.tools.ToProviderTools()
 
-		// 调用带工具的 LLM
-		response, err := p.ChatWithTools(ctx, session.Messages, providerTools, provider.WithSystemPrompt(a.systemPrompt))
+		// 使用流式带工具调用的 API
+		streamChan, err := p.ChatStreamWithTools(ctx, session.Messages, providerTools, provider.WithSystemPrompt(a.systemPrompt))
 		if err != nil {
 			out <- ServerMessage{Type: "error", Error: err.Error()}
 			return
 		}
 
-		// 处理工具调用
-		if len(response.ToolCalls) > 0 {
-			for _, tc := range response.ToolCalls {
-				// 发送工具调用通知
+		// 累积助手消息内容
+		var assistantContent string
+		var pendingToolCalls []provider.ToolCall
+
+		// 处理流式响应
+		for chunk := range streamChan {
+			switch chunk.Type {
+			case "content":
+				// 直接转发文本内容
 				out <- ServerMessage{
-					Type:     "tool_call",
-					ToolCall: &tc,
+					Type:    "chunk",
+					Content: chunk.Content,
 				}
+				assistantContent += chunk.Content
 
-				// 检查是否需要审批
-				if a.tools.RequiresApproval(tc.Name) {
-					desc, impact := a.tools.GetToolDescription(tc.Name, tc.Arguments)
+			case "tool_call":
+				if chunk.ToolCall != nil {
+					// 发送工具调用通知
+					tc := *chunk.ToolCall
 					out <- ServerMessage{
-						Type: "approval_request",
-						ApprovalRequest: &ApprovalRequest{
-							ToolCallID:  tc.ID,
-							ToolName:    tc.Name,
-							Description: desc,
-							Impact:      impact,
-							RiskLevel:   a.tools.GetRiskLevel(tc.Name),
-							Arguments:   tc.Arguments,
-						},
+						Type:     "tool_call",
+						ToolCall: &tc,
 					}
-					// 等待审批（这里简化处理，实际应该等待用户响应）
-					continue
+
+					// 检查是否需要审批
+					if a.tools.RequiresApproval(tc.Name) {
+						desc, impact := a.tools.GetToolDescription(tc.Name, tc.Arguments)
+						out <- ServerMessage{
+							Type: "approval_request",
+							ApprovalRequest: &ApprovalRequest{
+								ToolCallID:  tc.ID,
+								ToolName:    tc.Name,
+								Description: desc,
+								Impact:      impact,
+								RiskLevel:   a.tools.GetRiskLevel(tc.Name),
+								Arguments:   tc.Arguments,
+							},
+						}
+						// 等待审批（简化处理）
+						continue
+					}
+
+					pendingToolCalls = append(pendingToolCalls, tc)
 				}
 
+			case "error":
+				out <- ServerMessage{Type: "error", Error: chunk.Error}
+				return
+
+			case "done":
+				// 流结束
+			}
+		}
+
+		// 如果有文本内容或工具调用，添加到会话
+		if assistantContent != "" || len(pendingToolCalls) > 0 {
+			assistantMsg := provider.Message{
+				ID:        uuid.New().String(),
+				Role:      "assistant",
+				Content:   assistantContent,
+				CreatedAt: time.Now(),
+			}
+			// 如果有工具调用，添加到消息中
+			if len(pendingToolCalls) > 0 {
+				assistantMsg.ToolCalls = pendingToolCalls
+			}
+			session.Messages = append(session.Messages, assistantMsg)
+		}
+
+		// 执行工具调用
+		if len(pendingToolCalls) > 0 {
+			for _, tc := range pendingToolCalls {
 				// 执行工具
 				result, err := a.tools.Execute(ctx, tc.Name, tc.Arguments)
 				toolResult := &ToolResult{
@@ -235,31 +280,43 @@ func (a *Agent) ChatWithTools(ctx context.Context, session *Session, userMessage
 
 				// 将工具结果添加到消息历史
 				session.Messages = append(session.Messages, provider.Message{
-					ID:        uuid.New().String(),
-					Role:      "tool",
-					Content:   result,
-					CreatedAt: time.Now(),
+					ID:         uuid.New().String(),
+					Role:       "tool",
+					Content:    result,
+					ToolCallID: tc.ID, // 关联到工具调用
+					CreatedAt:  time.Now(),
 				})
 			}
 
-			// 继续调用 LLM 获取最终响应
-			finalResponse, err := p.Chat(ctx, session.Messages, provider.WithSystemPrompt(a.systemPrompt))
+			// 使用流式 API 获取最终响应
+			finalStream, err := p.ChatStreamWithTools(ctx, session.Messages, nil, provider.WithSystemPrompt(a.systemPrompt))
 			if err != nil {
 				out <- ServerMessage{Type: "error", Error: err.Error()}
 				return
 			}
 
-			session.Messages = append(session.Messages, *finalResponse)
-			out <- ServerMessage{
-				Type:    "chunk",
-				Content: finalResponse.Content,
+			var finalContent string
+			for chunk := range finalStream {
+				switch chunk.Type {
+				case "content":
+					out <- ServerMessage{
+						Type:    "chunk",
+						Content: chunk.Content,
+					}
+					finalContent += chunk.Content
+				case "error":
+					out <- ServerMessage{Type: "error", Error: chunk.Error}
+					return
+				}
 			}
-		} else if response.Message != nil {
-			// 没有工具调用，直接返回消息
-			session.Messages = append(session.Messages, *response.Message)
-			out <- ServerMessage{
-				Type:    "chunk",
-				Content: response.Message.Content,
+
+			if finalContent != "" {
+				session.Messages = append(session.Messages, provider.Message{
+					ID:        uuid.New().String(),
+					Role:      "assistant",
+					Content:   finalContent,
+					CreatedAt: time.Now(),
+				})
 			}
 		}
 
