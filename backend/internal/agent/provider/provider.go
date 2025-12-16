@@ -185,12 +185,33 @@ func (r *Registry) Get(name string) (LLMProvider, bool) {
 	return p, ok
 }
 
-// List 列出所有 Provider
+// List 列出所有 Provider（按固定顺序）
 func (r *Registry) List() []ProviderInfo {
+	// 定义固定顺序
+	order := []string{"openai", "deepseek", "qwen", "doubao"}
 	var result []ProviderInfo
-	for _, p := range r.providers {
-		result = append(result, p.Info())
+
+	// 按固定顺序添加
+	for _, name := range order {
+		if p, ok := r.providers[name]; ok {
+			result = append(result, p.Info())
+		}
 	}
+
+	// 添加其他未在固定顺序中的 provider
+	for name, p := range r.providers {
+		found := false
+		for _, orderedName := range order {
+			if name == orderedName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, p.Info())
+		}
+	}
+
 	return result
 }
 
