@@ -74,7 +74,8 @@ export interface ApprovalRequest {
   description: string;
   impact: string;
   riskLevel: RiskLevel;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
+  allowedDecisions?: string[];  // 允许的决策选项：approve, reject, edit
 }
 
 // 工具结果
@@ -94,17 +95,41 @@ export interface ClientMessage {
   model?: string;
   toolCallId?: string;
   approved?: boolean;
+  decision?: string;        // 审批决定: approve, reject, edit
+  editedArgs?: Record<string, unknown>;  // 编辑后的参数
+  features?: AgentFeatures; // DeepAgents 特性配置
 }
 
 // WebSocket 服务端消息
 export interface ServerMessage {
-  type: 'session' | 'chunk' | 'tool_call' | 'tool_result' | 'approval_request' | 'done' | 'error';
+  type: 'session' | 'chunk' | 'tool_call' | 'tool_result' | 'approval_request' | 'todos_update' | 'subagent_event' | 'done' | 'error';
   sessionId?: string;
   content?: string;
   toolCall?: ToolCall;
   toolResult?: ToolResult;
   approvalRequest?: ApprovalRequest;
+  todosUpdate?: TodosUpdate;
+  subagentEvent?: SubAgentEvent;
   error?: string;
+}
+
+// TodoList 更新（DeepAgent 特性）
+export interface TodosUpdate {
+  items: TodoItem[];
+}
+
+// Todo 项
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+// 子 Agent 事件（DeepAgent 特性）
+export interface SubAgentEvent {
+  agentName: string;
+  eventType: 'start' | 'end' | 'message';
+  content: string;
 }
 
 // Agent 配置
@@ -122,3 +147,19 @@ export interface ProviderConfig {
   baseURL?: string;
   models?: string[];
 }
+
+// DeepAgents 特性配置（前端可选开关）
+export interface AgentFeatures {
+  enablePlanning: boolean;    // 启用规划工具 (write_todos)
+  enableFilesystem: boolean;  // 启用文件系统 (ls, read_file, write_file, edit_file)
+  enableSubagents: boolean;   // 启用子代理 (task)
+  enableMemory: boolean;      // 启用长期记忆 (/memories/)
+}
+
+// 默认特性配置
+export const DEFAULT_AGENT_FEATURES: AgentFeatures = {
+  enablePlanning: true,
+  enableFilesystem: true,
+  enableSubagents: true,
+  enableMemory: true,
+};

@@ -11,14 +11,21 @@ import {
   ShieldCheckIcon,
   MagnifyingGlassIcon,
   BoltIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  CpuChipIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import { ChatMessage } from '../../components/ChatMessage';
 import { ApprovalDialog } from '../../components/ApprovalDialog';
+import { TodoListPanel, SubAgentFlow } from '../../components/agent';
 import { useAgentChat } from '../../hooks/useAgentChat';
-import type { Message, ApprovalRequest } from '../../types/agent';
+import type { Message, ApprovalRequest, TodoItem, SubAgentEvent, AgentFeatures } from '../../types/agent';
+import { DEFAULT_AGENT_FEATURES } from '../../types/agent';
 import api from '../../api/client';
+
+// Python Agent 服务地址
+const PYTHON_AGENT_API = import.meta.env.VITE_PYTHON_AGENT_URL || 'http://localhost:8000';
 
 // 生成唯一 ID
 let messageIdCounter = 0;
@@ -92,14 +99,26 @@ export default function AgentPage() {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showCapabilities, setShowCapabilities] = useState(false);
   const [tools, setTools] = useState<K8sTool[]>([]);
+  // DeepAgent 模式
+  const [useDeepAgent, setUseDeepAgent] = useState(false);
+  // DeepAgent 特有状态
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [subAgentEvents, setSubAgentEvents] = useState<SubAgentEvent[]>([]);
+  const [showSidePanel] = useState(true); // 侧边面板显示状态
+  const [features, setFeatures] = useState<AgentFeatures>(DEFAULT_AGENT_FEATURES);
+  const [showFeaturesPanel, setShowFeaturesPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
+  const featuresPanelRef = useRef<HTMLDivElement>(null);
 
-  // 点击外部关闭模型选择器
+  // 点击外部关闭模型选择器和特性面板
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modelSelectorRef.current && !modelSelectorRef.current.contains(event.target as Node)) {
         setShowModelSelector(false);
+      }
+      if (featuresPanelRef.current && !featuresPanelRef.current.contains(event.target as Node)) {
+        setShowFeaturesPanel(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -114,11 +133,13 @@ export default function AgentPage() {
 
   const checkConfiguration = async () => {
     try {
-      const response = await api.get('/agent/config');
-      const config = response.data.config;
-      const configuredProviders = Object.entries(config.providers || {})
-        .filter(([, provider]: [string, any]) => provider.apiKey === '***' && provider.enabled !== false)
-        .map(([name]) => name);
+      // 调用 Python Agent 服务的 provider 列表 API
+      const response = await fetch(`${PYTHON_AGENT_API}/api/providers?enabled_only=true`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch providers');
+      }
+      const providers = await response.json();
+      const configuredProviders = providers.map((p: any) => p.provider_type);
 
       setAvailableProviders(configuredProviders);
       setIsConfigured(configuredProviders.length > 0);
@@ -133,22 +154,36 @@ export default function AgentPage() {
       }
     } catch (error) {
       console.error('检查配置失败', error);
-      setIsConfigured(false);
+      // 如果 Python 服务不可用，默认启用（允许用户测试）
+      setIsConfigured(true);
+      setSelectedProvider('deepseek');
+      setSelectedModel('deepseek-chat');
     } finally {
       setIsCheckingConfig(false);
     }
   };
 
   const fetchTools = async () => {
-    try {
-      const response = await api.get('/agent/tools');
-      setTools(response.data.tools || []);
-    } catch (error) {
-      console.error('获取工具列表失败', error);
-    }
+    // 使用预定义的工具列表（Python Agent 的 K8s 工具）
+    setTools([
+      { name: 'list_pods', description: '列出指定命名空间的 Pod', category: 'query', riskLevel: 'low' },
+      { name: 'get_pod', description: '获取 Pod 详情', category: 'query', riskLevel: 'low' },
+      { name: 'list_deployments', description: '列出 Deployment', category: 'query', riskLevel: 'low' },
+      { name: 'get_deployment', description: '获取 Deployment 详情', category: 'query', riskLevel: 'low' },
+      { name: 'list_services', description: '列出 Service', category: 'query', riskLevel: 'low' },
+      { name: 'list_nodes', description: '列出集群节点', category: 'query', riskLevel: 'low' },
+      { name: 'get_pod_logs', description: '获取 Pod 日志', category: 'diagnostic', riskLevel: 'low' },
+      { name: 'describe_pod', description: '描述 Pod 详细信息', category: 'diagnostic', riskLevel: 'low' },
+      { name: 'check_resource_usage', description: '检查资源使用情况', category: 'diagnostic', riskLevel: 'low' },
+      { name: 'get_events', description: '获取 K8s 事件', category: 'diagnostic', riskLevel: 'low' },
+      { name: 'scale_deployment', description: '扩缩容 Deployment', category: 'action', riskLevel: 'medium' },
+      { name: 'restart_deployment', description: '重启 Deployment', category: 'action', riskLevel: 'medium' },
+      { name: 'delete_pod', description: '删除 Pod', category: 'action', riskLevel: 'high' },
+    ]);
   };
 
-  const { isConnected, isLoading, sendMessage, sendApproval } = useAgentChat({
+  const { isConnected, isLoading, sendMessage, sendApproval, newSession, saveMessages, loadMessages, sessionId } = useAgentChat({
+    useDeepAgent,
     onMessage: (content) => {
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
@@ -197,6 +232,13 @@ export default function AgentPage() {
       setApprovalRequest(request);
       setPendingToolCallId(request.toolCallId);
     },
+    // DeepAgent 特有回调
+    onTodosUpdate: (todosUpdate) => {
+      setTodos(todosUpdate.items);
+    },
+    onSubAgentEvent: (event) => {
+      setSubAgentEvents((prev) => [...prev, event]);
+    },
     onError: (error) => {
       console.error('[AgentChat] Error:', error);
       if (error === 'WebSocket is not connected') {
@@ -213,6 +255,30 @@ export default function AgentPage() {
       ]);
     },
   });
+
+  // 加载保存的消息历史
+  useEffect(() => {
+    const savedMessages = loadMessages();
+    if (savedMessages.length > 0) {
+      setMessages(savedMessages);
+      console.log('[AgentPage] Loaded', savedMessages.length, 'messages from localStorage');
+    }
+  }, [loadMessages]);
+
+  // 保存消息到 localStorage（当消息变化时）
+  useEffect(() => {
+    if (messages.length > 0) {
+      saveMessages(messages);
+    }
+  }, [messages, saveMessages]);
+
+  // 处理新建对话
+  const handleNewChat = () => {
+    newSession();
+    setMessages([]);
+    setTodos([]);
+    setSubAgentEvents([]);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -231,7 +297,7 @@ export default function AgentPage() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    sendMessage(inputValue.trim(), selectedProvider, selectedModel);
+    sendMessage(inputValue.trim(), selectedProvider, selectedModel, features);
     setInputValue('');
   };
 
@@ -429,6 +495,92 @@ export default function AgentPage() {
 
           {/* 右侧按钮组 */}
           <div className="flex items-center gap-3">
+            {/* 新建对话按钮 */}
+            <button
+              onClick={handleNewChat}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-lg transition-all border border-[#00ff9f]/30 hover:border-[#00ff9f] font-mono text-sm group"
+              title="新建对话"
+            >
+              <PlusIcon className="w-5 h-5 text-[#00ff9f]" />
+              <span className="text-gray-400 group-hover:text-gray-300 transition-colors">新对话</span>
+            </button>
+
+            {/* Deep Agent 模式开关 */}
+            <button
+              onClick={() => setUseDeepAgent(!useDeepAgent)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all font-mono text-sm group ${
+                useDeepAgent
+                  ? 'bg-gradient-to-r from-[#ff006e] to-[#ff006e]/80 text-white border border-[#ff006e] shadow-lg shadow-[#ff006e]/30'
+                  : 'bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 border border-[#ff006e]/30 hover:border-[#ff006e]'
+              }`}
+            >
+              <CpuChipIcon className={`w-5 h-5 ${useDeepAgent ? 'text-white' : 'text-[#ff006e]'}`} />
+              <span className={useDeepAgent ? 'text-white font-bold' : 'text-gray-400 group-hover:text-gray-300'}>
+                Deep Agent
+              </span>
+              {useDeepAgent && <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">ON</span>}
+            </button>
+
+            {/* DeepAgents 特性开关（仅在 Deep Agent 模式显示） */}
+            {useDeepAgent && (
+            <div className="relative" ref={featuresPanelRef}>
+              <button
+                onClick={() => setShowFeaturesPanel(!showFeaturesPanel)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-lg transition-all border border-[#ff006e]/30 hover:border-[#ff006e] font-mono text-sm group"
+              >
+                <SparklesIcon className="w-5 h-5 text-[#ff006e]" />
+                <span className="text-gray-400 group-hover:text-gray-300 transition-colors">特性</span>
+                <span className="text-xs text-[#ff006e] font-bold">
+                  {Object.values(features).filter(Boolean).length}/4
+                </span>
+              </button>
+
+              {/* 特性开关面板 */}
+              {showFeaturesPanel && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-[#0f1629]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[#ff006e]/30 z-50 overflow-hidden">
+                  <div className="p-4">
+                    <div className="text-xs font-mono text-[#ff006e] px-2 py-2 border-b border-[#ff006e]/20 mb-3 flex items-center gap-2">
+                      <SparklesIcon className="w-4 h-4" />
+                      Deep Agent 特性配置
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { key: 'enablePlanning', label: '任务规划', desc: '使用 write_todos 工具分解任务' },
+                        { key: 'enableFilesystem', label: '文件系统', desc: '读写文件，保存上下文' },
+                        { key: 'enableSubagents', label: '子代理', desc: '委派复杂任务给专门代理' },
+                        { key: 'enableMemory', label: '长期记忆', desc: '持久化保存偏好和历史' },
+                      ].map((item) => (
+                        <label
+                          key={item.key}
+                          className="flex items-start gap-3 p-3 bg-[#0a0e27]/50 rounded-lg border border-gray-700/30 hover:border-gray-600/50 cursor-pointer transition-all"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={features[item.key as keyof AgentFeatures]}
+                            onChange={(e) =>
+                              setFeatures((prev) => ({
+                                ...prev,
+                                [item.key]: e.target.checked,
+                              }))
+                            }
+                            className="mt-1 w-4 h-4 rounded border-gray-600 bg-[#0a0e27] text-[#ff006e] focus:ring-[#ff006e] focus:ring-offset-0"
+                          />
+                          <div className="flex-1">
+                            <div className="font-mono text-sm text-gray-200">{item.label}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{item.desc}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-700/30 text-xs font-mono text-gray-500">
+                      启用这些特性以增强 Deep Agent 能力
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            )}
+
             {/* 显示能力按钮 */}
             <button
               onClick={() => setShowCapabilities(true)}
@@ -498,54 +650,72 @@ export default function AgentPage() {
         </div>
       </header>
 
-      {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="max-w-5xl mx-auto space-y-5">
-          {messages.length === 0 ? (
-            <div className="bg-[#0f1629]/60 backdrop-blur-sm rounded-2xl shadow-2xl p-12 text-center border border-[#00ff9f]/20 relative overflow-hidden">
-              {/* 装饰性角落 */}
-              <div className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-[#00ff9f]/30 rounded-tl-2xl"></div>
-              <div className="absolute bottom-0 right-0 w-20 h-20 border-b-2 border-r-2 border-[#ff006e]/30 rounded-br-2xl"></div>
+      {/* 消息列表 + 侧边面板 */}
+      <div className="flex-1 overflow-hidden flex">
+        {/* 主内容区 */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="max-w-5xl mx-auto space-y-5">
+            {messages.length === 0 ? (
+              <div className="bg-[#0f1629]/60 backdrop-blur-sm rounded-2xl shadow-2xl p-12 text-center border border-[#00ff9f]/20 relative overflow-hidden">
+                {/* 装饰性角落 */}
+                <div className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-[#00ff9f]/30 rounded-tl-2xl"></div>
+                <div className="absolute bottom-0 right-0 w-20 h-20 border-b-2 border-r-2 border-[#ff006e]/30 rounded-br-2xl"></div>
 
-              <div className="relative z-10">
-                <div className="w-20 h-20 mx-auto mb-6 relative">
-                  <SparklesIcon className="w-20 h-20 text-[#00ff9f]/50" />
-                  <div className="absolute inset-0 blur-2xl bg-[#00ff9f] opacity-30 animate-pulse"></div>
-                </div>
-                <h2 className="text-3xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-[#00ff9f] to-[#00ffff]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                  {'>'} 欢迎使用 K8s 运维助手
-                </h2>
-                <p className="text-gray-400 font-mono text-sm mb-8 max-w-2xl mx-auto leading-relaxed">
-                  我可以帮你查询集群状态、诊断问题、执行运维操作等。所有高风险操作都需要你的确认。
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-                  {[
-                    { title: '列出所有 Pod', desc: '查看集群中的所有 Pod', prompt: '列出所有命名空间下的 Pod' },
-                    { title: '检查集群健康', desc: '诊断集群当前状态', prompt: '检查集群健康状态' },
-                    { title: '查看 Deployment', desc: '查看部署情况', prompt: '查看 default 命名空间下的 Deployment' },
-                    { title: '分析异常', desc: '查找潜在问题', prompt: '分析集群中的异常情况' },
-                  ].map((item, idx) => (
-                    <button
-                      key={idx}
-                      className="text-left p-4 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-[#00ff9f]/20 hover:border-[#00ff9f]/50 group relative overflow-hidden"
-                      onClick={() => setInputValue(item.prompt)}
-                      disabled={!isConnected}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#00ff9f]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      <div className="relative z-10">
-                        <div className="font-bold text-[#00ff9f] text-sm mb-1 font-mono">{item.title}</div>
-                        <div className="text-xs text-gray-500 font-mono">{item.desc}</div>
-                      </div>
-                    </button>
-                  ))}
+                <div className="relative z-10">
+                  <div className="w-20 h-20 mx-auto mb-6 relative">
+                    <SparklesIcon className="w-20 h-20 text-[#00ff9f]/50" />
+                    <div className="absolute inset-0 blur-2xl bg-[#00ff9f] opacity-30 animate-pulse"></div>
+                  </div>
+                  <h2 className="text-3xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-[#00ff9f] to-[#00ffff]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
+                    {'>'} 欢迎使用 K8s 运维助手
+                  </h2>
+                  <p className="text-gray-400 font-mono text-sm mb-8 max-w-2xl mx-auto leading-relaxed">
+                    我可以帮你查询集群状态、诊断问题、执行运维操作等。所有高风险操作都需要你的确认。
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+                    {[
+                      { title: '列出所有 Pod', desc: '查看集群中的所有 Pod', prompt: '列出所有命名空间下的 Pod' },
+                      { title: '检查集群健康', desc: '诊断集群当前状态', prompt: '检查集群健康状态' },
+                      { title: '查看 Deployment', desc: '查看部署情况', prompt: '查看 default 命名空间下的 Deployment' },
+                      { title: '分析异常', desc: '查找潜在问题', prompt: '分析集群中的异常情况' },
+                    ].map((item, idx) => (
+                      <button
+                        key={idx}
+                        className="text-left p-4 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-[#00ff9f]/20 hover:border-[#00ff9f]/50 group relative overflow-hidden"
+                        onClick={() => setInputValue(item.prompt)}
+                        disabled={!isConnected}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#00ff9f]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <div className="relative z-10">
+                          <div className="font-bold text-[#00ff9f] text-sm mb-1 font-mono">{item.title}</div>
+                          <div className="text-xs text-gray-500 font-mono">{item.desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            messages.map((message) => <ChatMessage key={message.id} message={message} />)
-          )}
-          <div ref={messagesEndRef} />
+            ) : (
+              messages.map((message) => <ChatMessage key={message.id} message={message} />)
+            )}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
+
+        {/* 侧边面板 - DeepAgent 状态 */}
+        {showSidePanel && (todos.length > 0 || subAgentEvents.length > 0) && (
+          <div className="w-80 flex-shrink-0 border-l border-[#00ff9f]/10 bg-[#0a0e27]/30 overflow-y-auto p-4 space-y-4">
+            {/* 任务列表 */}
+            {todos.length > 0 && (
+              <TodoListPanel todos={todos} />
+            )}
+
+            {/* SubAgent 协作流程 */}
+            {subAgentEvents.length > 0 && (
+              <SubAgentFlow events={subAgentEvents} />
+            )}
+          </div>
+        )}
       </div>
 
       {/* 输入框 - 终端风格 - 固定底部 */}
@@ -590,6 +760,10 @@ export default function AgentPage() {
             <span className="text-[#00ff9f]">{'>'} {isConnected ? '在线' : '离线'}</span>
             <span className="text-gray-600">|</span>
             <span>{selectedProvider} / {selectedModel}</span>
+            <span className="text-gray-600">|</span>
+            <span className={useDeepAgent ? 'text-[#ff006e]' : 'text-[#00ffff]'}>
+              {useDeepAgent ? 'Deep Agent' : 'React Agent'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             {isLoading && (

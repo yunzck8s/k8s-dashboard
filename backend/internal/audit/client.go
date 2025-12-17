@@ -136,6 +136,31 @@ func (c *Client) initSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 	CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
 	CREATE INDEX IF NOT EXISTS idx_audit_logs_namespace ON audit_logs(namespace);
+
+	-- Agent 工具调用审计表
+	CREATE TABLE IF NOT EXISTS agent_tool_calls (
+		id BIGSERIAL PRIMARY KEY,
+		session_id VARCHAR(64) NOT NULL,
+		tool_call_id VARCHAR(64) NOT NULL,
+		tool_name VARCHAR(100) NOT NULL,
+		arguments JSONB,
+		result JSONB,
+		status VARCHAR(20) NOT NULL DEFAULT 'pending',
+		risk_level VARCHAR(20),
+		approved_by VARCHAR(255),
+		approved_at TIMESTAMP WITH TIME ZONE,
+		decision VARCHAR(20),
+		edited_arguments JSONB,
+		duration_ms BIGINT,
+		error_message TEXT,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		completed_at TIMESTAMP WITH TIME ZONE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_session ON agent_tool_calls(session_id);
+	CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_created ON agent_tool_calls(created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_status ON agent_tool_calls(status);
+	CREATE INDEX IF NOT EXISTS idx_agent_tool_calls_tool ON agent_tool_calls(tool_name);
 	`
 
 	_, err := c.db.Exec(schema)
@@ -358,4 +383,203 @@ func (c *Client) GetStats(duration time.Duration) (map[string]interface{}, error
 // Close 关闭数据库连接
 func (c *Client) Close() error {
 	return c.db.Close()
+}
+
+// AgentToolCall Agent 工具调用审计记录
+type AgentToolCall struct {
+	ID              int64      `json:"id"`
+	SessionID       string     `json:"sessionId"`
+	ToolCallID      string     `json:"toolCallId"`
+	ToolName        string     `json:"toolName"`
+	Arguments       string     `json:"arguments"`       // JSON
+	Result          string     `json:"result"`          // JSON
+	Status          string     `json:"status"`          // pending, approved, rejected, running, completed, failed
+	RiskLevel       string     `json:"riskLevel"`       // low, medium, high
+	ApprovedBy      string     `json:"approvedBy"`
+	ApprovedAt      *time.Time `json:"approvedAt,omitempty"`
+	Decision        string     `json:"decision"`        // approve, reject, edit
+	EditedArguments string     `json:"editedArguments"` // JSON
+	DurationMs      int64      `json:"durationMs"`
+	ErrorMessage    string     `json:"errorMessage"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	CompletedAt     *time.Time `json:"completedAt,omitempty"`
+}
+
+// LogToolCall 记录工具调用开始
+func (c *Client) LogToolCall(tc *AgentToolCall) (int64, error) {
+	query := `
+		INSERT INTO agent_tool_calls (
+			session_id, tool_call_id, tool_name, arguments, status, risk_level
+		) VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id
+	`
+
+	var id int64
+	err := c.db.QueryRow(query,
+		tc.SessionID,
+		tc.ToolCallID,
+		tc.ToolName,
+		tc.Arguments,
+		tc.Status,
+		tc.RiskLevel,
+	).Scan(&id)
+
+	return id, err
+}
+
+// UpdateToolCallApproval 更新工具调用审批状态
+func (c *Client) UpdateToolCallApproval(toolCallID, decision, approvedBy, editedArgs string) error {
+	query := `
+		UPDATE agent_tool_calls
+		SET status = $1, decision = $2, approved_by = $3, approved_at = $4, edited_arguments = $5
+		WHERE tool_call_id = $6
+	`
+
+	now := time.Now()
+	status := "approved"
+	if decision == "reject" {
+		status = "rejected"
+	}
+
+	_, err := c.db.Exec(query, status, decision, approvedBy, now, editedArgs, toolCallID)
+	return err
+}
+
+// UpdateToolCallResult 更新工具调用结果
+func (c *Client) UpdateToolCallResult(toolCallID string, result string, success bool, durationMs int64, errorMsg string) error {
+	query := `
+		UPDATE agent_tool_calls
+		SET status = $1, result = $2, duration_ms = $3, error_message = $4, completed_at = $5
+		WHERE tool_call_id = $6
+	`
+
+	status := "completed"
+	if !success {
+		status = "failed"
+	}
+	now := time.Now()
+
+	_, err := c.db.Exec(query, status, result, durationMs, errorMsg, now, toolCallID)
+	return err
+}
+
+// ListToolCalls 查询工具调用记录
+func (c *Client) ListToolCalls(sessionID string, page, pageSize int) ([]AgentToolCall, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+
+	// 构建查询
+	where := "WHERE 1=1"
+	args := []interface{}{}
+	argIndex := 1
+
+	if sessionID != "" {
+		where += fmt.Sprintf(" AND session_id = $%d", argIndex)
+		args = append(args, sessionID)
+		argIndex++
+	}
+
+	// 查询总数
+	var total int64
+	countQuery := "SELECT COUNT(*) FROM agent_tool_calls " + where
+	if err := c.db.QueryRow(countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// 查询数据
+	offset := (page - 1) * pageSize
+	query := fmt.Sprintf(`
+		SELECT id, session_id, tool_call_id, tool_name,
+		       COALESCE(arguments, '{}'), COALESCE(result, '{}'),
+		       status, COALESCE(risk_level, ''),
+		       COALESCE(approved_by, ''), approved_at,
+		       COALESCE(decision, ''), COALESCE(edited_arguments, '{}'),
+		       COALESCE(duration_ms, 0), COALESCE(error_message, ''),
+		       created_at, completed_at
+		FROM agent_tool_calls %s
+		ORDER BY created_at DESC
+		LIMIT $%d OFFSET $%d
+	`, where, argIndex, argIndex+1)
+
+	args = append(args, pageSize, offset)
+
+	rows, err := c.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var calls []AgentToolCall
+	for rows.Next() {
+		var tc AgentToolCall
+		err := rows.Scan(
+			&tc.ID, &tc.SessionID, &tc.ToolCallID, &tc.ToolName,
+			&tc.Arguments, &tc.Result, &tc.Status, &tc.RiskLevel,
+			&tc.ApprovedBy, &tc.ApprovedAt, &tc.Decision, &tc.EditedArguments,
+			&tc.DurationMs, &tc.ErrorMessage, &tc.CreatedAt, &tc.CompletedAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		calls = append(calls, tc)
+	}
+
+	return calls, total, nil
+}
+
+// GetToolCallStats 获取工具调用统计
+func (c *Client) GetToolCallStats(since time.Duration) (map[string]interface{}, error) {
+	sinceTime := time.Now().Add(-since)
+	stats := make(map[string]interface{})
+
+	// 总数
+	var total int64
+	c.db.QueryRow("SELECT COUNT(*) FROM agent_tool_calls WHERE created_at >= $1", sinceTime).Scan(&total)
+	stats["total"] = total
+
+	// 按状态统计
+	statusStats := make(map[string]int64)
+	rows, err := c.db.Query(`
+		SELECT status, COUNT(*) as count
+		FROM agent_tool_calls
+		WHERE created_at >= $1
+		GROUP BY status
+	`, sinceTime)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var status string
+			var count int64
+			rows.Scan(&status, &count)
+			statusStats[status] = count
+		}
+	}
+	stats["byStatus"] = statusStats
+
+	// 按工具统计
+	toolStats := make(map[string]int64)
+	rows, err = c.db.Query(`
+		SELECT tool_name, COUNT(*) as count
+		FROM agent_tool_calls
+		WHERE created_at >= $1
+		GROUP BY tool_name
+		ORDER BY count DESC
+		LIMIT 10
+	`, sinceTime)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var tool string
+			var count int64
+			rows.Scan(&tool, &count)
+			toolStats[tool] = count
+		}
+	}
+	stats["byTool"] = toolStats
+
+	return stats, nil
 }
