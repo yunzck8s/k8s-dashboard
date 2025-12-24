@@ -5,7 +5,7 @@
 """
 import json
 import asyncio
-from langchain_core.tools import tool
+from agno.tools import tool
 
 from src.k8s.client import get_k8s_client
 
@@ -23,11 +23,9 @@ def _run_async(coro):
         return asyncio.run(coro)
 
 
-@tool
+@tool(requires_confirmation=True)
 def scale_deployment(namespace: str, name: str, replicas: int) -> str:
-    """扩缩容 Deployment
-
-    ⚠️ 此操作需要用户确认
+    """扩缩容 Deployment - 需要用户确认
 
     Args:
         namespace: 命名空间
@@ -49,11 +47,9 @@ def scale_deployment(namespace: str, name: str, replicas: int) -> str:
         return json.dumps({"error": str(e), "success": False}, ensure_ascii=False)
 
 
-@tool
+@tool(requires_confirmation=True)
 def restart_deployment(namespace: str, name: str) -> str:
-    """重启 Deployment（滚动重启所有 Pod）
-
-    ⚠️ 此操作需要用户确认
+    """重启 Deployment（滚动重启所有 Pod）- 需要用户确认
 
     Args:
         namespace: 命名空间
@@ -73,11 +69,9 @@ def restart_deployment(namespace: str, name: str) -> str:
         return json.dumps({"error": str(e), "success": False}, ensure_ascii=False)
 
 
-@tool
+@tool(requires_confirmation=True)
 def delete_pod(namespace: str, name: str, force: bool = False) -> str:
-    """删除 Pod
-
-    ⚠️ 此操作需要用户确认
+    """删除 Pod - 需要用户确认
 
     Args:
         namespace: 命名空间

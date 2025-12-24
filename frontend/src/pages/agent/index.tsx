@@ -1,28 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  PaperAirplaneIcon,
-  SparklesIcon,
-  Cog6ToothIcon,
-  ExclamationTriangleIcon,
-  ChevronDownIcon,
-  WrenchScrewdriverIcon,
-  XMarkIcon,
-  ShieldCheckIcon,
-  MagnifyingGlassIcon,
-  BoltIcon,
-  ChartBarIcon,
-  CpuChipIcon,
-  PlusIcon,
-} from '@heroicons/react/24/outline';
-import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import { ChatMessage } from '../../components/ChatMessage';
 import { ApprovalDialog } from '../../components/ApprovalDialog';
-import { TodoListPanel, SubAgentFlow } from '../../components/agent';
 import { useAgentChat } from '../../hooks/useAgentChat';
-import type { Message, ApprovalRequest, TodoItem, SubAgentEvent, AgentFeatures } from '../../types/agent';
-import { DEFAULT_AGENT_FEATURES } from '../../types/agent';
-import api from '../../api/client';
+import type { Message, ApprovalRequest } from '../../types/agent';
 
 // Python Agent 服务地址
 const PYTHON_AGENT_API = import.meta.env.VITE_PYTHON_AGENT_URL || 'http://localhost:8000';
@@ -33,14 +14,6 @@ const generateMessageId = () => {
   messageIdCounter += 1;
   return `${Date.now()}-${messageIdCounter}-${Math.random().toString(36).slice(2, 8)}`;
 };
-
-// 工具定义
-interface K8sTool {
-  name: string;
-  description: string;
-  category: 'query' | 'diagnostic' | 'action' | 'analysis';
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-}
 
 // Provider 配置
 interface ProviderOption {
@@ -97,28 +70,15 @@ export default function AgentPage() {
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [showModelSelector, setShowModelSelector] = useState(false);
-  const [showCapabilities, setShowCapabilities] = useState(false);
-  const [tools, setTools] = useState<K8sTool[]>([]);
-  // DeepAgent 模式
-  const [useDeepAgent, setUseDeepAgent] = useState(false);
-  // DeepAgent 特有状态
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [subAgentEvents, setSubAgentEvents] = useState<SubAgentEvent[]>([]);
-  const [showSidePanel] = useState(true); // 侧边面板显示状态
-  const [features, setFeatures] = useState<AgentFeatures>(DEFAULT_AGENT_FEATURES);
-  const [showFeaturesPanel, setShowFeaturesPanel] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
-  const featuresPanelRef = useRef<HTMLDivElement>(null);
 
-  // 点击外部关闭模型选择器和特性面板
+  // 点击外部关闭模型选择器
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modelSelectorRef.current && !modelSelectorRef.current.contains(event.target as Node)) {
         setShowModelSelector(false);
-      }
-      if (featuresPanelRef.current && !featuresPanelRef.current.contains(event.target as Node)) {
-        setShowFeaturesPanel(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -128,12 +88,10 @@ export default function AgentPage() {
   // 检查配置状态
   useEffect(() => {
     checkConfiguration();
-    fetchTools();
   }, []);
 
   const checkConfiguration = async () => {
     try {
-      // 调用 Python Agent 服务的 provider 列表 API
       const response = await fetch(`${PYTHON_AGENT_API}/api/providers?enabled_only=true`);
       if (!response.ok) {
         throw new Error('Failed to fetch providers');
@@ -154,7 +112,6 @@ export default function AgentPage() {
       }
     } catch (error) {
       console.error('检查配置失败', error);
-      // 如果 Python 服务不可用，默认启用（允许用户测试）
       setIsConfigured(true);
       setSelectedProvider('deepseek');
       setSelectedModel('deepseek-chat');
@@ -163,27 +120,8 @@ export default function AgentPage() {
     }
   };
 
-  const fetchTools = async () => {
-    // 使用预定义的工具列表（Python Agent 的 K8s 工具）
-    setTools([
-      { name: 'list_pods', description: '列出指定命名空间的 Pod', category: 'query', riskLevel: 'low' },
-      { name: 'get_pod', description: '获取 Pod 详情', category: 'query', riskLevel: 'low' },
-      { name: 'list_deployments', description: '列出 Deployment', category: 'query', riskLevel: 'low' },
-      { name: 'get_deployment', description: '获取 Deployment 详情', category: 'query', riskLevel: 'low' },
-      { name: 'list_services', description: '列出 Service', category: 'query', riskLevel: 'low' },
-      { name: 'list_nodes', description: '列出集群节点', category: 'query', riskLevel: 'low' },
-      { name: 'get_pod_logs', description: '获取 Pod 日志', category: 'diagnostic', riskLevel: 'low' },
-      { name: 'describe_pod', description: '描述 Pod 详细信息', category: 'diagnostic', riskLevel: 'low' },
-      { name: 'check_resource_usage', description: '检查资源使用情况', category: 'diagnostic', riskLevel: 'low' },
-      { name: 'get_events', description: '获取 K8s 事件', category: 'diagnostic', riskLevel: 'low' },
-      { name: 'scale_deployment', description: '扩缩容 Deployment', category: 'action', riskLevel: 'medium' },
-      { name: 'restart_deployment', description: '重启 Deployment', category: 'action', riskLevel: 'medium' },
-      { name: 'delete_pod', description: '删除 Pod', category: 'action', riskLevel: 'high' },
-    ]);
-  };
-
-  const { isConnected, isLoading, sendMessage, sendApproval, newSession, saveMessages, loadMessages, sessionId } = useAgentChat({
-    useDeepAgent,
+  const { isConnected, isLoading, sendMessage, sendApproval, newSession } = useAgentChat({
+    useDeepAgent: false,
     onMessage: (content) => {
       setMessages((prev) => {
         const lastMessage = prev[prev.length - 1];
@@ -232,13 +170,6 @@ export default function AgentPage() {
       setApprovalRequest(request);
       setPendingToolCallId(request.toolCallId);
     },
-    // DeepAgent 特有回调
-    onTodosUpdate: (todosUpdate) => {
-      setTodos(todosUpdate.items);
-    },
-    onSubAgentEvent: (event) => {
-      setSubAgentEvents((prev) => [...prev, event]);
-    },
     onError: (error) => {
       console.error('[AgentChat] Error:', error);
       if (error === 'WebSocket is not connected') {
@@ -256,28 +187,9 @@ export default function AgentPage() {
     },
   });
 
-  // 加载保存的消息历史
-  useEffect(() => {
-    const savedMessages = loadMessages();
-    if (savedMessages.length > 0) {
-      setMessages(savedMessages);
-      console.log('[AgentPage] Loaded', savedMessages.length, 'messages from localStorage');
-    }
-  }, [loadMessages]);
-
-  // 保存消息到 localStorage（当消息变化时）
-  useEffect(() => {
-    if (messages.length > 0) {
-      saveMessages(messages);
-    }
-  }, [messages, saveMessages]);
-
-  // 处理新建对话
   const handleNewChat = () => {
     newSession();
     setMessages([]);
-    setTodos([]);
-    setSubAgentEvents([]);
   };
 
   useEffect(() => {
@@ -297,17 +209,8 @@ export default function AgentPage() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    sendMessage(inputValue.trim(), selectedProvider, selectedModel, features);
+    sendMessage(inputValue.trim(), selectedProvider, selectedModel);
     setInputValue('');
-  };
-
-  const handleProviderChange = (provider: string) => {
-    setSelectedProvider(provider);
-    const providerConfig = PROVIDER_CONFIG[provider];
-    if (providerConfig?.models.length > 0) {
-      setSelectedModel(providerConfig.models[0].id);
-    }
-    setShowModelSelector(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -333,32 +236,13 @@ export default function AgentPage() {
     }
   };
 
-  // 加载中
+  // 加载中状态
   if (isCheckingConfig) {
     return (
-      <div className="flex items-center justify-center relative" style={{ height: 'calc(100vh - 140px)' }}>
-        {/* 动画背景 */}
-        <div className="absolute inset-0 bg-[#0a0e27]">
-          <div className="absolute inset-0 opacity-30" style={{
-            backgroundImage: `
-              radial-gradient(circle at 20% 50%, rgba(0, 255, 159, 0.15) 0%, transparent 50%),
-              radial-gradient(circle at 80% 80%, rgba(255, 0, 110, 0.15) 0%, transparent 50%)
-            `
-          }}></div>
-          {/* 扫描线效果 */}
-          <div className="absolute inset-0 opacity-10" style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 159, 0.03) 2px, rgba(0, 255, 159, 0.03) 4px)'
-          }}></div>
-        </div>
-
-        <div className="text-center relative z-10">
-          <div className="relative inline-block">
-            <ArrowPathIcon className="w-16 h-16 mb-4 text-[#00ff9f] animate-spin" />
-            <div className="absolute inset-0 blur-xl bg-[#00ff9f] opacity-50 animate-pulse"></div>
-          </div>
-          <p className="text-[#00ff9f] font-mono text-sm tracking-wider animate-pulse">
-            {'>'} 正在初始化系统...
-          </p>
+      <div className="flex items-center justify-center h-full bg-[#0a0e27]">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+          <p className="text-slate-400">正在初始化...</p>
         </div>
       </div>
     );
@@ -367,79 +251,28 @@ export default function AgentPage() {
   // 未配置提示
   if (!isConfigured) {
     return (
-      <div className="flex items-center justify-center relative" style={{ height: 'calc(100vh - 140px)' }}>
-        {/* 动画背景 */}
-        <div className="absolute inset-0 bg-[#0a0e27]">
-          <div className="absolute inset-0 opacity-20" style={{
-            backgroundImage: `
-              radial-gradient(circle at 20% 50%, rgba(255, 0, 110, 0.2) 0%, transparent 50%),
-              radial-gradient(circle at 80% 80%, rgba(0, 255, 159, 0.1) 0%, transparent 50%)
-            `
-          }}></div>
-        </div>
-
-        <div className="max-w-2xl w-full mx-auto px-6 relative z-10">
-          <div className="bg-[#0f1629]/90 backdrop-blur-xl rounded-2xl shadow-2xl p-10 border border-[#ff006e]/30 relative overflow-hidden">
-            {/* 装饰性边框光效 */}
-            <div className="absolute inset-0 opacity-50">
-              <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#ff006e] to-transparent"></div>
-              <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#00ff9f] to-transparent"></div>
+      <div className="flex items-center justify-center h-full bg-[#0a0e27] p-4">
+        <div className="max-w-md w-full bg-[#111a22] rounded-xl shadow-2xl p-6 border border-[#233648]">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-amber-500 text-3xl">warning</span>
             </div>
-
-            <div className="text-center mb-8 relative">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#ff006e] to-[#ff006e]/50 flex items-center justify-center relative">
-                <ExclamationTriangleIcon className="w-14 h-14 text-white" />
-                <div className="absolute inset-0 blur-2xl bg-[#ff006e] opacity-60 animate-pulse"></div>
-              </div>
-              <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#ff006e] to-[#00ff9f] mb-3" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                系统未配置
-              </h2>
-              <p className="text-gray-400 font-mono text-sm">
-                {'>'} 需要配置 LLM Provider API Key 才能使用 AI 助手
-              </p>
-            </div>
-
-            <div className="bg-[#0a0e27]/50 rounded-xl p-6 mb-8 border border-[#00ff9f]/20">
-              <h3 className="font-bold text-[#00ff9f] mb-4 text-lg" style={{ fontFamily: 'Rajdhani, sans-serif' }}>配置步骤</h3>
-              <ol className="space-y-3 list-none text-gray-300 font-mono text-sm">
-                <li className="flex items-start gap-3">
-                  <span className="text-[#00ff9f] font-bold">01.</span>
-                  <span>前往设置页面的 "AI 助手" 标签</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-[#00ff9f] font-bold">02.</span>
-                  <span>选择 LLM Provider（OpenAI、DeepSeek、通义千问、豆包）</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-[#00ff9f] font-bold">03.</span>
-                  <span>展开 Provider 卡片并输入 API Key</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="text-[#00ff9f] font-bold">04.</span>
-                  <span>保存配置后返回此页面开始使用</span>
-                </li>
-              </ol>
-            </div>
-
-            <div className="flex gap-4">
-              <Link
-                to="/settings"
-                className="flex-1 py-4 px-6 bg-gradient-to-r from-[#ff006e] to-[#ff006e]/80 hover:from-[#ff006e]/90 hover:to-[#ff006e]/70 text-white font-bold rounded-xl transition-all transform hover:scale-105 hover:shadow-lg hover:shadow-[#ff006e]/50 flex items-center justify-center gap-3 relative overflow-hidden group"
-                style={{ fontFamily: 'Rajdhani, sans-serif' }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                <Cog6ToothIcon className="w-6 h-6 relative z-10" />
-                <span className="relative z-10">前往设置</span>
-              </Link>
-              <button
-                onClick={checkConfiguration}
-                className="py-4 px-6 bg-[#0a0e27] hover:bg-[#0a0e27]/80 text-[#00ff9f] font-bold rounded-xl transition-all border-2 border-[#00ff9f]/30 hover:border-[#00ff9f] flex items-center justify-center gap-3"
-                style={{ fontFamily: 'Rajdhani, sans-serif' }}
-              >
-                <ArrowPathIcon className="w-6 h-6" />
-                <span>重新检查</span>
-              </button>
-            </div>
+            <h2 className="text-xl font-bold text-white mb-2">系统未配置</h2>
+            <p className="text-slate-400 text-sm">需要配置 LLM Provider 才能使用 AI 助手</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex-1 py-2.5 px-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-lg transition-all text-center text-sm"
+            >
+              打开设置
+            </button>
+            <button
+              onClick={checkConfiguration}
+              className="py-2.5 px-4 bg-[#233648] hover:bg-[#2e4559] text-slate-300 font-semibold rounded-lg transition-all text-sm"
+            >
+              重新检查
+            </button>
           </div>
         </div>
       </div>
@@ -447,331 +280,312 @@ export default function AgentPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col relative" style={{ height: 'calc(100vh - 140px)' }}>
-      {/* 动画背景 */}
-      <div className="fixed inset-0 bg-[#0a0e27] -z-10">
-        <div className="absolute inset-0 opacity-20" style={{
-          backgroundImage: `
-            radial-gradient(circle at 20% 20%, rgba(0, 255, 159, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(255, 0, 110, 0.1) 0%, transparent 50%)
-          `
-        }}></div>
-        {/* 扫描线 */}
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 255, 159, 0.05) 2px, rgba(0, 255, 159, 0.05) 4px)'
-        }}></div>
-      </div>
-
-      {/* 头部 - 终端风格 - 固定 */}
-      <header className="flex-shrink-0 bg-[#0f1629]/80 backdrop-blur-xl border-b border-[#00ff9f]/20 px-6 py-4 relative">
-        {/* 装饰性顶部线条 */}
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#00ff9f] to-transparent"></div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00ff9f] to-[#00ff9f]/50 flex items-center justify-center relative overflow-hidden group">
-              <SparklesIcon className="w-7 h-7 text-[#0a0e27] relative z-10" />
-              <div className="absolute inset-0 bg-[#00ff9f] blur-xl opacity-50 group-hover:opacity-80 transition-opacity"></div>
+    <div className="h-full flex bg-[#0a0e27] overflow-hidden relative">
+      <div className="flex w-full h-full bg-[#111a22] overflow-hidden">
+        {/* 侧边栏 */}
+        <aside className="w-56 bg-[#0b1116] border-r border-[#233648] flex flex-col flex-shrink-0">
+          <div className="p-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h1 className="text-xs font-bold text-slate-200 tracking-tight">历史记录</h1>
+              <button className="text-slate-400 hover:text-slate-200 transition-colors">
+                <span className="material-symbols-outlined text-[18px]">search</span>
+              </button>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00ff9f] to-[#00ffff]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                AI 运维助手
-              </h1>
-              <p className="text-xs font-mono mt-1">
-                {isConnected ? (
-                  <span className="flex items-center gap-2 text-[#00ff9f]">
-                    <span className="w-2 h-2 bg-[#00ff9f] rounded-full animate-pulse shadow-[0_0_10px_rgba(0,255,159,0.8)]"></span>
-                    {'>'} 系统在线
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2 text-[#ff006e]">
-                    <span className="w-2 h-2 bg-[#ff006e] rounded-full animate-pulse"></span>
-                    {'>'} 连接中断
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* 右侧按钮组 */}
-          <div className="flex items-center gap-3">
-            {/* 新建对话按钮 */}
             <button
               onClick={handleNewChat}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-lg transition-all border border-[#00ff9f]/30 hover:border-[#00ff9f] font-mono text-sm group"
-              title="新建对话"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg shadow-sm transition-all"
             >
-              <PlusIcon className="w-5 h-5 text-[#00ff9f]" />
-              <span className="text-gray-400 group-hover:text-gray-300 transition-colors">新对话</span>
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              <span className="text-xs font-semibold">新对话</span>
             </button>
-
-            {/* Deep Agent 模式开关 */}
-            <button
-              onClick={() => setUseDeepAgent(!useDeepAgent)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all font-mono text-sm group ${
-                useDeepAgent
-                  ? 'bg-gradient-to-r from-[#ff006e] to-[#ff006e]/80 text-white border border-[#ff006e] shadow-lg shadow-[#ff006e]/30'
-                  : 'bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 border border-[#ff006e]/30 hover:border-[#ff006e]'
-              }`}
-            >
-              <CpuChipIcon className={`w-5 h-5 ${useDeepAgent ? 'text-white' : 'text-[#ff006e]'}`} />
-              <span className={useDeepAgent ? 'text-white font-bold' : 'text-gray-400 group-hover:text-gray-300'}>
-                Deep Agent
-              </span>
-              {useDeepAgent && <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">ON</span>}
-            </button>
-
-            {/* DeepAgents 特性开关（仅在 Deep Agent 模式显示） */}
-            {useDeepAgent && (
-            <div className="relative" ref={featuresPanelRef}>
-              <button
-                onClick={() => setShowFeaturesPanel(!showFeaturesPanel)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-lg transition-all border border-[#ff006e]/30 hover:border-[#ff006e] font-mono text-sm group"
-              >
-                <SparklesIcon className="w-5 h-5 text-[#ff006e]" />
-                <span className="text-gray-400 group-hover:text-gray-300 transition-colors">特性</span>
-                <span className="text-xs text-[#ff006e] font-bold">
-                  {Object.values(features).filter(Boolean).length}/4
-                </span>
-              </button>
-
-              {/* 特性开关面板 */}
-              {showFeaturesPanel && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-[#0f1629]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[#ff006e]/30 z-50 overflow-hidden">
-                  <div className="p-4">
-                    <div className="text-xs font-mono text-[#ff006e] px-2 py-2 border-b border-[#ff006e]/20 mb-3 flex items-center gap-2">
-                      <SparklesIcon className="w-4 h-4" />
-                      Deep Agent 特性配置
-                    </div>
-                    <div className="space-y-3">
-                      {[
-                        { key: 'enablePlanning', label: '任务规划', desc: '使用 write_todos 工具分解任务' },
-                        { key: 'enableFilesystem', label: '文件系统', desc: '读写文件，保存上下文' },
-                        { key: 'enableSubagents', label: '子代理', desc: '委派复杂任务给专门代理' },
-                        { key: 'enableMemory', label: '长期记忆', desc: '持久化保存偏好和历史' },
-                      ].map((item) => (
-                        <label
-                          key={item.key}
-                          className="flex items-start gap-3 p-3 bg-[#0a0e27]/50 rounded-lg border border-gray-700/30 hover:border-gray-600/50 cursor-pointer transition-all"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={features[item.key as keyof AgentFeatures]}
-                            onChange={(e) =>
-                              setFeatures((prev) => ({
-                                ...prev,
-                                [item.key]: e.target.checked,
-                              }))
-                            }
-                            className="mt-1 w-4 h-4 rounded border-gray-600 bg-[#0a0e27] text-[#ff006e] focus:ring-[#ff006e] focus:ring-offset-0"
-                          />
-                          <div className="flex-1">
-                            <div className="font-mono text-sm text-gray-200">{item.label}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">{item.desc}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-gray-700/30 text-xs font-mono text-gray-500">
-                      启用这些特性以增强 Deep Agent 能力
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            )}
-
-            {/* 显示能力按钮 */}
-            <button
-              onClick={() => setShowCapabilities(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-lg transition-all border border-[#00ffff]/30 hover:border-[#00ffff] font-mono text-sm group"
-            >
-              <WrenchScrewdriverIcon className="w-5 h-5 text-[#00ffff]" />
-              <span className="text-gray-400 group-hover:text-gray-300 transition-colors">能力列表</span>
-            </button>
-
-            {/* 模型选择器 - 终端风格 */}
-            <div className="relative" ref={modelSelectorRef}>
-              <button
-                onClick={() => setShowModelSelector(!showModelSelector)}
-                className="flex items-center gap-3 px-5 py-2.5 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-lg transition-all border border-[#00ff9f]/30 hover:border-[#00ff9f] font-mono text-sm group"
-              >
-                <span className="text-[#00ff9f] font-bold">
-                  {PROVIDER_CONFIG[selectedProvider]?.name || selectedProvider}
-                </span>
-                <span className="text-[#ff006e]">/</span>
-                <span className="text-gray-400 group-hover:text-gray-300 transition-colors">
-                  {PROVIDER_CONFIG[selectedProvider]?.models.find((m) => m.id === selectedModel)?.name ||
-                    selectedModel}
-                </span>
-                <ChevronDownIcon className={`w-4 h-4 text-[#00ff9f] transition-transform ${showModelSelector ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* 下拉菜单 */}
-              {showModelSelector && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-[#0f1629]/95 backdrop-blur-xl rounded-xl shadow-2xl border border-[#00ff9f]/30 z-50 overflow-hidden">
-                  <div className="p-3">
-                    <div className="text-xs font-mono text-[#00ff9f] px-3 py-2 border-b border-[#00ff9f]/20 mb-2">
-                      {'>'} 选择模型
-                    </div>
-                    {availableProviders.map((providerId) => {
-                      const provider = PROVIDER_CONFIG[providerId];
-                      if (!provider) return null;
-                      return (
-                        <div key={providerId} className="mb-2">
-                          <div className="text-xs font-bold font-mono text-[#ff006e] px-3 py-1.5 bg-[#ff006e]/10 rounded-lg mb-1">
-                            {provider.name}
-                          </div>
-                          {provider.models.map((model) => (
-                            <button
-                              key={model.id}
-                              onClick={() => {
-                                handleProviderChange(providerId);
-                                setSelectedModel(model.id);
-                                setShowModelSelector(false);
-                              }}
-                              className={`w-full text-left px-4 py-2.5 text-sm font-mono rounded-lg transition-all ${
-                                selectedProvider === providerId && selectedModel === model.id
-                                  ? 'bg-[#00ff9f]/20 text-[#00ff9f] border-l-2 border-[#00ff9f]'
-                                  : 'text-gray-400 hover:text-gray-300 hover:bg-[#0a0e27]/50'
-                              }`}
-                            >
-                              {model.name}
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
-        </div>
-      </header>
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-2 pb-3">
+            <div className="text-[10px] text-slate-500 px-3 py-2">暂无历史记录</div>
+          </div>
+        </aside>
 
-      {/* 消息列表 + 侧边面板 */}
-      <div className="flex-1 overflow-hidden flex">
         {/* 主内容区 */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <div className="max-w-5xl mx-auto space-y-5">
-            {messages.length === 0 ? (
-              <div className="bg-[#0f1629]/60 backdrop-blur-sm rounded-2xl shadow-2xl p-12 text-center border border-[#00ff9f]/20 relative overflow-hidden">
-                {/* 装饰性角落 */}
-                <div className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-[#00ff9f]/30 rounded-tl-2xl"></div>
-                <div className="absolute bottom-0 right-0 w-20 h-20 border-b-2 border-r-2 border-[#ff006e]/30 rounded-br-2xl"></div>
+        <div className="flex-1 flex flex-col h-full min-w-0 bg-[#111a22]">
+          {/* 头部 */}
+          <header className="flex items-center justify-between px-4 py-2.5 border-b border-[#233648] bg-[#111a22] shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center size-9 rounded-full bg-primary/10 text-primary shrink-0">
+                <span className="material-symbols-outlined text-[20px]">smart_toy</span>
+                <span className={`absolute bottom-0 right-0 size-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'} border-2 border-[#111a22]`}></span>
+              </div>
+              <div className="flex flex-col">
+                <h2 className="text-sm font-bold leading-none">K8s Copilot</h2>
+                <div className="flex items-center gap-1.5 mt-1 text-[10px]">
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${isConnected ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                    {isConnected ? '在线' : '离线'}
+                  </span>
+                </div>
+              </div>
 
-                <div className="relative z-10">
-                  <div className="w-20 h-20 mx-auto mb-6 relative">
-                    <SparklesIcon className="w-20 h-20 text-[#00ff9f]/50" />
-                    <div className="absolute inset-0 blur-2xl bg-[#00ff9f] opacity-30 animate-pulse"></div>
+              {/* Provider 选择器 */}
+              <div className="flex items-center gap-2 ml-3 pl-3 border-l border-[#233648] relative" ref={modelSelectorRef}>
+                <button
+                  onClick={() => setShowModelSelector(!showModelSelector)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#233648] border border-primary/30 hover:bg-[#2e4559] transition-colors text-[11px] font-medium"
+                >
+                  <span className="material-symbols-outlined text-[14px] text-primary">psychology</span>
+                  <span className="text-white">{PROVIDER_CONFIG[selectedProvider]?.name || selectedProvider}</span>
+                  <span className="material-symbols-outlined text-[14px] text-slate-500">{showModelSelector ? 'expand_less' : 'expand_more'}</span>
+                </button>
+
+                {/* 下拉菜单 */}
+                {showModelSelector && (
+                  <div className="absolute top-full left-0 mt-2 w-56 bg-[#1c2a38] border border-[#2e4559] rounded-xl shadow-2xl z-50 overflow-hidden">
+                    <div className="p-1.5 space-y-0.5">
+                      {availableProviders.map((providerId) => {
+                        const provider = PROVIDER_CONFIG[providerId];
+                        if (!provider) return null;
+                        return (
+                          <div key={providerId}>
+                            {provider.models.map((model) => (
+                              <button
+                                key={model.id}
+                                onClick={() => {
+                                  setSelectedProvider(providerId);
+                                  setSelectedModel(model.id);
+                                  setShowModelSelector(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-2 text-left rounded-lg transition-all text-xs ${
+                                  selectedProvider === providerId && selectedModel === model.id
+                                    ? 'bg-primary/10 text-primary border-l-2 border-primary'
+                                    : 'text-slate-300 hover:bg-[#233648]'
+                                }`}
+                              >
+                                <span>{provider.name} - {model.name}</span>
+                                {selectedProvider === providerId && selectedModel === model.id && (
+                                  <span className="material-symbols-outlined text-primary text-[14px]">check_circle</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <h2 className="text-3xl font-bold mb-3 text-transparent bg-clip-text bg-gradient-to-r from-[#00ff9f] to-[#00ffff]" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                    {'>'} 欢迎使用 K8s 运维助手
-                  </h2>
-                  <p className="text-gray-400 font-mono text-sm mb-8 max-w-2xl mx-auto leading-relaxed">
-                    我可以帮你查询集群状态、诊断问题、执行运维操作等。所有高风险操作都需要你的确认。
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
-                    {[
-                      { title: '列出所有 Pod', desc: '查看集群中的所有 Pod', prompt: '列出所有命名空间下的 Pod' },
-                      { title: '检查集群健康', desc: '诊断集群当前状态', prompt: '检查集群健康状态' },
-                      { title: '查看 Deployment', desc: '查看部署情况', prompt: '查看 default 命名空间下的 Deployment' },
-                      { title: '分析异常', desc: '查找潜在问题', prompt: '分析集群中的异常情况' },
-                    ].map((item, idx) => (
-                      <button
-                        key={idx}
-                        className="text-left p-4 bg-[#0a0e27]/50 hover:bg-[#0a0e27]/80 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-[#00ff9f]/20 hover:border-[#00ff9f]/50 group relative overflow-hidden"
-                        onClick={() => setInputValue(item.prompt)}
-                        disabled={!isConnected}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#00ff9f]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="relative z-10">
-                          <div className="font-bold text-[#00ff9f] text-sm mb-1 font-mono">{item.title}</div>
-                          <div className="text-xs text-gray-500 font-mono">{item.desc}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center justify-center size-8 rounded-lg hover:bg-[#233648] text-slate-400 hover:text-slate-300 transition-colors"
+                title="设置"
+              >
+                <span className="material-symbols-outlined text-[18px]">settings</span>
+              </button>
+              <div className="w-px h-4 bg-[#233648] mx-1"></div>
+              <button className="flex items-center justify-center size-8 rounded-lg hover:bg-[#233648] text-slate-400 hover:text-slate-300 transition-colors">
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+              </button>
+            </div>
+          </header>
+
+          {/* 消息列表 */}
+          <main className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#111a22] custom-scrollbar">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                <div className="w-16 h-16 mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-primary text-4xl">smart_toy</span>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">欢迎使用 K8s Copilot</h3>
+                <p className="text-slate-400 text-sm mb-6 max-w-md">
+                  我可以帮你管理集群、诊断问题、执行操作。所有危险操作都需要你的确认。
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-w-2xl w-full">
+                  {[
+                    '列出所有 Pod',
+                    '检查集群健康',
+                    '查看 Deployment',
+                    '分析异常',
+                  ].map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => setInputValue(prompt)}
+                      className="px-3 py-2.5 bg-[#233648] hover:bg-[#2e4559] rounded-lg border border-[#2e4559] text-left transition-all"
+                    >
+                      <span className="text-xs font-medium text-slate-300">{prompt}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
-              messages.map((message) => <ChatMessage key={message.id} message={message} />)
+              <>
+                {messages.map((message) => (
+                  <ChatMessage key={message.id} message={message} />
+                ))}
+                <div ref={messagesEndRef} />
+              </>
             )}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
+          </main>
 
-        {/* 侧边面板 - DeepAgent 状态 */}
-        {showSidePanel && (todos.length > 0 || subAgentEvents.length > 0) && (
-          <div className="w-80 flex-shrink-0 border-l border-[#00ff9f]/10 bg-[#0a0e27]/30 overflow-y-auto p-4 space-y-4">
-            {/* 任务列表 */}
-            {todos.length > 0 && (
-              <TodoListPanel todos={todos} />
-            )}
-
-            {/* SubAgent 协作流程 */}
-            {subAgentEvents.length > 0 && (
-              <SubAgentFlow events={subAgentEvents} />
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 输入框 - 终端风格 - 固定底部 */}
-      <div className="flex-shrink-0 bg-[#0f1629]/90 backdrop-blur-xl border-t border-[#00ff9f]/20 px-6 py-5 relative">
-        {/* 装饰性底部线条 */}
-        <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#00ff9f] to-transparent"></div>
-
-        <div className="max-w-5xl mx-auto flex gap-4">
-          <div className="flex-1 relative">
-            <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isConnected
-                  ? '> 输入你的问题... (Shift+Enter 换行，Enter 发送)'
-                  : '> 等待连接...'
-              }
-              disabled={!isConnected || isLoading}
-              className="w-full min-h-[70px] max-h-[200px] resize-none px-5 py-4 bg-[#0a0e27]/80 border-2 border-[#00ff9f]/30 rounded-xl text-gray-300 placeholder-gray-600 focus:outline-none focus:border-[#00ff9f] disabled:opacity-50 font-mono text-sm transition-all"
-              style={{ caretColor: '#00ff9f' }}
-            />
-          </div>
-          <button
-            onClick={handleSend}
-            disabled={!isConnected || isLoading || !inputValue.trim()}
-            className="px-8 py-4 bg-gradient-to-r from-[#00ff9f] to-[#00ffff] text-[#0a0e27] font-bold rounded-xl hover:shadow-lg hover:shadow-[#00ff9f]/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 disabled:transform-none flex items-center justify-center relative overflow-hidden group"
-            style={{ fontFamily: 'Rajdhani, sans-serif' }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700"></div>
-            {isLoading ? (
-              <ArrowPathIcon className="w-6 h-6 animate-spin relative z-10" />
-            ) : (
-              <PaperAirplaneIcon className="w-6 h-6 relative z-10" />
-            )}
-          </button>
-        </div>
-
-        {/* 状态栏 */}
-        <div className="max-w-5xl mx-auto mt-3 flex items-center justify-between text-xs font-mono text-gray-600">
-          <div className="flex items-center gap-4">
-            <span className="text-[#00ff9f]">{'>'} {isConnected ? '在线' : '离线'}</span>
-            <span className="text-gray-600">|</span>
-            <span>{selectedProvider} / {selectedModel}</span>
-            <span className="text-gray-600">|</span>
-            <span className={useDeepAgent ? 'text-[#ff006e]' : 'text-[#00ffff]'}>
-              {useDeepAgent ? 'Deep Agent' : 'React Agent'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {isLoading && (
-              <span className="text-[#ff006e] animate-pulse">{'>'} 处理中...</span>
-            )}
-          </div>
+          {/* 输入框 */}
+          <footer className="p-3 border-t border-[#233648] bg-[#111a22] shrink-0">
+            <div className="relative flex items-end gap-2 bg-[#1c2a38] p-1.5 rounded-xl border border-[#2e4559] focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+              <textarea
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-transparent border-none text-white placeholder-slate-500 focus:ring-0 text-sm py-2.5 px-2.5 resize-none max-h-32 outline-none"
+                placeholder="输入你的问题..."
+                rows={1}
+                disabled={!isConnected || isLoading}
+              />
+              <button
+                onClick={handleSend}
+                disabled={!isConnected || isLoading || !inputValue.trim()}
+                className="p-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shrink-0 mb-0.5"
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  {isLoading ? 'progress_activity' : 'arrow_upward'}
+                </span>
+              </button>
+            </div>
+            <div className="text-center mt-2">
+              <p className="text-[9px] font-medium text-slate-600">
+                AI 可能会犯错，请验证生成的命令
+              </p>
+            </div>
+          </footer>
         </div>
       </div>
+
+      {/* 设置侧边栏 */}
+      {showSettings && (
+        <>
+          {/* 背景遮罩 */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={() => setShowSettings(false)}
+          />
+
+          {/* 设置面板 */}
+          <div className="fixed right-0 top-0 w-full md:w-[420px] h-full flex flex-col border-l border-[#324d67] bg-[#101922] shadow-2xl z-50 animate-in slide-in-from-right">
+            {/* 头部 */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#324d67] shrink-0">
+              <div className="flex flex-col">
+                <h1 className="text-white text-xl font-bold leading-tight tracking-tight">Assistant Settings</h1>
+                <p className="text-[#92adc9] text-xs font-normal mt-1">Configure your AI companion</p>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-[#92adc9] hover:text-white transition-colors p-2 rounded-full hover:bg-[#192633]"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* 内容区 */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+              {/* Model Configuration */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-symbols-outlined text-primary text-xl">smart_toy</span>
+                  <h2 className="text-white text-base font-bold tracking-tight">Model Configuration</h2>
+                </div>
+                <div className="space-y-5">
+                  <div className="flex flex-col">
+                    <label className="text-[#92adc9] text-sm font-medium mb-2">AI Model</label>
+                    <div className="relative">
+                      <select className="appearance-none w-full bg-[#192633] border border-[#324d67] text-white text-sm rounded-lg focus:ring-1 focus:ring-primary focus:border-primary block p-3 pr-10 outline-none transition-all">
+                        <option value="gpt-4">Kube-GPT-4 (Recommended)</option>
+                        <option value="gpt-3.5">GPT-3.5 Turbo (Faster)</option>
+                        <option value="llama-2">Llama 2 (Local)</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#92adc9]">
+                        <span className="material-symbols-outlined text-lg">expand_more</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="h-px bg-[#324d67]/50 w-full"></div>
+
+              {/* Provider Settings */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-symbols-outlined text-primary text-xl">extension</span>
+                  <h2 className="text-white text-base font-bold tracking-tight">Provider Settings</h2>
+                </div>
+                <div className="space-y-4">
+                  <p className="text-[#92adc9] text-xs mb-3">Configure API keys for external model providers.</p>
+                  <Link
+                    to="/settings"
+                    className="block w-full p-3 bg-[#192633] hover:bg-[#192633]/80 border border-[#324d67] rounded-lg text-white text-sm font-medium transition-colors text-center"
+                  >
+                    前往完整设置页面
+                  </Link>
+                </div>
+              </section>
+
+              <div className="h-px bg-[#324d67]/50 w-full"></div>
+
+              {/* Security & Context */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-symbols-outlined text-primary text-xl">shield_lock</span>
+                  <h2 className="text-white text-base font-bold tracking-tight">Security & Context</h2>
+                </div>
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-white text-sm font-medium">Read-only Mode</span>
+                      <span className="text-[#92adc9] text-xs leading-relaxed">Prevent the assistant from applying YAML changes or deleting resources.</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input type="checkbox" className="sr-only peer" defaultChecked />
+                      <div className="w-11 h-6 bg-[#192633] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary border border-[#324d67]"></div>
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              <div className="h-px bg-[#324d67]/50 w-full"></div>
+
+              {/* About */}
+              <section>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="material-symbols-outlined text-primary text-xl">info</span>
+                  <h2 className="text-white text-base font-bold tracking-tight">About</h2>
+                </div>
+                <div className="bg-[#192633]/50 rounded-lg p-4 border border-[#324d67]/50 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-primary text-lg">smart_toy</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-white text-sm font-medium">K8s Copilot</h3>
+                      <p className="text-[#92adc9] text-xs mt-1 leading-relaxed">
+                        Your intelligent companion for cluster management, offering real-time insights and automated resource optimization.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div className="h-4"></div>
+            </div>
+
+            {/* 底部按钮 */}
+            <div className="p-6 border-t border-[#324d67] bg-[#101922] shrink-0">
+              <div className="flex items-center gap-4">
+                <button className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-[#92adc9] hover:text-white hover:bg-[#192633] transition-colors">
+                  Reset Defaults
+                </button>
+                <button className="flex-1 px-4 py-3 rounded-lg text-sm font-medium text-white bg-primary hover:bg-blue-600 transition-colors shadow-lg shadow-blue-900/20">
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* 审批对话框 */}
       <ApprovalDialog
@@ -780,105 +594,6 @@ export default function AgentPage() {
         onApprove={handleApprove}
         onReject={handleReject}
       />
-
-      {/* 能力展示弹窗 */}
-      {showCapabilities && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#0f1629]/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-[#00ffff]/30 w-full max-w-4xl max-h-[80vh] overflow-hidden relative">
-            {/* 装饰性线条 */}
-            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#00ffff] to-transparent"></div>
-
-            {/* 头部 */}
-            <div className="flex items-center justify-between p-6 border-b border-[#00ffff]/20">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00ffff] to-[#00ffff]/50 flex items-center justify-center relative">
-                  <WrenchScrewdriverIcon className="w-6 h-6 text-[#0a0e27] relative z-10" />
-                  <div className="absolute inset-0 blur-xl bg-[#00ffff] opacity-50"></div>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#00ffff] to-white" style={{ fontFamily: 'Rajdhani, sans-serif' }}>
-                    Agent 能力列表
-                  </h2>
-                  <p className="text-xs font-mono text-gray-400 mt-1">{'>'} 共 {tools.length} 个可用工具</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowCapabilities(false)}
-                className="w-10 h-10 rounded-lg bg-gray-700/30 hover:bg-gray-700/50 border border-gray-600/30 hover:border-gray-500/50 transition-all flex items-center justify-center"
-              >
-                <XMarkIcon className="w-6 h-6 text-gray-400 hover:text-gray-300" />
-              </button>
-            </div>
-
-            {/* 内容区域 */}
-            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 100px)' }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {['query', 'diagnostic', 'action', 'analysis'].map((category) => {
-                  const categoryTools = tools.filter((t) => t.category === category);
-                  if (categoryTools.length === 0) return null;
-
-                  const categoryInfo = {
-                    query: { label: '查询操作', icon: MagnifyingGlassIcon, color: '#00ff9f' },
-                    diagnostic: { label: '诊断检查', icon: ShieldCheckIcon, color: '#00ffff' },
-                    action: { label: '执行操作', icon: BoltIcon, color: '#ff006e' },
-                    analysis: { label: '分析功能', icon: ChartBarIcon, color: '#ffaa00' },
-                  }[category];
-
-                  const Icon = categoryInfo?.icon || MagnifyingGlassIcon;
-
-                  return (
-                    <div key={category} className="bg-[#0a0e27]/50 rounded-xl p-4 border border-gray-700/30">
-                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-700/30">
-                        <Icon className="w-5 h-5" style={{ color: categoryInfo?.color }} />
-                        <h3 className="font-bold font-mono text-sm" style={{ color: categoryInfo?.color }}>
-                          {categoryInfo?.label}
-                        </h3>
-                        <span className="ml-auto text-xs text-gray-500 font-mono">({categoryTools.length})</span>
-                      </div>
-                      <div className="space-y-2">
-                        {categoryTools.map((tool) => {
-                          const riskColors = {
-                            low: '#00ff9f',
-                            medium: '#ffaa00',
-                            high: '#ff006e',
-                            critical: '#ff0000',
-                          };
-                          const riskColor = riskColors[tool.riskLevel] || '#00ff9f';
-
-                          return (
-                            <div key={tool.name} className="p-3 bg-[#0a0e27]/30 rounded-lg border border-gray-700/20 hover:border-gray-600/40 transition-all">
-                              <div className="flex items-start justify-between gap-2 mb-1">
-                                <div className="font-mono text-sm font-bold text-gray-200">{tool.name}</div>
-                                <div
-                                  className="text-xs px-2 py-0.5 rounded font-mono font-bold"
-                                  style={{
-                                    backgroundColor: `${riskColor}20`,
-                                    borderColor: `${riskColor}60`,
-                                    color: riskColor,
-                                    border: `1px solid`,
-                                  }}
-                                >
-                                  {tool.riskLevel.toUpperCase()}
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-400 font-mono leading-relaxed">{tool.description}</p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 添加自定义字体 */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-      `}</style>
     </div>
   );
 }

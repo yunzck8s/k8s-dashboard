@@ -1,9 +1,8 @@
-# LangChain / LangGraph 框架
-langchain>=1.0.0
-langchain-openai>=1.0.0
-langchain-anthropic>=1.0.0
-langgraph>=1.0.0
-langgraph-checkpoint-postgres>=2.0.0  # PostgreSQL checkpointer（可选）
+# Agno 框架
+agno>=0.1.0
+
+# 数据库连接（Agno 使用 psycopg 而非 asyncpg）
+psycopg[binary]>=3.0.0
 
 # gRPC
 grpcio>=1.60.0

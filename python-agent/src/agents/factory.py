@@ -1,75 +1,56 @@
-"""Agent 工厂
+"""Agent 工厂（重构为 Team 工厂）
 
-根据配置创建 React Agent 或 Deep Agent。
+创建 K8s Operations Team，替代原来的 React/Deep Agent 分支逻辑。
 """
-from typing import Any, Optional, Dict
-from dataclasses import dataclass, field
+from typing import Optional
+from dataclasses import dataclass
 import structlog
 
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.store.memory import InMemoryStore
+from agno.db.postgres import PostgresDb
+from agno.db.in_memory import InMemoryDb
 
-from src.agents.react import create_react_agent_instance
-from src.agents.deep import create_deep_agent_instance
+from src.agents.team import create_k8s_team
 
 logger = structlog.get_logger()
 
 
 @dataclass
-class AgentConfig:
-    """Agent 配置"""
-    model: str  # 格式: provider:model_name
-    use_deep_agent: bool = False
+class TeamConfig:
+    """Team 配置
+
+    简化版配置，移除了原有的 use_deep_agent 和 features 字段。
+    """
+    model: str  # 格式: provider:model_name（如 "deepseek:deepseek-chat"）
     api_key: Optional[str] = None  # 从数据库读取的 API Key
     base_url: Optional[str] = None  # 自定义 Base URL
-    features: Dict[str, bool] = field(default_factory=lambda: {
-        "enable_planning": True,
-        "enable_filesystem": True,
-        "enable_subagents": True,
-        "enable_memory": True,
-    })
 
 
-def create_agent(
-    config: AgentConfig,
-    checkpointer: Optional[Any] = None,
-    store: Optional[Any] = None,
-) -> Any:
-    """根据配置创建 Agent
+def create_team(
+    config: TeamConfig,
+    db: Optional[PostgresDb] = None,
+):
+    """创建 Agno Team（替代原来的 create_agent）
 
     Args:
-        config: Agent 配置
-        checkpointer: LangGraph checkpointer，用于状态持久化
-        store: LangGraph store，用于跨会话存储
+        config: Team 配置
+        db: PostgresDb 实例用于会话持久化，None 时使用内存存储
 
     Returns:
-        Agent 实例（CompiledGraph）
+        Team 实例（CompiledGraph）
     """
-    if checkpointer is None:
-        checkpointer = MemorySaver()
+    if db is None:
+        db = InMemoryDb()
 
-    if config.use_deep_agent:
-        logger.info(
-            "创建 Deep Agent",
-            model=config.model,
-            features=config.features,
-        )
-        if store is None:
-            store = InMemoryStore()
-        return create_deep_agent_instance(
-            model=config.model,
-            checkpointer=checkpointer,
-            store=store,
-            features=config.features,
-        )
-    else:
-        logger.info(
-            "创建 React Agent",
-            model=config.model,
-        )
-        return create_react_agent_instance(
-            model=config.model,
-            checkpointer=checkpointer,
-            api_key=config.api_key,
-            base_url=config.base_url,
-        )
+    logger.info(
+        "创建 K8s Operations Team",
+        model=config.model,
+        has_api_key=bool(config.api_key),
+        has_base_url=bool(config.base_url),
+    )
+
+    return create_k8s_team(
+        model=config.model,
+        api_key=config.api_key,
+        base_url=config.base_url,
+        db=db,
+    )

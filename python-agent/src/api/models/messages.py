@@ -17,14 +17,6 @@ class CamelCaseModel(BaseModel):
     )
 
 
-class AgentFeatures(CamelCaseModel):
-    """Agent 特性配置"""
-    enable_planning: bool = True
-    enable_filesystem: bool = True
-    enable_subagents: bool = True
-    enable_memory: bool = True
-
-
 class ClientMessage(BaseModel):
     """客户端消息
 
@@ -35,12 +27,10 @@ class ClientMessage(BaseModel):
     content: Optional[str] = None
     provider: Optional[str] = None
     model: Optional[str] = None
-    use_deep_agent: bool = False
-    features: Optional[AgentFeatures] = None
 
     # 审批相关
     tool_call_id: Optional[str] = None
-    decision: Optional[str] = None  # approve, reject, edit
+    decision: Optional[str] = None  # approve, reject, edit（注：Agno 不支持 edit）
     edited_args: Optional[Dict[str, Any]] = None
 
 

@@ -1,6 +1,6 @@
 """WebSocket 处理器
 
-处理 Agent 的 WebSocket 通信。
+处理 Agent 的 WebSocket 通信（Agno 版本）。
 """
 import json
 import uuid
@@ -8,11 +8,11 @@ from typing import Dict, Any, Optional
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
 
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.store.memory import InMemoryStore
-from langgraph.types import Command
+from agno.db.postgres import PostgresDb
+from agno.db.in_memory import InMemoryDb
+from agno.run.agent import RunEvent
 
-from src.agents import create_agent, AgentConfig
+from src.agents import create_team, TeamConfig
 from src.api.models.messages import (
     ClientMessage,
     ServerMessage,
@@ -30,97 +30,47 @@ from src.config import settings
 logger = structlog.get_logger()
 
 
-def get_postgres_connection_string() -> Optional[str]:
-    """将 asyncpg 格式的连接字符串转换为 psycopg 格式"""
-    db_url = settings.database_url
-    if not db_url:
-        return None
-    # postgresql+asyncpg://user:pass@host:port/db -> postgresql://user:pass@host:port/db
-    if "+asyncpg" in db_url:
-        return db_url.replace("+asyncpg", "")
-    return db_url
-
-
-async def create_postgres_checkpointer():
-    """创建 PostgreSQL checkpointer
-
-    使用 psycopg 连接池创建长期运行的 checkpointer。
-    连接池会自动管理连接的创建和回收。
-    """
-    try:
-        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-        from psycopg_pool import AsyncConnectionPool
-
-        conn_string = get_postgres_connection_string()
-        if not conn_string:
-            logger.warning("数据库连接字符串未配置，使用 MemorySaver")
-            return MemorySaver()
-
-        logger.info("初始化 PostgreSQL checkpointer...", conn_string=conn_string[:50] + "...")
-
-        # 创建连接池（长期运行应用的推荐方式）
-        pool = AsyncConnectionPool(
-            conninfo=conn_string,
-            min_size=1,
-            max_size=10,
-            open=False,  # 延迟打开
-            kwargs={"autocommit": True},
-        )
-        await pool.open()
-
-        # 使用连接池创建 checkpointer
-        checkpointer = AsyncPostgresSaver(pool)
-
-        # 创建必要的表（首次运行时需要）
-        await checkpointer.setup()
-
-        logger.info("PostgreSQL checkpointer 初始化完成")
-        return checkpointer
-    except ImportError as e:
-        logger.warning("langgraph-checkpoint-postgres 或 psycopg_pool 未安装，使用 MemorySaver", error=str(e))
-        return MemorySaver()
-    except Exception as e:
-        logger.error("PostgreSQL checkpointer 初始化失败，使用 MemorySaver", error=str(e), exc_info=True)
-        return MemorySaver()
-
-
-class AgentSession:
-    """Agent 会话"""
+class TeamSession:
+    """Team 会话（替代原来的 AgentSession）"""
 
     def __init__(
         self,
         session_id: str,
-        agent: Any,
-        config: dict,
-        use_deep_agent: bool,
+        team: Any,
     ):
         self.session_id = session_id
-        self.agent = agent
-        self.config = config
-        self.use_deep_agent = use_deep_agent
-        self.pending_interrupt: Optional[Dict[str, Any]] = None
+        self.team = team
+        self.pending_approval: Optional[Any] = None  # 存储待处理的审批事件
 
 
 class WebSocketManager:
-    """WebSocket 连接管理器"""
+    """WebSocket 连接管理器（Agno 版本）"""
 
     def __init__(self):
-        self.sessions: Dict[str, AgentSession] = {}
-        self.checkpointer = None  # 延迟初始化
-        self.store = InMemoryStore()
-        self._checkpointer_initialized = False
+        self.sessions: Dict[str, TeamSession] = {}  # 存储 TeamSession
+        self.db: Optional[PostgresDb] = None  # PostgresDb 替代 checkpointer
+        self._db_initialized = False
 
-    async def _ensure_checkpointer(self):
-        """确保 checkpointer 已初始化"""
-        if not self._checkpointer_initialized:
-            if settings.checkpointer_type == "postgres":
-                self.checkpointer = await create_postgres_checkpointer()
+    async def _ensure_db(self):
+        """确保 PostgresDb 已初始化"""
+        if not self._db_initialized:
+            # 转换 asyncpg 连接字符串为 psycopg 格式
+            db_url = settings.database_url
+            if db_url and "+asyncpg" in db_url:
+                db_url = db_url.replace("+asyncpg", "+psycopg")
+                try:
+                    self.db = PostgresDb(db_url=db_url)
+                    logger.info("PostgresDb 初始化完成", db_url=db_url[:50] + "...")
+                except Exception as e:
+                    logger.error("PostgresDb 初始化失败，使用 InMemoryDb", error=str(e), exc_info=True)
+                    self.db = InMemoryDb()
             else:
-                self.checkpointer = MemorySaver()
-            self._checkpointer_initialized = True
+                logger.warning("数据库连接字符串未配置，使用 InMemoryDb")
+                self.db = InMemoryDb()
+            self._db_initialized = True
             logger.info(
-                "Checkpointer 已初始化",
-                type=type(self.checkpointer).__name__,
+                "数据库已初始化",
+                type=type(self.db).__name__,
             )
 
     async def _get_provider_api_key(self, provider: str) -> tuple[Optional[str], Optional[str]]:
@@ -174,11 +124,11 @@ class WebSocketManager:
             await self._send_error(websocket, f"未知消息类型: {message.type}")
 
     async def _handle_chat_message(self, websocket: WebSocket, message: ClientMessage):
-        """处理聊天消息"""
+        """处理聊天消息（使用 Agno Team）"""
         session_id = message.session_id or str(uuid.uuid4())
 
-        # 确保 checkpointer 已初始化
-        await self._ensure_checkpointer()
+        # 确保 db 已初始化
+        await self._ensure_db()
 
         # 获取或创建会话
         if session_id not in self.sessions:
@@ -196,28 +146,20 @@ class WebSocketManager:
                 has_api_key=bool(api_key),
             )
 
-            agent_config = AgentConfig(
+            config = TeamConfig(
                 model=model or "deepseek:deepseek-chat",
-                use_deep_agent=message.use_deep_agent,
                 api_key=api_key,
                 base_url=base_url,
-                features=message.features.model_dump() if message.features else {},
             )
 
-            agent = create_agent(
-                config=agent_config,
-                checkpointer=self.checkpointer,
-                store=self.store if message.use_deep_agent else None,
+            team = create_team(
+                config=config,
+                db=self.db,
             )
 
-            self.sessions[session_id] = AgentSession(
+            self.sessions[session_id] = TeamSession(
                 session_id=session_id,
-                agent=agent,
-                config={
-                    "configurable": {"thread_id": session_id},
-                    "recursion_limit": 100,  # 增加递归限制
-                },
-                use_deep_agent=message.use_deep_agent,
+                team=team,
             )
 
             # 发送会话创建响应
@@ -228,34 +170,36 @@ class WebSocketManager:
 
         session = self.sessions[session_id]
 
-        # 流式执行 Agent
+        # 流式执行 Team
         try:
-            async for event in session.agent.astream_events(
-                {"messages": [{"role": "user", "content": message.content}]},
-                config=session.config,
-                version="v2",
+            async for event in session.team.arun(
+                input=message.content,
+                session_id=session_id,
+                user_id=session_id,  # Agno 使用 user_id 进行跨会话记忆
+                stream=True,
+                stream_events=True,
             ):
-                await self._process_event(websocket, session, event)
+                await self._process_agno_event(websocket, session, event)
 
             # 发送完成信号（如果没有中断）
-            if session.pending_interrupt is None:
+            if session.pending_approval is None:
                 await self._send_message(websocket, ServerMessage(
                     type="done",
                     session_id=session_id,
                 ))
         except Exception as e:
-            logger.error("Agent 执行错误", error=str(e), exc_info=True)
+            logger.error("Team 执行错误", error=str(e), exc_info=True)
             await self._send_error(websocket, str(e), session_id)
 
     async def _handle_approval(self, websocket: WebSocket, message: ClientMessage):
-        """处理审批响应"""
+        """处理审批响应（Agno 方式）"""
         session_id = message.session_id
         if not session_id or session_id not in self.sessions:
             await self._send_error(websocket, "会话不存在")
             return
 
         session = self.sessions[session_id]
-        if session.pending_interrupt is None:
+        if not session.pending_approval:
             await self._send_error(websocket, "没有待处理的审批请求", session_id)
             return
 
@@ -266,35 +210,56 @@ class WebSocketManager:
             decision=message.decision,
         )
 
-        # 构建决定
-        decision = {"type": message.decision}
-        if message.decision == "edit" and message.edited_args:
-            action_requests = session.pending_interrupt.get("action_requests", [])
-            for action in action_requests:
-                if action.get("id") == message.tool_call_id:
-                    decision["edited_action"] = {
-                        "name": action["name"],
-                        "args": message.edited_args,
-                    }
-                    break
+        event = session.pending_approval
+
+        # 处理审批决策
+        active_requirements = getattr(event, 'active_requirements', [])
+        for req in active_requirements:
+            tool_execution = getattr(req, 'tool_execution', None)
+            if not tool_execution:
+                continue
+
+            tool_call_id = getattr(tool_execution, 'tool_call_id', '')
+            if tool_call_id == message.tool_call_id:
+                if message.decision == "approve":
+                    req.confirm()
+                    logger.info("用户批准操作", tool_call_id=tool_call_id)
+                elif message.decision == "reject":
+                    req.reject("用户拒绝执行")
+                    logger.info("用户拒绝操作", tool_call_id=tool_call_id)
+                elif message.decision == "edit":
+                    # Agno 不支持直接编辑，引导用户重新输入
+                    req.reject("参数需要修改")
+                    await self._send_message(websocket, ServerMessage(
+                        type="chunk",
+                        session_id=session_id,
+                        content="❌ 操作已取消。请重新输入完整命令（包括修改后的参数）。",
+                    ))
+                    session.pending_approval = None
+                    logger.info("用户请求编辑参数，操作已取消", tool_call_id=tool_call_id)
+                    return
+                break
 
         # 清除中断状态
-        session.pending_interrupt = None
+        session.pending_approval = None
 
         # 恢复执行
         try:
-            async for event in session.agent.astream_events(
-                Command(resume={"decisions": [decision]}),
-                config=session.config,
-                version="v2",
-            ):
-                await self._process_event(websocket, session, event)
+            run_id = getattr(event, 'run_id', None)
+            requirements = getattr(event, 'requirements', [])
 
-            if session.pending_interrupt is None:
-                await self._send_message(websocket, ServerMessage(
-                    type="done",
-                    session_id=session_id,
-                ))
+            async for event_resumed in session.team.acontinue_run(
+                run_id=run_id,
+                requirements=requirements,
+                stream=True,
+                stream_events=True,
+            ):
+                await self._process_agno_event(websocket, session, event_resumed)
+
+            await self._send_message(websocket, ServerMessage(
+                type="done",
+                session_id=session_id,
+            ))
         except Exception as e:
             logger.error("恢复执行错误", error=str(e), exc_info=True)
             await self._send_error(websocket, str(e), session_id)
@@ -304,113 +269,133 @@ class WebSocketManager:
         session_id = message.session_id
         if session_id and session_id in self.sessions:
             session = self.sessions[session_id]
-            session.pending_interrupt = None
+            session.pending_approval = None
             logger.info("取消请求", session_id=session_id)
 
-    async def _process_event(self, websocket: WebSocket, session: AgentSession, event: dict):
-        """处理 Agent 事件"""
-        event_type = event.get("event", "")
-        data = event.get("data", {})
+    async def _process_agno_event(
+        self,
+        websocket: WebSocket,
+        session: TeamSession,
+        event,
+    ):
+        """处理 Agno 事件并映射到 ServerMessage"""
+        # 获取事件类型
+        event_type = getattr(event, 'event', None)
 
-        if event_type == "on_chat_model_stream":
-            chunk = data.get("chunk")
-            if chunk and hasattr(chunk, "content") and chunk.content:
+        # 1. 流式内容
+        if event_type == RunEvent.run_content:
+            content = getattr(event, 'content', None)
+            if content:
                 await self._send_message(websocket, ServerMessage(
                     type="chunk",
                     session_id=session.session_id,
-                    content=chunk.content,
+                    content=content,
                 ))
 
-        elif event_type == "on_tool_start":
-            tool_name = event.get("name", "")
-            tool_input = data.get("input", {})
-            run_id = event.get("run_id", str(uuid.uuid4()))
-
-            # 检查是否是 write_todos 工具
-            if tool_name == "write_todos":
-                todos = tool_input.get("todos", tool_input.get("items", []))
-                await self._send_message(websocket, ServerMessage(
-                    type="todos_update",
-                    session_id=session.session_id,
-                    todos_update=TodosUpdate(
-                        items=[
-                            TodoItem(
-                                id=str(i),
-                                content=todo.get("content", ""),
-                                status=todo.get("status", "pending"),
-                            )
-                            for i, todo in enumerate(todos)
-                        ]
-                    ),
-                ))
-            else:
+        # 2. 工具调用开始
+        elif event_type == RunEvent.tool_call_started:
+            tool = getattr(event, 'tool', None)
+            if tool:
                 await self._send_message(websocket, ServerMessage(
                     type="tool_call",
                     session_id=session.session_id,
                     tool_call=ToolCall(
-                        id=run_id,
-                        name=tool_name,
-                        arguments=tool_input,
+                        id=getattr(tool, 'tool_call_id', str(uuid.uuid4())),
+                        name=getattr(tool, 'tool_name', ''),
+                        arguments=getattr(tool, 'tool_args', {}),
                         status="running",
                     ),
                 ))
 
-        elif event_type == "on_tool_end":
-            tool_name = event.get("name", "")
-            tool_output = data.get("output", "")
-            run_id = event.get("run_id", "")
-
-            if tool_name != "write_todos":
+        # 3. 工具调用完成
+        elif event_type == RunEvent.tool_call_completed:
+            tool = getattr(event, 'tool', None)
+            if tool:
+                result = getattr(tool, 'result', '')
+                result_str = str(result)[:10000]  # 限制长度
                 await self._send_message(websocket, ServerMessage(
                     type="tool_result",
                     session_id=session.session_id,
                     tool_result=ToolResult(
-                        id=run_id,
-                        name=tool_name,
-                        result=str(tool_output)[:10000],
+                        id=getattr(tool, 'tool_call_id', ''),
+                        name=getattr(tool, 'tool_name', ''),
+                        result=result_str,
                         success=True,
                     ),
                 ))
 
-        elif event_type == "on_chain_start":
-            chain_name = event.get("name", "")
-            if any(keyword in chain_name.lower() for keyword in ["subagent", "task", "diagnostics"]):
-                await self._send_message(websocket, ServerMessage(
-                    type="subagent_event",
-                    session_id=session.session_id,
-                    subagent_event=SubAgentEvent(
-                        agent_name=chain_name,
-                        event_type="start",
-                        content=f"子代理 {chain_name} 开始执行",
-                    ),
-                ))
+        # 4. Human-in-the-Loop（需要审批）
+        if hasattr(event, 'is_paused') and event.is_paused:
+            session.pending_approval = event
 
-        elif event_type == "on_chain_end":
-            chain_name = event.get("name", "")
-            if any(keyword in chain_name.lower() for keyword in ["subagent", "task", "diagnostics"]):
-                await self._send_message(websocket, ServerMessage(
-                    type="subagent_event",
-                    session_id=session.session_id,
-                    subagent_event=SubAgentEvent(
-                        agent_name=chain_name,
-                        event_type="end",
-                        content=f"子代理 {chain_name} 执行完成",
-                    ),
-                ))
+            active_requirements = getattr(event, 'active_requirements', [])
+            for req in active_requirements:
+                needs_confirmation = getattr(req, 'needs_confirmation', False)
+                if needs_confirmation:
+                    await self._send_approval_request(
+                        websocket,
+                        session.session_id,
+                        req,
+                    )
 
-        # 处理中断（Human-in-the-Loop）
-        if "__interrupt__" in str(data) or event_type == "on_interrupt":
-            interrupt_data = data.get("__interrupt__", data.get("interrupt", []))
-            if interrupt_data:
-                await self._handle_interrupt(websocket, session, interrupt_data)
+        # 5. 执行结束
+        elif event_type == RunEvent.run_end:
+            # 已在外层处理
+            pass
+
+    async def _send_approval_request(
+        self,
+        websocket: WebSocket,
+        session_id: str,
+        requirement,
+    ):
+        """发送审批请求到前端"""
+        tool_execution = getattr(requirement, 'tool_execution', None)
+        if not tool_execution:
+            return
+
+        tool_name = getattr(tool_execution, 'tool_name', '')
+        tool_args = getattr(tool_execution, 'tool_args', {})
+        tool_call_id = getattr(tool_execution, 'tool_call_id', str(uuid.uuid4()))
+
+        # 生成描述
+        descriptions = {
+            "scale_deployment": f"扩缩容 Deployment {tool_args.get('namespace', 'default')}/{tool_args.get('name', '')} 到 {tool_args.get('replicas', '?')} 个副本",
+            "restart_deployment": f"重启 Deployment {tool_args.get('namespace', 'default')}/{tool_args.get('name', '')}",
+            "delete_pod": f"删除 Pod {tool_args.get('namespace', 'default')}/{tool_args.get('name', '')}",
+        }
+
+        # 生成风险等级
+        risk_level = "high" if tool_name == "delete_pod" else "medium"
+
+        # 生成影响说明
+        impacts = {
+            "scale_deployment": f"此操作会修改 Deployment 的副本数，可能影响服务可用性",
+            "restart_deployment": f"此操作会滚动重启所有 Pod，服务会短暂中断",
+            "delete_pod": f"此操作会立即终止 Pod，如果有控制器管理，新的 Pod 将被创建",
+        }
+
+        await self._send_message(websocket, ServerMessage(
+            type="approval_request",
+            session_id=session_id,
+            approval_request=ApprovalRequest(
+                tool_call_id=tool_call_id,
+                tool_name=tool_name,
+                description=descriptions.get(tool_name, f"执行 {tool_name}"),
+                impact=impacts.get(tool_name, "此操作可能影响集群状态"),
+                risk_level=risk_level,
+                arguments=tool_args,
+                allowed_decisions=["approve", "reject"],  # 移除 "edit"
+            ),
+        ))
 
     async def _handle_interrupt(
         self,
         websocket: WebSocket,
-        session: AgentSession,
+        session: TeamSession,
         interrupt_data: Any,
     ):
-        """处理中断（审批请求）"""
+        """处理中断（审批请求）- 已废弃，保留兼容性"""
         try:
             if isinstance(interrupt_data, list) and len(interrupt_data) > 0:
                 interrupt_value = interrupt_data[0]
