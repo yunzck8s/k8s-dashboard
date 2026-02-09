@@ -66,8 +66,8 @@ export default function Alerts() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">告警管理</h1>
-          <p className="text-slate-400 mt-1">
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>告警管理</h1>
+          <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
             监控和管理集群告警、静默规则和告警规则
           </p>
         </div>
@@ -95,7 +95,7 @@ export default function Alerts() {
       </div>
 
       {/* Tab 导航 */}
-      <div className="border-b border-slate-700">
+      <div style={{ borderBottom: '1px solid var(--color-border)' }}>
         <nav className="flex gap-1" role="tablist">
           {tabs.map((tab) => (
             <button
@@ -103,23 +103,21 @@ export default function Alerts() {
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px',
-                activeTab === tab.id
-                  ? 'text-blue-400 border-blue-400'
-                  : 'text-slate-400 border-transparent hover:text-slate-300 hover:border-slate-600'
-              )}
+              className="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px"
+              style={{
+                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                borderColor: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
+              }}
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
               {tab.count !== undefined && tab.count > 0 && (
                 <span
-                  className={clsx(
-                    'px-2 py-0.5 text-xs rounded-full',
-                    activeTab === tab.id
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'bg-slate-700 text-slate-400'
-                  )}
+                  className="px-2 py-0.5 text-xs rounded-full"
+                  style={{
+                    background: activeTab === tab.id ? 'rgba(99, 102, 241, 0.2)' : 'var(--color-bg-tertiary)',
+                    color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                  }}
                 >
                   {tab.count}
                 </span>
@@ -133,20 +131,32 @@ export default function Alerts() {
       <div>
         {activeTab === 'active' && <AlertsActive />}
         {activeTab === 'history' && (
-          <div className="card p-12 text-center">
-            <ClockIcon className="w-12 h-12 mx-auto text-slate-500 mb-4" />
-            <p className="text-slate-500">历史记录功能开发中...</p>
-            <p className="text-slate-600 text-sm mt-2">
+          <div
+            className="p-12 text-center rounded-xl"
+            style={{
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <ClockIcon className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-muted)' }} />
+            <p style={{ color: 'var(--color-text-muted)' }}>历史记录功能开发中...</p>
+            <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
               将支持查看已解决的告警历史和趋势分析
             </p>
           </div>
         )}
         {activeTab === 'silences' && <AlertsSilences />}
         {activeTab === 'rules' && (
-          <div className="card p-12 text-center">
-            <Cog6ToothIcon className="w-12 h-12 mx-auto text-slate-500 mb-4" />
-            <p className="text-slate-500">告警规则功能开发中...</p>
-            <p className="text-slate-600 text-sm mt-2">
+          <div
+            className="p-12 text-center rounded-xl"
+            style={{
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <Cog6ToothIcon className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-muted)' }} />
+            <p style={{ color: 'var(--color-text-muted)' }}>告警规则功能开发中...</p>
+            <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
               将支持创建自定义告警规则并同步到 VictoriaMetrics
             </p>
           </div>

@@ -100,15 +100,24 @@ export default function PodDetail() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2"
+          style={{ borderColor: 'var(--color-primary)' }}
+        />
       </div>
     );
   }
 
   if (error || !pod) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-red-400">加载失败：{(error as Error)?.message || 'Pod 不存在'}</p>
+      <div
+        className="p-6 text-center rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <p style={{ color: '#F87171' }}>加载失败：{(error as Error)?.message || 'Pod 不存在'}</p>
         <button onClick={() => refetch()} className="btn btn-primary mt-4">
           重试
         </button>
@@ -135,12 +144,12 @@ export default function PodDetail() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{name}</h1>
+              <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>{name}</h1>
               <span className={clsx('badge', getPodStatusColor(pod))}>
                 {pod.status.phase}
               </span>
             </div>
-            <p className="text-slate-400 mt-1">
+            <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
               命名空间: {namespace} | 节点: {pod.spec.nodeName || 'Pending'}
             </p>
           </div>
@@ -166,18 +175,22 @@ export default function PodDetail() {
       </div>
 
       {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
+      <div style={{ borderBottom: '1px solid var(--color-border)' }}>
         <nav className="flex gap-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
-                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors duration-150',
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  ? 'border-current'
+                  : 'border-transparent'
               )}
+              style={{
+                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                borderColor: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
+              }}
             >
               {tab.label}
             </button>
@@ -199,14 +212,26 @@ export default function PodDetail() {
           />
         )}
         {activeTab === 'terminal' && (
-          <div className="card overflow-hidden" style={{ minHeight: '500px' }}>
-            <div className="p-4 border-b border-slate-700">
+          <div
+            className="overflow-hidden rounded-xl"
+            style={{
+              minHeight: '500px',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <div className="p-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
               <div className="flex items-center gap-4">
-                <label className="text-sm text-slate-400">选择容器:</label>
+                <label className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>选择容器:</label>
                 <select
                   value={selectedContainer}
                   onChange={(e) => setSelectedContainer(e.target.value)}
-                  className="bg-slate-700 border-slate-600 rounded px-3 py-1.5 text-sm text-white"
+                  className="rounded px-3 py-1.5 text-sm"
+                  style={{
+                    background: 'var(--color-bg-tertiary)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
                 >
                   {pod.spec.containers.map((c) => (
                     <option key={c.name} value={c.name}>
@@ -237,8 +262,14 @@ function OverviewTab({ pod }: { pod: Pod }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 基本信息 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">基本信息</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={pod.metadata.name} />
           <InfoRow label="命名空间" value={pod.metadata.namespace || '-'} />
@@ -261,8 +292,14 @@ function OverviewTab({ pod }: { pod: Pod }) {
 
       {/* 标签和注解 */}
       <div className="space-y-6">
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">标签</h3>
+        <div
+          className="p-6 rounded-xl"
+          style={{
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>标签</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(pod.metadata.labels || {}).map(([key, value]) => (
               <span key={key} className="badge badge-default text-xs">
@@ -270,34 +307,46 @@ function OverviewTab({ pod }: { pod: Pod }) {
               </span>
             ))}
             {!pod.metadata.labels && (
-              <span className="text-slate-500">无标签</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>无标签</span>
             )}
           </div>
         </div>
 
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">注解</h3>
+        <div
+          className="p-6 rounded-xl"
+          style={{
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
+          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>注解</h3>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {Object.entries(pod.metadata.annotations || {}).map(([key, value]) => (
               <div key={key} className="text-sm">
-                <span className="text-slate-400">{key}:</span>
-                <span className="text-slate-300 ml-2 break-all">{value}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}>{key}:</span>
+                <span className="ml-2 break-all" style={{ color: 'var(--color-text-secondary)' }}>{value}</span>
               </div>
             ))}
             {!pod.metadata.annotations && (
-              <span className="text-slate-500">无注解</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>无注解</span>
             )}
           </div>
         </div>
       </div>
 
       {/* 条件状态 */}
-      <div className="card p-6 lg:col-span-2">
-        <h3 className="text-lg font-semibold text-white mb-4">条件状态</h3>
+      <div
+        className="p-6 lg:col-span-2 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>条件状态</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-slate-400 text-sm">
+              <tr className="text-left text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 <th className="pb-3">类型</th>
                 <th className="pb-3">状态</th>
                 <th className="pb-3">原因</th>
@@ -306,8 +355,8 @@ function OverviewTab({ pod }: { pod: Pod }) {
             </thead>
             <tbody className="text-sm">
               {pod.status.conditions?.map((condition) => (
-                <tr key={condition.type} className="border-t border-slate-700">
-                  <td className="py-3 text-slate-300">{condition.type}</td>
+                <tr key={condition.type} style={{ borderTop: '1px solid var(--color-border)' }}>
+                  <td className="py-3" style={{ color: 'var(--color-text-secondary)' }}>{condition.type}</td>
                   <td className="py-3">
                     <span
                       className={clsx(
@@ -318,8 +367,8 @@ function OverviewTab({ pod }: { pod: Pod }) {
                       {condition.status}
                     </span>
                   </td>
-                  <td className="py-3 text-slate-400">{condition.reason || '-'}</td>
-                  <td className="py-3 text-slate-400">
+                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>{condition.reason || '-'}</td>
+                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>
                     {condition.lastTransitionTime
                       ? formatDistanceToNow(new Date(condition.lastTransitionTime), {
                           addSuffix: true,
@@ -346,10 +395,17 @@ function ContainersTab({ pod }: { pod: Pod }) {
       {pod.spec.containers.map((container) => {
         const status = containerStatuses.find((cs) => cs.name === container.name);
         return (
-          <div key={container.name} className="card p-6">
+          <div
+            key={container.name}
+            className="p-6 rounded-xl"
+            style={{
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-white">{container.name}</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>{container.name}</h3>
                 {status && (
                   <span
                     className={clsx(
@@ -362,7 +418,7 @@ function ContainersTab({ pod }: { pod: Pod }) {
                 )}
               </div>
               {status && (
-                <span className="text-slate-400 text-sm">
+                <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
                   重启次数: {status.restartCount}
                 </span>
               )}
@@ -389,18 +445,18 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 资源限制 */}
               {container.resources && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm text-slate-400 mb-2">资源</dt>
+                  <dt className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>资源</dt>
                   <dd className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-slate-500">请求:</span>
-                      <span className="text-slate-300 ml-2">
+                      <span style={{ color: 'var(--color-text-muted)' }}>请求:</span>
+                      <span className="ml-2" style={{ color: 'var(--color-text-secondary)' }}>
                         CPU: {container.resources.requests?.cpu || '-'},
                         内存: {container.resources.requests?.memory || '-'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-500">限制:</span>
-                      <span className="text-slate-300 ml-2">
+                      <span style={{ color: 'var(--color-text-muted)' }}>限制:</span>
+                      <span className="ml-2" style={{ color: 'var(--color-text-secondary)' }}>
                         CPU: {container.resources.limits?.cpu || '-'},
                         内存: {container.resources.limits?.memory || '-'}
                       </span>
@@ -412,13 +468,16 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 环境变量 */}
               {container.env && container.env.length > 0 && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm text-slate-400 mb-2">环境变量</dt>
-                  <dd className="bg-slate-800 rounded p-3 max-h-40 overflow-y-auto">
+                  <dt className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>环境变量</dt>
+                  <dd
+                    className="rounded p-3 max-h-40 overflow-y-auto"
+                    style={{ background: 'var(--color-bg-tertiary)' }}
+                  >
                     {container.env.map((env, idx) => (
                       <div key={idx} className="text-sm font-mono">
-                        <span className="text-blue-400">{env.name}</span>
-                        <span className="text-slate-500">=</span>
-                        <span className="text-slate-300">
+                        <span style={{ color: 'var(--color-primary)' }}>{env.name}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>=</span>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>
                           {env.value || (env.valueFrom ? '[from secret/configmap]' : '')}
                         </span>
                       </div>
@@ -430,12 +489,12 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 挂载卷 */}
               {container.volumeMounts && container.volumeMounts.length > 0 && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm text-slate-400 mb-2">挂载卷</dt>
+                  <dt className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>挂载卷</dt>
                   <dd className="space-y-1">
                     {container.volumeMounts.map((mount, idx) => (
                       <div key={idx} className="text-sm">
-                        <span className="text-slate-300 font-mono">{mount.mountPath}</span>
-                        <span className="text-slate-500 ml-2">← {mount.name}</span>
+                        <span className="font-mono" style={{ color: 'var(--color-text-secondary)' }}>{mount.mountPath}</span>
+                        <span className="ml-2" style={{ color: 'var(--color-text-muted)' }}>← {mount.name}</span>
                         {mount.readOnly && <span className="badge badge-default ml-2">只读</span>}
                       </div>
                     ))}
@@ -472,7 +531,7 @@ function LogsTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <label className="text-slate-400">容器:</label>
+          <label style={{ color: 'var(--color-text-muted)' }}>容器:</label>
           <select
             value={selectedContainer}
             onChange={(e) => onContainerChange(e.target.value)}
@@ -497,8 +556,14 @@ function LogsTab({
         </div>
       </div>
 
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap">
+      <div
+        className="p-4 rounded-xl max-h-[600px] overflow-auto"
+        style={{
+          background: 'var(--color-bg-tertiary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <pre className="text-sm font-mono whitespace-pre-wrap" style={{ color: 'var(--color-text-secondary)' }}>
           {logs || '暂无日志'}
         </pre>
       </div>
@@ -520,8 +585,16 @@ function YamlTab({ yaml }: { yaml: string }) {
           复制 YAML
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+      <div
+        className="p-4 rounded-xl max-h-[600px] overflow-auto"
+        style={{
+          background: 'var(--color-bg-tertiary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <pre className="text-sm font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+          {yaml || '加载中...'}
+        </pre>
       </div>
     </div>
   );
@@ -530,7 +603,13 @@ function YamlTab({ yaml }: { yaml: string }) {
 // 事件标签页
 function EventsTab({ events }: { events: Event[] }) {
   return (
-    <div className="card overflow-hidden">
+    <div
+      className="overflow-hidden rounded-xl"
+      style={{
+        background: 'var(--color-bg-secondary)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
       <div className="table-container">
         <table>
           <thead>
@@ -555,10 +634,10 @@ function EventsTab({ events }: { events: Event[] }) {
                     {event.type}
                   </span>
                 </td>
-                <td className="text-slate-300">{event.reason}</td>
-                <td className="text-slate-400 max-w-md truncate">{event.message}</td>
-                <td className="text-slate-400">{event.count || 1}</td>
-                <td className="text-slate-400">
+                <td style={{ color: 'var(--color-text-secondary)' }}>{event.reason}</td>
+                <td className="max-w-md truncate" style={{ color: 'var(--color-text-muted)' }}>{event.message}</td>
+                <td style={{ color: 'var(--color-text-muted)' }}>{event.count || 1}</td>
+                <td style={{ color: 'var(--color-text-muted)' }}>
                   {event.lastTimestamp
                     ? formatDistanceToNow(new Date(event.lastTimestamp), {
                         addSuffix: true,
@@ -572,7 +651,7 @@ function EventsTab({ events }: { events: Event[] }) {
         </table>
       </div>
       {events.length === 0 && (
-        <div className="text-center py-12 text-slate-400">暂无事件</div>
+        <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>暂无事件</div>
       )}
     </div>
   );
@@ -590,8 +669,8 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={clsx('text-slate-200', mono && 'font-mono text-sm')}>{value}</dd>
+      <dt style={{ color: 'var(--color-text-muted)' }}>{label}</dt>
+      <dd className={clsx(mono && 'font-mono text-sm')} style={{ color: 'var(--color-text-secondary)' }}>{value}</dd>
     </div>
   );
 }

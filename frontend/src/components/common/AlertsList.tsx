@@ -60,14 +60,17 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-32">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
+        <div
+          className="animate-spin rounded-full h-6 w-6 border-b-2"
+          style={{ borderColor: 'var(--color-primary)' }}
+        />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-4 text-slate-400">
+      <div className="text-center py-4" style={{ color: 'var(--color-text-muted)' }}>
         加载告警失败
       </div>
     );
@@ -89,7 +92,7 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
 
   if (alerts.length === 0) {
     return (
-      <div className="text-center py-8 text-slate-400">
+      <div className="text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
         <BellAlertIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
         <p>{severityFilter ? `暂无${getSeverityConfig(severityFilter).label}告警` : '暂无活跃告警'}</p>
       </div>
@@ -100,10 +103,12 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
     <div className="space-y-3">
       {showTitle && (
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-slate-400">
+          <h4 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
             {severityFilter ? `${getSeverityConfig(severityFilter).label}告警` : '活跃告警'}
           </h4>
-          <span className="text-xs text-slate-500">{filteredAlerts.length} 个告警</span>
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {filteredAlerts.length} 个告警
+          </span>
         </div>
       )}
       {alerts.map((alert) => {
@@ -119,7 +124,7 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
           <div
             key={alert.fingerprint}
             className={clsx(
-              'p-3 rounded-lg border transition-all hover:scale-[1.01]',
+              'p-3 rounded-lg border transition-all duration-150',
               config.bgColor,
               config.borderColor
             )}
@@ -142,16 +147,18 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
                   </span>
                 </div>
                 {(namespace || pod) && (
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
                     {namespace && <span>{namespace}</span>}
                     {namespace && pod && <span> / </span>}
                     {pod && <span>{pod}</span>}
                   </div>
                 )}
                 {description && (
-                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{description}</p>
+                  <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
+                    {description}
+                  </p>
                 )}
-                <div className="text-xs text-slate-500 mt-2">
+                <div className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
                   开始于{' '}
                   {formatDistanceToNow(new Date(alert.startsAt), {
                     addSuffix: true,

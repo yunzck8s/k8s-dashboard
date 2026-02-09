@@ -217,15 +217,24 @@ export default function Pods() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2"
+          style={{ borderColor: 'var(--color-primary)' }}
+        />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-red-400">加载失败：{(error as Error).message}</p>
+      <div
+        className="p-6 text-center rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <p style={{ color: '#F87171' }}>加载失败：{(error as Error).message}</p>
         <button onClick={() => refetch()} className="btn btn-primary mt-4">
           重试
         </button>
@@ -259,41 +268,42 @@ export default function Pods() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-cyan-100 to-teal-100 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             Pods
           </h1>
-          <p className="text-slate-400 mt-2 text-sm font-medium">
-            共 <span className="text-cyan-400 font-semibold">{totalItems}</span> 个 Pod
+          <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+            共 <span style={{ color: 'var(--color-primary)' }}>{totalItems}</span> 个 Pod
             {currentNamespace !== 'all' && (
               <>
-                {' '}在 <span className="text-teal-400 font-semibold">{currentNamespace}</span> 命名空间
+                {' '}在 <span style={{ color: 'var(--color-primary)' }}>{currentNamespace}</span> 命名空间
               </>
             )}
             {totalPages > 1 && (
-              <span className="ml-2 text-xs text-slate-500">
+              <span className="ml-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                 (第 {currentPage}/{totalPages} 页)
               </span>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => refetch()}
-            className="group relative px-5 py-2.5 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-cyan-500/50 rounded-lg text-sm font-semibold text-slate-300 hover:text-white shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/0 via-cyan-600/10 to-cyan-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <span className="relative z-10 flex items-center gap-2">
-              <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              刷新
-            </span>
-          </button>
-        </div>
+        <button
+          onClick={() => refetch()}
+          className="btn btn-secondary flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          刷新
+        </button>
       </div>
 
       {/* Pod 列表 */}
-      <div className="card overflow-hidden">
+      <div
+        className="overflow-hidden rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
         <div className="table-container">
           <table>
             <thead>
@@ -321,7 +331,8 @@ export default function Pods() {
                     <td>
                       <Link
                         to={`/workloads/pods/${pod.metadata.namespace}/${pod.metadata.name}`}
-                        className="text-blue-400 hover:text-blue-300 font-medium"
+                        className="font-medium transition-colors"
+                        style={{ color: 'var(--color-primary)' }}
                       >
                         {pod.metadata.name}
                       </Link>
@@ -340,36 +351,36 @@ export default function Pods() {
                     </td>
                     <td>{getReadyContainers(pod)}</td>
                     <td>{getRestartCount(pod)}</td>
-                    <td className="text-slate-300 font-mono text-sm">
+                    <td className="font-mono text-sm">
                       <div className="flex flex-col">
-                        <span className="text-green-400">
+                        <span style={{ color: '#34D399' }}>
                           {metrics ? formatCpuUsage(metrics.cpuUsage) : '-'}
                         </span>
-                        <span className="text-xs text-slate-500">
-                          请求: <span className="text-blue-400">{resources.cpuRequest}</span>
+                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                          请求: <span style={{ color: '#60A5FA' }}>{resources.cpuRequest}</span>
                           {resources.cpuLimit !== '-' && (
-                            <> / 限制: <span className="text-orange-400">{resources.cpuLimit}</span></>
+                            <> / 限制: <span style={{ color: '#FBBF24' }}>{resources.cpuLimit}</span></>
                           )}
                         </span>
                       </div>
                     </td>
-                    <td className="text-slate-300 font-mono text-sm">
+                    <td className="font-mono text-sm">
                       <div className="flex flex-col">
-                        <span className="text-green-400">
+                        <span style={{ color: '#34D399' }}>
                           {metrics ? formatMemory(metrics.memoryUsage) : '-'}
                         </span>
-                        <span className="text-xs text-slate-500">
-                          请求: <span className="text-blue-400">{resources.memRequest}</span>
+                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                          请求: <span style={{ color: '#60A5FA' }}>{resources.memRequest}</span>
                           {resources.memLimit !== '-' && (
-                            <> / 限制: <span className="text-orange-400">{resources.memLimit}</span></>
+                            <> / 限制: <span style={{ color: '#FBBF24' }}>{resources.memLimit}</span></>
                           )}
                         </span>
                       </div>
                     </td>
-                    <td className="text-slate-400">
+                    <td style={{ color: 'var(--color-text-secondary)' }}>
                       {pod.spec.nodeName || '-'}
                     </td>
-                    <td className="text-slate-400">
+                    <td style={{ color: 'var(--color-text-secondary)' }}>
                       {formatDistanceToNow(
                         new Date(pod.metadata.creationTimestamp),
                         { addSuffix: true, locale: zhCN }
@@ -384,7 +395,7 @@ export default function Pods() {
 
         {/* 空状态 */}
         {pods.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>
             没有找到 Pod
           </div>
         )}

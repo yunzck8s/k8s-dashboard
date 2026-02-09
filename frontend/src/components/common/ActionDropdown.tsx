@@ -64,11 +64,15 @@ export default function ActionDropdown({
           onClick={() => setIsOpen(!isOpen)}
           disabled={disabled}
           className={clsx(
-            'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all',
-            'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600',
+            'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-150',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             buttonClassName
           )}
+          style={{
+            background: 'var(--color-bg-tertiary)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-primary)',
+          }}
         >
           {label}
           <ChevronDownIcon className={clsx('w-4 h-4 transition-transform', isOpen && 'rotate-180')} />
@@ -76,12 +80,18 @@ export default function ActionDropdown({
       )}
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-lg bg-slate-800 border border-slate-700 shadow-xl z-50 overflow-hidden">
+        <div
+          className="absolute right-0 mt-2 w-56 rounded-lg shadow-xl z-50 overflow-hidden"
+          style={{
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <div className="py-1">
             {items.map((item, index) => (
               <div key={index}>
                 {isDivider(item) ? (
-                  <div className="border-t border-slate-700 my-1" />
+                  <div className="my-1" style={{ borderTop: '1px solid var(--color-border)' }} />
                 ) : (
                   <button
                     onClick={() => {
@@ -92,12 +102,20 @@ export default function ActionDropdown({
                     }}
                     disabled={item.disabled}
                     className={clsx(
-                      'w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors',
-                      item.danger
-                        ? 'text-red-400 hover:bg-red-500/10'
-                        : 'text-slate-300 hover:bg-slate-700',
+                      'w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors duration-150',
                       item.disabled && 'opacity-50 cursor-not-allowed'
                     )}
+                    style={{
+                      color: item.danger ? '#F87171' : 'var(--color-text-secondary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = item.danger
+                        ? 'rgba(248, 113, 113, 0.1)'
+                        : 'var(--color-bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                    }}
                   >
                     {item.icon && <span className="w-5 h-5 flex-shrink-0">{item.icon}</span>}
                     {item.label}

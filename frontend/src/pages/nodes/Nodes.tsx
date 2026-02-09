@@ -37,12 +37,11 @@ function parseMemory(value: string): number {
   return parseFloat(value);
 }
 
-// 资源使用进度条组件（带气泡效果）
+// 资源使用进度条组件（简化版）
 function ResourceBar({
   used,
   total,
   label,
-  colorClass = 'bg-blue-500',
 }: {
   used: number;
   total: number;
@@ -50,83 +49,30 @@ function ResourceBar({
   colorClass?: string;
 }) {
   const percentage = total > 0 ? Math.min((used / total) * 100, 100) : 0;
+
   const getBarColor = () => {
-    if (percentage >= 90) return 'bg-red-500';
-    if (percentage >= 70) return 'bg-amber-500';
-    return colorClass;
+    if (percentage >= 90) return '#EF4444';
+    if (percentage >= 70) return '#F59E0B';
+    return 'var(--color-primary)';
   };
-
-  // 获取气泡颜色
-  const getBubbleColor = () => {
-    if (percentage >= 90) return 'rgba(239, 68, 68, 0.6)';
-    if (percentage >= 70) return 'rgba(245, 158, 11, 0.6)';
-    if (colorClass === 'bg-purple-500') return 'rgba(168, 85, 247, 0.6)';
-    return 'rgba(59, 130, 246, 0.6)';
-  };
-
-  // 生成气泡数量
-  const bubbleCount = Math.max(2, Math.min(Math.floor(percentage / 20) + 1, 4));
 
   return (
     <div className="min-w-[120px]">
-      <style>
-        {`
-          @keyframes bar-bubble-float {
-            0%, 100% {
-              transform: translateX(0) scale(1);
-              opacity: 0.7;
-            }
-            50% {
-              transform: translateX(3px) scale(1.2);
-              opacity: 0.4;
-            }
-          }
-          @keyframes bar-shimmer {
-            0% {
-              background-position: -100% 0;
-            }
-            100% {
-              background-position: 200% 0;
-            }
-          }
-        `}
-      </style>
       <div className="flex items-center justify-between text-xs mb-1">
-        <span className="text-slate-400">{label}</span>
-        <span className="text-slate-300">{percentage.toFixed(0)}%</span>
+        <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+        <span style={{ color: 'var(--color-text-secondary)' }}>{percentage.toFixed(0)}%</span>
       </div>
-      <div className="h-2 bg-slate-700 rounded-full overflow-hidden relative">
+      <div
+        className="h-2 rounded-full overflow-hidden"
+        style={{ background: 'var(--color-bg-tertiary)' }}
+      >
         <div
-          className={clsx('h-full rounded-full transition-all relative overflow-hidden', getBarColor())}
-          style={{ width: `${percentage}%` }}
-        >
-          {/* 光泽效果 */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'bar-shimmer 2s infinite linear',
-            }}
-          />
-          {/* 气泡效果 */}
-          {percentage > 10 && Array.from({ length: bubbleCount }, (_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full"
-              style={{
-                width: `${3 + (i % 2) * 2}px`,
-                height: `${3 + (i % 2) * 2}px`,
-                backgroundColor: getBubbleColor(),
-                left: `${15 + (i * 100) / bubbleCount}%`,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                boxShadow: `0 0 4px ${getBubbleColor()}`,
-                animation: `bar-bubble-float ${1.5 + i * 0.3}s ease-in-out ${i * 0.2}s infinite`,
-              }}
-            />
-          ))}
-        </div>
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${percentage}%`,
+            background: getBarColor(),
+          }}
+        />
       </div>
     </div>
   );
@@ -184,15 +130,24 @@ export default function Nodes() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2"
+          style={{ borderColor: 'var(--color-primary)' }}
+        />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-red-400">加载失败：{(error as Error).message}</p>
+      <div
+        className="p-6 text-center rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <p style={{ color: '#F87171' }}>加载失败：{(error as Error).message}</p>
         <button onClick={() => refetch()} className="btn btn-primary mt-4">
           重试
         </button>
@@ -239,8 +194,8 @@ export default function Nodes() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">节点</h1>
-          <p className="text-slate-400 mt-1">共 {nodes.length} 个节点</p>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>节点</h1>
+          <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>共 {nodes.length} 个节点</p>
         </div>
         <button onClick={() => refetch()} className="btn btn-secondary">
           刷新
@@ -248,7 +203,13 @@ export default function Nodes() {
       </div>
 
       {/* 节点列表 */}
-      <div className="card overflow-hidden">
+      <div
+        className="overflow-hidden rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
         <div className="table-container">
           <table>
             <thead>
@@ -287,7 +248,8 @@ export default function Nodes() {
                     <td>
                       <Link
                         to={`/nodes/${node.metadata.name}`}
-                        className="text-blue-400 hover:text-blue-300 font-medium"
+                        className="font-medium transition-colors"
+                        style={{ color: 'var(--color-primary)' }}
                       >
                         {node.metadata.name}
                       </Link>
@@ -302,7 +264,7 @@ export default function Nodes() {
                         )}
                       </div>
                     </td>
-                    <td className="text-slate-400">{getNodeRoles(node)}</td>
+                    <td style={{ color: 'var(--color-text-muted)' }}>{getNodeRoles(node)}</td>
                     <td>
                       <ResourceBar
                         used={resourceUsage.cpuRequest}
@@ -321,13 +283,13 @@ export default function Nodes() {
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-semibold text-white">{podCount}</span>
-                        <span className="text-slate-500">/</span>
-                        <span className="text-slate-400">{podCapacity}</span>
+                        <span className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>{podCount}</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>/</span>
+                        <span style={{ color: 'var(--color-text-muted)' }}>{podCapacity}</span>
                       </div>
                     </td>
-                    <td className="text-slate-400">{node.status.nodeInfo?.kubeletVersion || '-'}</td>
-                    <td className="text-slate-400">
+                    <td style={{ color: 'var(--color-text-muted)' }}>{node.status.nodeInfo?.kubeletVersion || '-'}</td>
+                    <td style={{ color: 'var(--color-text-muted)' }}>
                       {formatDistanceToNow(new Date(node.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -340,7 +302,7 @@ export default function Nodes() {
           </table>
         </div>
         {nodes.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到节点</div>
+          <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>没有找到节点</div>
         )}
       </div>
 

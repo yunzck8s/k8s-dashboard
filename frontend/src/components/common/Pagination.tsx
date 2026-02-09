@@ -70,18 +70,17 @@ export default function Pagination({
     <div className="flex items-center justify-between px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
       {/* 左侧：每页显示数量 */}
       <div className="flex items-center gap-4">
-        <span className="text-sm" style={{ color: 'var(--color-text-secondary)', fontFamily: 'Rajdhani, sans-serif' }}>
+        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           每页显示
         </span>
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-          className="px-3 py-1 rounded text-sm font-medium transition-all"
+          className="px-3 py-1 rounded-lg text-sm font-medium transition-all duration-150"
           style={{
             background: 'var(--color-bg-tertiary)',
             border: '1px solid var(--color-border)',
             color: 'var(--color-text-primary)',
-            fontFamily: 'JetBrains Mono, monospace',
           }}
         >
           {pageSizeOptions.map((size) => (
@@ -90,10 +89,10 @@ export default function Pagination({
             </option>
           ))}
         </select>
-        <span className="text-sm" style={{ color: 'var(--color-text-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
-          显示 <span style={{ color: 'var(--color-accent-primary)' }}>{startItem}</span> -{' '}
-          <span style={{ color: 'var(--color-accent-primary)' }}>{endItem}</span> / 共{' '}
-          <span style={{ color: 'var(--color-accent-primary)' }}>{totalItems}</span> 项
+        <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          显示 <span style={{ color: 'var(--color-primary)' }}>{startItem}</span> -{' '}
+          <span style={{ color: 'var(--color-primary)' }}>{endItem}</span> / 共{' '}
+          <span style={{ color: 'var(--color-primary)' }}>{totalItems}</span> 项
         </span>
       </div>
 
@@ -135,15 +134,12 @@ export default function Pagination({
                 key={page}
                 onClick={() => onPageChange(page as number)}
                 className={clsx(
-                  'px-3 py-1 rounded text-sm font-semibold transition-all',
-                  'hover:scale-105'
+                  'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-150'
                 )}
                 style={{
-                  background: isActive ? 'var(--color-accent-primary)' : 'var(--color-bg-tertiary)',
-                  border: isActive ? '1px solid var(--color-accent-primary)' : '1px solid var(--color-border)',
-                  color: isActive ? '#0a0e1a' : 'var(--color-text-primary)',
-                  fontFamily: 'JetBrains Mono, monospace',
-                  boxShadow: isActive ? '0 0 20px var(--color-accent-glow)' : 'none',
+                  background: isActive ? 'var(--color-primary)' : 'var(--color-bg-tertiary)',
+                  border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  color: isActive ? 'white' : 'var(--color-text-primary)',
                 }}
               >
                 {page}
@@ -170,7 +166,7 @@ export default function Pagination({
         {/* 快速跳转 */}
         {totalPages > 10 && (
           <div className="flex items-center gap-2 ml-4">
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)', fontFamily: 'Rajdhani, sans-serif' }}>
+            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
               跳转至
             </span>
             <input
@@ -186,12 +182,11 @@ export default function Pagination({
                   }
                 }
               }}
-              className="w-16 px-2 py-1 rounded text-sm text-center transition-all"
+              className="w-16 px-2 py-1 rounded-lg text-sm text-center transition-all duration-150"
               style={{
                 background: 'var(--color-bg-tertiary)',
                 border: '1px solid var(--color-border)',
                 color: 'var(--color-text-primary)',
-                fontFamily: 'JetBrains Mono, monospace',
               }}
             />
           </div>

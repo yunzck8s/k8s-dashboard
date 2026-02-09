@@ -52,11 +52,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: 'var(--color-bg-primary)' }}
+    >
       <div className="w-full max-w-md">
         {/* Logo 和标题 */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
+            style={{ background: 'var(--color-primary)' }}
+          >
             <svg
               className="w-10 h-10 text-white"
               fill="none"
@@ -71,16 +77,33 @@ export default function Login() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">K8s Dashboard</h1>
-          <p className="text-slate-400 mt-2">Kubernetes 集群管理平台</p>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+            K8s Dashboard
+          </h1>
+          <p className="mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+            Kubernetes 集群管理平台
+          </p>
         </div>
 
         {/* 登录表单 */}
-        <div className="bg-slate-800 rounded-xl shadow-xl p-8">
+        <div
+          className="rounded-xl shadow-xl p-8"
+          style={{
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* 错误提示 */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+              <div
+                className="flex items-center gap-2 p-3 rounded-lg"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  color: '#F87171',
+                }}
+              >
                 <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
                 <span className="text-sm">{error}</span>
               </div>
@@ -90,7 +113,8 @@ export default function Login() {
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-slate-300 mb-2"
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'var(--color-text-secondary)' }}
               >
                 用户名
               </label>
@@ -99,7 +123,12 @@ export default function Login() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full rounded-lg px-4 py-3 transition-all duration-150"
+                style={{
+                  background: 'var(--color-bg-tertiary)',
+                  border: '1px solid var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                }}
                 placeholder="请输入用户名"
                 autoComplete="username"
                 autoFocus
@@ -110,7 +139,8 @@ export default function Login() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-slate-300 mb-2"
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'var(--color-text-secondary)' }}
               >
                 密码
               </label>
@@ -120,14 +150,20 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg px-4 py-3 pr-12 transition-all duration-150"
+                  style={{
+                    background: 'var(--color-bg-tertiary)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
                   placeholder="请输入密码"
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 transition-colors"
+                  style={{ color: 'var(--color-text-muted)' }}
                 >
                   {showPassword ? (
                     <EyeSlashIcon className="w-5 h-5" />
@@ -142,14 +178,15 @@ export default function Login() {
             <button
               type="submit"
               disabled={loginMutation.isPending}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full font-medium py-3 px-4 rounded-lg transition-all duration-150 flex items-center justify-center gap-2"
+              style={{
+                background: loginMutation.isPending ? 'rgba(99, 102, 241, 0.5)' : 'var(--color-primary)',
+                color: 'white',
+              }}
             >
               {loginMutation.isPending ? (
                 <>
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -174,16 +211,17 @@ export default function Login() {
           </form>
 
           {/* 提示信息 */}
-          <div className="mt-6 pt-6 border-t border-slate-700">
-            <p className="text-sm text-slate-400 text-center">
-              默认管理员账号: <span className="text-slate-300">admin</span> /{' '}
-              <span className="text-slate-300">admin123</span>
+          <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <p className="text-sm text-center" style={{ color: 'var(--color-text-muted)' }}>
+              默认管理员账号:{' '}
+              <span style={{ color: 'var(--color-text-secondary)' }}>admin</span> /{' '}
+              <span style={{ color: 'var(--color-text-secondary)' }}>admin123</span>
             </p>
           </div>
         </div>
 
         {/* 版权信息 */}
-        <p className="text-center text-slate-500 text-sm mt-8">
+        <p className="text-center text-sm mt-8" style={{ color: 'var(--color-text-muted)' }}>
           © 2024 K8s Dashboard. All rights reserved.
         </p>
       </div>

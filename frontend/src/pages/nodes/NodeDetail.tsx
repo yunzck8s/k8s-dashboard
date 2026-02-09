@@ -77,15 +77,24 @@ export default function NodeDetail() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+        <div
+          className="animate-spin rounded-full h-8 w-8 border-b-2"
+          style={{ borderColor: 'var(--color-primary)' }}
+        />
       </div>
     );
   }
 
   if (error || !node) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-red-400">加载失败：{(error as Error)?.message || '节点不存在'}</p>
+      <div
+        className="p-6 text-center rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <p style={{ color: '#F87171' }}>加载失败：{(error as Error)?.message || '节点不存在'}</p>
         <button onClick={() => refetch()} className="btn btn-primary mt-4">
           重试
         </button>
@@ -118,7 +127,7 @@ export default function NodeDetail() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{name}</h1>
+              <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>{name}</h1>
               <span className={clsx('badge', isReady ? 'badge-success' : 'badge-error')}>
                 {isReady ? 'Ready' : 'NotReady'}
               </span>
@@ -126,7 +135,7 @@ export default function NodeDetail() {
                 <span className="badge badge-warning">SchedulingDisabled</span>
               )}
             </div>
-            <p className="text-slate-400 mt-1">
+            <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
               {node.status.nodeInfo?.kubeletVersion} | {node.status.nodeInfo?.osImage}
             </p>
           </div>
@@ -170,18 +179,22 @@ export default function NodeDetail() {
       </div>
 
       {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
+      <div style={{ borderBottom: '1px solid var(--color-border)' }}>
         <nav className="flex gap-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={clsx(
-                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors duration-150',
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  ? 'border-current'
+                  : 'border-transparent'
               )}
+              style={{
+                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                borderColor: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
+              }}
             >
               {tab.label}
             </button>
@@ -205,8 +218,14 @@ function OverviewTab({ node }: { node: Node }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* 基本信息 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">基本信息</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={node.metadata.name} />
           <InfoRow label="UID" value={node.metadata.uid} mono />
@@ -223,8 +242,14 @@ function OverviewTab({ node }: { node: Node }) {
       </div>
 
       {/* 系统信息 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">系统信息</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>系统信息</h3>
         <dl className="space-y-3">
           <InfoRow label="操作系统" value={node.status.nodeInfo?.osImage || '-'} />
           <InfoRow label="内核版本" value={node.status.nodeInfo?.kernelVersion || '-'} />
@@ -236,8 +261,14 @@ function OverviewTab({ node }: { node: Node }) {
       </div>
 
       {/* 资源容量 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">资源容量</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>资源容量</h3>
         <dl className="space-y-3">
           <InfoRow label="CPU" value={node.status.capacity?.cpu || '-'} />
           <InfoRow label="内存" value={formatMemory(node.status.capacity?.memory)} />
@@ -247,8 +278,14 @@ function OverviewTab({ node }: { node: Node }) {
       </div>
 
       {/* 可分配资源 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">可分配资源</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>可分配资源</h3>
         <dl className="space-y-3">
           <InfoRow label="CPU" value={node.status.allocatable?.cpu || '-'} />
           <InfoRow label="内存" value={formatMemory(node.status.allocatable?.memory)} />
@@ -258,8 +295,14 @@ function OverviewTab({ node }: { node: Node }) {
       </div>
 
       {/* 地址 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">地址</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>地址</h3>
         <dl className="space-y-3">
           {node.status.addresses?.map((addr) => (
             <InfoRow key={addr.type} label={addr.type} value={addr.address} mono />
@@ -268,8 +311,14 @@ function OverviewTab({ node }: { node: Node }) {
       </div>
 
       {/* 标签 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">标签</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>标签</h3>
         <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
           {Object.entries(node.metadata.labels || {}).map(([key, value]) => (
             <span key={key} className="badge badge-default text-xs">
@@ -280,24 +329,36 @@ function OverviewTab({ node }: { node: Node }) {
       </div>
 
       {/* 污点 */}
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">污点 (Taints)</h3>
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>污点 (Taints)</h3>
         <div className="space-y-2">
           {node.spec.taints?.map((taint, idx) => (
             <div key={idx} className="badge badge-warning text-xs">
               {taint.key}={taint.value}:{taint.effect}
             </div>
-          )) || <span className="text-slate-500">无污点</span>}
+          )) || <span style={{ color: 'var(--color-text-muted)' }}>无污点</span>}
         </div>
       </div>
 
       {/* 条件状态 */}
-      <div className="card p-6 lg:col-span-2">
-        <h3 className="text-lg font-semibold text-white mb-4">条件状态</h3>
+      <div
+        className="p-6 lg:col-span-2 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>条件状态</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-slate-400 text-sm">
+              <tr className="text-left text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 <th className="pb-3">类型</th>
                 <th className="pb-3">状态</th>
                 <th className="pb-3">原因</th>
@@ -307,8 +368,8 @@ function OverviewTab({ node }: { node: Node }) {
             </thead>
             <tbody className="text-sm">
               {node.status.conditions?.map((condition) => (
-                <tr key={condition.type} className="border-t border-slate-700">
-                  <td className="py-3 text-slate-300">{condition.type}</td>
+                <tr key={condition.type} style={{ borderTop: '1px solid var(--color-border)' }}>
+                  <td className="py-3" style={{ color: 'var(--color-text-secondary)' }}>{condition.type}</td>
                   <td className="py-3">
                     <span
                       className={clsx(
@@ -325,9 +386,9 @@ function OverviewTab({ node }: { node: Node }) {
                       {condition.status}
                     </span>
                   </td>
-                  <td className="py-3 text-slate-400">{condition.reason || '-'}</td>
-                  <td className="py-3 text-slate-400 max-w-xs truncate">{condition.message || '-'}</td>
-                  <td className="py-3 text-slate-400">
+                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>{condition.reason || '-'}</td>
+                  <td className="py-3 max-w-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{condition.message || '-'}</td>
+                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>
                     {condition.lastHeartbeatTime
                       ? formatDistanceToNow(new Date(condition.lastHeartbeatTime), {
                           addSuffix: true,
@@ -374,7 +435,13 @@ function PodsTab({ pods }: { pods: Pod[] }) {
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div
+      className="overflow-hidden rounded-xl"
+      style={{
+        background: 'var(--color-bg-secondary)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
       <div className="table-container">
         <table>
           <thead>
@@ -398,7 +465,8 @@ function PodsTab({ pods }: { pods: Pod[] }) {
                   <td>
                     <Link
                       to={`/workloads/pods/${pod.metadata.namespace}/${pod.metadata.name}`}
-                      className="text-blue-400 hover:text-blue-300"
+                      className="transition-colors"
+                      style={{ color: 'var(--color-primary)' }}
                     >
                       {pod.metadata.name}
                     </Link>
@@ -413,8 +481,8 @@ function PodsTab({ pods }: { pods: Pod[] }) {
                   </td>
                   <td>{ready}/{total}</td>
                   <td>{restarts}</td>
-                  <td className="text-slate-400 font-mono text-sm">{pod.status.podIP || '-'}</td>
-                  <td className="text-slate-400">
+                  <td className="font-mono text-sm" style={{ color: 'var(--color-text-muted)' }}>{pod.status.podIP || '-'}</td>
+                  <td style={{ color: 'var(--color-text-muted)' }}>
                     {formatDistanceToNow(new Date(pod.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -427,7 +495,7 @@ function PodsTab({ pods }: { pods: Pod[] }) {
         </table>
       </div>
       {pods.length === 0 && (
-        <div className="text-center py-12 text-slate-400">此节点上暂无 Pods</div>
+        <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>此节点上暂无 Pods</div>
       )}
     </div>
   );
@@ -437,8 +505,14 @@ function PodsTab({ pods }: { pods: Pod[] }) {
 function MetricsTab({ metrics }: { metrics?: any }) {
   if (!metrics) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-slate-400">暂无指标数据</p>
+      <div
+        className="p-6 text-center rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <p style={{ color: 'var(--color-text-muted)' }}>暂无指标数据</p>
       </div>
     );
   }
@@ -452,12 +526,18 @@ function MetricsTab({ metrics }: { metrics?: any }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">CPU 使用率</h3>
-        <div className="text-4xl font-bold text-blue-400 mb-4">
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>CPU 使用率</h3>
+        <div className="text-4xl font-bold mb-4" style={{ color: 'var(--color-primary)' }}>
           {cpuPercentage.toFixed(1)}%
         </div>
-        <div className="text-sm text-slate-400">
+        <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
           <div className="flex justify-between mb-1">
             <span>使用量:</span>
             <span className="font-mono">{(cpuUsage / 1000).toFixed(2)} cores</span>
@@ -467,19 +547,31 @@ function MetricsTab({ metrics }: { metrics?: any }) {
             <span className="font-mono">{(cpuCapacity / 1000).toFixed(2)} cores</span>
           </div>
         </div>
-        <div className="w-full bg-slate-700 rounded-full h-2 mt-4">
+        <div
+          className="w-full rounded-full h-2 mt-4"
+          style={{ background: 'var(--color-bg-tertiary)' }}
+        >
           <div
-            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${Math.min(cpuPercentage, 100)}%` }}
+            className="h-2 rounded-full transition-all duration-300"
+            style={{
+              width: `${Math.min(cpuPercentage, 100)}%`,
+              background: 'var(--color-primary)',
+            }}
           />
         </div>
       </div>
-      <div className="card p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">内存使用率</h3>
-        <div className="text-4xl font-bold text-green-400 mb-4">
+      <div
+        className="p-6 rounded-xl"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>内存使用率</h3>
+        <div className="text-4xl font-bold mb-4" style={{ color: '#10B981' }}>
           {memoryPercentage.toFixed(1)}%
         </div>
-        <div className="text-sm text-slate-400">
+        <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
           <div className="flex justify-between mb-1">
             <span>使用量:</span>
             <span className="font-mono">{(memoryUsage / 1024 / 1024 / 1024).toFixed(2)} GB</span>
@@ -489,10 +581,16 @@ function MetricsTab({ metrics }: { metrics?: any }) {
             <span className="font-mono">{(memoryCapacity / 1024 / 1024 / 1024).toFixed(2)} GB</span>
           </div>
         </div>
-        <div className="w-full bg-slate-700 rounded-full h-2 mt-4">
+        <div
+          className="w-full rounded-full h-2 mt-4"
+          style={{ background: 'var(--color-bg-tertiary)' }}
+        >
           <div
-            className="bg-green-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${Math.min(memoryPercentage, 100)}%` }}
+            className="h-2 rounded-full transition-all duration-300"
+            style={{
+              width: `${Math.min(memoryPercentage, 100)}%`,
+              background: '#10B981',
+            }}
           />
         </div>
       </div>
@@ -514,8 +612,16 @@ function YamlTab({ yaml }: { yaml: string }) {
           复制 YAML
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-auto">
-        <pre className="text-sm text-slate-300 font-mono">{yaml || '加载中...'}</pre>
+      <div
+        className="p-4 rounded-xl max-h-[600px] overflow-auto"
+        style={{
+          background: 'var(--color-bg-tertiary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <pre className="text-sm font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+          {yaml || '加载中...'}
+        </pre>
       </div>
     </div>
   );
@@ -533,8 +639,8 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={clsx('text-slate-200', mono && 'font-mono text-sm')}>{value}</dd>
+      <dt style={{ color: 'var(--color-text-muted)' }}>{label}</dt>
+      <dd className={clsx(mono && 'font-mono text-sm')} style={{ color: 'var(--color-text-secondary)' }}>{value}</dd>
     </div>
   );
 }

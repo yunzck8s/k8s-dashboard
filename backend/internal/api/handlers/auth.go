@@ -34,7 +34,21 @@ type LoginResponse struct {
 // Login 用户登录
 func (h *AuthHandler) Login(c *gin.Context) {
 	if h.auth == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "认证服务未启用"})
+		// 认证服务不可用时，返回免认证的管理员用户
+		c.JSON(http.StatusOK, gin.H{
+			"token": "no-auth-mode",
+			"user": gin.H{
+				"id":            1,
+				"username":      "admin",
+				"displayName":   "管理员",
+				"email":         "admin@local",
+				"role":          "admin",
+				"allNamespaces": true,
+				"enabled":       true,
+				"createdAt":     "2024-01-01T00:00:00Z",
+			},
+			"namespaces": []string{},
+		})
 		return
 	}
 

@@ -106,25 +106,38 @@ export default function YamlEditorModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div
+        className="rounded-xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div
+          className="flex items-center justify-between px-6 py-4"
+          style={{ borderBottom: '1px solid var(--color-border)' }}
+        >
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/10 rounded-lg">
-              <DocumentTextIcon className="w-5 h-5 text-blue-400" />
+            <div
+              className="p-2 rounded-lg"
+              style={{ background: 'var(--color-primary-light)' }}
+            >
+              <DocumentTextIcon className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                 {title || `编辑 ${resourceType} YAML`}
               </h3>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
                 修改 YAML 配置并保存到 Kubernetes 集群
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="p-1 text-slate-400 hover:text-white transition-colors"
+            className="p-1 transition-colors duration-150"
+            style={{ color: 'var(--color-text-muted)' }}
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
@@ -154,22 +167,31 @@ export default function YamlEditorModal({
         </div>
 
         {/* 状态栏 */}
-        <div className="px-6 py-3 border-t border-slate-700 bg-slate-800/50">
+        <div
+          className="px-6 py-3"
+          style={{
+            borderTop: '1px solid var(--color-border)',
+            background: 'var(--color-bg-tertiary)',
+          }}
+        >
           {isValidating ? (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
+            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              <div
+                className="animate-spin rounded-full h-4 w-4 border-b-2"
+                style={{ borderColor: 'var(--color-primary)' }}
+              />
               <span>正在验证...</span>
             </div>
           ) : error ? (
-            <div className="flex items-start gap-2 text-sm text-red-400">
+            <div className="flex items-start gap-2 text-sm" style={{ color: '#F87171' }}>
               <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">YAML 语法错误</p>
-                <p className="text-xs text-red-300/80 mt-1">{error}</p>
+                <p className="text-xs mt-1" style={{ color: 'rgba(248, 113, 113, 0.8)' }}>{error}</p>
               </div>
             </div>
           ) : isValid ? (
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <div className="flex items-center gap-2 text-sm" style={{ color: '#34D399' }}>
               <CheckCircleIcon className="w-5 h-5" />
               <span>YAML 语法正确</span>
             </div>
@@ -177,11 +199,18 @@ export default function YamlEditorModal({
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+        <div
+          className="flex justify-end gap-3 px-6 py-4"
+          style={{
+            borderTop: '1px solid var(--color-border)',
+            background: 'var(--color-bg-tertiary)',
+          }}
+        >
           <button
             type="button"
             onClick={handleClose}
-            className="px-5 py-2.5 text-slate-300 hover:text-white transition-colors font-medium"
+            className="px-5 py-2.5 font-medium transition-colors duration-150"
+            style={{ color: 'var(--color-text-secondary)' }}
             disabled={isPending}
           >
             取消
@@ -190,7 +219,11 @@ export default function YamlEditorModal({
             type="button"
             onClick={handleSave}
             disabled={!isValid || isPending || isValidating}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2.5 rounded-lg font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            style={{
+              background: 'var(--color-primary)',
+              color: 'white',
+            }}
           >
             {isPending ? (
               <>

@@ -44,17 +44,34 @@ export default function Header() {
   };
 
   return (
-    <header className="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-6">
+    <header
+      className="h-16 flex items-center justify-between px-6"
+      style={{
+        background: 'var(--color-bg-secondary)',
+        borderBottom: '1px solid var(--color-border)',
+      }}
+    >
       {/* 左侧：搜索框 */}
       <div className="flex items-center gap-4">
         <div className="relative">
-          <MagnifyingGlassIcon className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <MagnifyingGlassIcon className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }} />
           <input
             type="text"
             placeholder="搜索资源..."
-            className="w-80 bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-80 pl-10 pr-12 py-2 text-sm rounded-lg transition-all duration-150"
+            style={{
+              background: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
           />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs text-slate-400 bg-slate-600 rounded">
+          <kbd
+            className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 text-xs rounded"
+            style={{
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-muted)',
+            }}
+          >
             ⌘K
           </kbd>
         </div>
@@ -65,12 +82,18 @@ export default function Header() {
         {/* 集群选择器 */}
         {clusters.length > 0 && (
           <Menu as="div" className="relative">
-            <Menu.Button className="flex items-center gap-2 px-3 py-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors">
-              <ServerIcon className="w-4 h-4 text-slate-400" />
-              <span className="text-sm text-slate-200">
+            <Menu.Button
+              className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-150"
+              style={{
+                background: 'var(--color-bg-tertiary)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <ServerIcon className="w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
+              <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
                 {currentCluster || '选择集群'}
               </span>
-              <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+              <ChevronDownIcon className="w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
             </Menu.Button>
             <Transition
               as={Fragment}
@@ -81,26 +104,28 @@ export default function Header() {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="absolute right-0 mt-2 w-56 bg-slate-700 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+              <Menu.Items
+                className="absolute right-0 mt-2 w-56 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                style={{ background: 'var(--color-bg-elevated)' }}
+              >
                 <div className="py-1">
                   {clusters.map((cluster) => (
                     <Menu.Item key={cluster.name}>
                       {({ active }) => (
                         <button
                           onClick={() => setCurrentCluster(cluster.name)}
-                          className={clsx(
-                            'w-full text-left px-4 py-2 text-sm flex items-center justify-between',
-                            active ? 'bg-slate-600 text-white' : 'text-slate-300'
-                          )}
+                          className="w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors duration-150"
+                          style={{
+                            background: active ? 'var(--color-primary-light)' : 'transparent',
+                            color: 'var(--color-text-primary)',
+                          }}
                         >
                           <span>{cluster.name}</span>
                           <span
-                            className={clsx(
-                              'w-2 h-2 rounded-full',
-                              cluster.status === 'connected'
-                                ? 'bg-green-500'
-                                : 'bg-red-500'
-                            )}
+                            className="w-2 h-2 rounded-full"
+                            style={{
+                              background: cluster.status === 'connected' ? 'var(--color-success)' : 'var(--color-error)',
+                            }}
                           />
                         </button>
                       )}
@@ -114,10 +139,16 @@ export default function Header() {
 
         {/* 命名空间选择器 */}
         <Menu as="div" className="relative">
-          <Menu.Button className="flex items-center gap-2 px-3 py-2 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors">
-            <span className="text-sm text-slate-400">Namespace:</span>
-            <span className="text-sm text-slate-200">{currentNamespace}</span>
-            <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+          <Menu.Button
+            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors duration-150"
+            style={{
+              background: 'var(--color-bg-tertiary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Namespace:</span>
+            <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{currentNamespace}</span>
+            <ChevronDownIcon className="w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
           </Menu.Button>
           <Transition
             as={Fragment}
@@ -128,33 +159,36 @@ export default function Header() {
             leaveFrom="transform opacity-100 scale-100"
             leaveTo="transform opacity-0 scale-95"
           >
-            <Menu.Items className="absolute right-0 mt-2 w-56 max-h-80 overflow-y-auto bg-slate-700 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+            <Menu.Items
+              className="absolute right-0 mt-2 w-56 max-h-80 overflow-y-auto rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+              style={{ background: 'var(--color-bg-elevated)' }}
+            >
               <div className="py-1">
                 <Menu.Item>
                   {({ active }) => (
                     <button
                       onClick={() => setCurrentNamespace('all')}
-                      className={clsx(
-                        'w-full text-left px-4 py-2 text-sm',
-                        active ? 'bg-slate-600 text-white' : 'text-slate-300',
-                        currentNamespace === 'all' && 'text-blue-400'
-                      )}
+                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-150"
+                      style={{
+                        background: active ? 'var(--color-primary-light)' : 'transparent',
+                        color: currentNamespace === 'all' ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                      }}
                     >
                       所有命名空间
                     </button>
                   )}
                 </Menu.Item>
-                <div className="border-t border-slate-600 my-1" />
+                <div className="my-1" style={{ borderTop: '1px solid var(--color-border)' }} />
                 {namespaces.map((ns) => (
                   <Menu.Item key={ns.metadata.name}>
                     {({ active }) => (
                       <button
                         onClick={() => setCurrentNamespace(ns.metadata.name)}
-                        className={clsx(
-                          'w-full text-left px-4 py-2 text-sm',
-                          active ? 'bg-slate-600 text-white' : 'text-slate-300',
-                          currentNamespace === ns.metadata.name && 'text-blue-400'
-                        )}
+                        className="w-full text-left px-4 py-2 text-sm transition-colors duration-150"
+                        style={{
+                          background: active ? 'var(--color-primary-light)' : 'transparent',
+                          color: currentNamespace === ns.metadata.name ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                        }}
                       >
                         {ns.metadata.name}
                       </button>
@@ -169,7 +203,16 @@ export default function Header() {
         {/* 主题切换 */}
         <button
           onClick={toggleTheme}
-          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+          className="p-2 rounded-lg transition-colors duration-150"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--color-primary-light)';
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+          }}
           title={theme === 'dark' ? '切换到亮色主题' : '切换到暗色主题'}
         >
           {theme === 'dark' ? (
@@ -180,24 +223,48 @@ export default function Header() {
         </button>
 
         {/* 通知 */}
-        <button className="relative p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+        <button
+          className="relative p-2 rounded-lg transition-colors duration-150"
+          style={{ color: 'var(--color-text-secondary)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--color-primary-light)';
+            e.currentTarget.style.color = 'var(--color-text-primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--color-text-secondary)';
+          }}
+        >
           <BellIcon className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+          <span
+            className="absolute top-1 right-1 w-2 h-2 rounded-full"
+            style={{ background: 'var(--color-error)' }}
+          />
         </button>
 
         {/* 用户菜单 */}
         <Menu as="div" className="relative">
-          <Menu.Button className="flex items-center gap-2 p-2 hover:bg-slate-700 rounded-lg transition-colors">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+          <Menu.Button
+            className="flex items-center gap-2 p-2 rounded-lg transition-colors duration-150"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--color-primary)' }}
+            >
               <span className="text-white text-sm font-medium">
                 {user?.displayName?.[0] || user?.username?.[0]?.toUpperCase() || 'U'}
               </span>
             </div>
             <div className="hidden sm:block text-left">
-              <div className="text-sm text-white">{user?.displayName || user?.username}</div>
-              <div className="text-xs text-slate-400">{roleDisplay}</div>
+              <div className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                {user?.displayName || user?.username}
+              </div>
+              <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                {roleDisplay}
+              </div>
             </div>
-            <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+            <ChevronDownIcon className="w-4 h-4" style={{ color: 'var(--color-text-muted)' }} />
           </Menu.Button>
           <Transition
             as={Fragment}
@@ -208,12 +275,25 @@ export default function Header() {
             leaveFrom="transform opacity-100 scale-100"
             leaveTo="transform opacity-0 scale-95"
           >
-            <Menu.Items className="absolute right-0 mt-2 w-56 bg-slate-700 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-              <div className="p-3 border-b border-slate-600">
-                <div className="text-white font-medium">{user?.displayName || user?.username}</div>
-                <div className="text-slate-400 text-sm">{user?.email || user?.username}</div>
+            <Menu.Items
+              className="absolute right-0 mt-2 w-56 rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+              style={{ background: 'var(--color-bg-elevated)' }}
+            >
+              <div className="p-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>
+                  {user?.displayName || user?.username}
+                </div>
+                <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  {user?.email || user?.username}
+                </div>
                 <div className="mt-1">
-                  <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
+                  <span
+                    className="px-2 py-0.5 rounded text-xs"
+                    style={{
+                      background: 'var(--color-primary-light)',
+                      color: 'var(--color-primary)',
+                    }}
+                  >
                     {roleDisplay}
                   </span>
                 </div>
@@ -223,10 +303,11 @@ export default function Header() {
                   {({ active }) => (
                     <a
                       href="/settings"
-                      className={clsx(
-                        'flex items-center gap-2 px-4 py-2 text-sm',
-                        active ? 'bg-slate-600 text-white' : 'text-slate-300'
-                      )}
+                      className="flex items-center gap-2 px-4 py-2 text-sm transition-colors duration-150"
+                      style={{
+                        background: active ? 'var(--color-primary-light)' : 'transparent',
+                        color: 'var(--color-text-primary)',
+                      }}
                     >
                       <Cog6ToothIcon className="w-4 h-4" />
                       设置
@@ -234,32 +315,32 @@ export default function Header() {
                   )}
                 </Menu.Item>
                 {user?.role === 'admin' && (
-                  <>
-                    <Menu.Item>
-                      {({ active }) => (
-                        <a
-                          href="/admin/users"
-                          className={clsx(
-                            'flex items-center gap-2 px-4 py-2 text-sm',
-                            active ? 'bg-slate-600 text-white' : 'text-slate-300'
-                          )}
-                        >
-                          <UserIcon className="w-4 h-4" />
-                          用户管理
-                        </a>
-                      )}
-                    </Menu.Item>
-                  </>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <a
+                        href="/admin/users"
+                        className="flex items-center gap-2 px-4 py-2 text-sm transition-colors duration-150"
+                        style={{
+                          background: active ? 'var(--color-primary-light)' : 'transparent',
+                          color: 'var(--color-text-primary)',
+                        }}
+                      >
+                        <UserIcon className="w-4 h-4" />
+                        用户管理
+                      </a>
+                    )}
+                  </Menu.Item>
                 )}
-                <div className="border-t border-slate-600 my-1" />
+                <div className="my-1" style={{ borderTop: '1px solid var(--color-border)' }} />
                 <Menu.Item>
                   {({ active }) => (
                     <button
                       onClick={handleLogout}
-                      className={clsx(
-                        'w-full flex items-center gap-2 px-4 py-2 text-sm',
-                        active ? 'bg-slate-600 text-white' : 'text-slate-300'
-                      )}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors duration-150"
+                      style={{
+                        background: active ? 'var(--color-primary-light)' : 'transparent',
+                        color: 'var(--color-text-primary)',
+                      }}
                     >
                       <ArrowRightOnRectangleIcon className="w-4 h-4" />
                       退出登录

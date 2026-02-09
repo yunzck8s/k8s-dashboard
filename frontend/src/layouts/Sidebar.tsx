@@ -132,19 +132,26 @@ export default function Sidebar() {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen bg-slate-800 border-r border-slate-700 transition-all duration-300 z-40 flex flex-col',
+        'fixed left-0 top-0 h-screen transition-all duration-200 z-40 flex flex-col',
         sidebarCollapsed ? 'w-16' : 'w-64'
       )}
+      style={{
+        background: 'var(--color-bg-secondary)',
+        borderRight: '1px solid var(--color-border)',
+      }}
     >
       {/* Logo */}
-      <div className="h-16 flex items-center justify-center border-b border-slate-700 px-4">
+      <div
+        className="h-16 flex items-center justify-center px-4"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
         {sidebarCollapsed ? (
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <span className="text-white font-bold">K</span>
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold">K</span>
             </div>
             <span className="text-white font-semibold text-lg">K8s Dashboard</span>
@@ -214,12 +221,17 @@ export default function Sidebar() {
       {/* 折叠按钮 */}
       <button
         onClick={toggleSidebar}
-        className="h-12 flex items-center justify-center border-t border-slate-700 hover:bg-slate-700 transition-colors"
+        className="h-12 flex items-center justify-center transition-colors duration-150"
+        style={{
+          borderTop: '1px solid var(--color-border)',
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-light)'}
+        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
       >
         {sidebarCollapsed ? (
-          <ChevronRightIcon className="w-5 h-5 text-slate-400" />
+          <ChevronRightIcon className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
         ) : (
-          <ChevronLeftIcon className="w-5 h-5 text-slate-400" />
+          <ChevronLeftIcon className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
         )}
       </button>
     </aside>
