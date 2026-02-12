@@ -74,7 +74,7 @@ func main() {
 	// 初始化认证客户端
 	authClient, err = auth.NewClient(database, dialect, jwtSecret)
 	if err != nil {
-		log.Printf("Warning: 认证模块初始化失败: %v", err)
+		log.Fatalf("Failed to initialize auth module: %v", err)
 	}
 
 	// 初始化告警服务

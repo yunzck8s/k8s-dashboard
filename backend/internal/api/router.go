@@ -45,7 +45,7 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 	})
 
 	// 创建处理器
-	h := handlers.NewHandler(k8sClient, clusterManager, metricsClient, alertClient, alertService, auditClient)
+	h := handlers.NewHandler(k8sClient, clusterManager, metricsClient, alertClient, alertService, auditClient, authClient)
 	authHandler := handlers.NewAuthHandler(authClient)
 
 	// 创建观测服务和处理器
@@ -57,25 +57,23 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 	{
 		// 登录登出
 		publicAPI.POST("/auth/login", authHandler.Login)
-		publicAPI.POST("/auth/logout", authHandler.Logout)
 	}
 
 	// ========== 需要认证的 API ==========
 	v1 := r.Group("/api/v1")
-
-	// 如果 authClient 不为空，启用认证中间件
-	if authClient != nil {
-		v1.Use(middleware.AuthMiddleware(authClient))
-		v1.Use(middleware.NamespaceAccessMiddleware(authClient))
-	}
+	v1.Use(middleware.AuthMiddleware(authClient))
+	v1.Use(middleware.NamespaceAccessMiddleware(authClient))
 	v1.Use(middleware.ClusterSelector(clusterManager))
+	v1.Use(middleware.AuthorizeByRoute())
 
 	{
 		// 当前用户
 		v1.GET("/auth/me", authHandler.GetCurrentUser)
+		v1.POST("/auth/logout", authHandler.Logout)
 		v1.POST("/auth/password", authHandler.ChangePassword)
 		v1.GET("/auth/sessions", authHandler.GetUserSessions)
 		v1.DELETE("/auth/sessions/:id", authHandler.RevokeSession)
+		v1.POST("/ws/tickets", h.CreateWSTicket)
 
 		// 多集群（切换和查询对登录用户开放）
 		v1.GET("/clusters", h.ListClusters)
@@ -100,11 +98,21 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 		v1.GET("/silences/:id", h.GetSilence)
 		v1.DELETE("/silences/:id", h.DeleteSilence)
 
-		// Namespaces (使用不同的路径避免冲突)
+		// Namespaces
 		v1.GET("/namespaces", h.ListNamespaces)
 		v1.POST("/namespaces", h.CreateNamespace)
-		v1.GET("/namespace/:ns", h.GetNamespace)
-		v1.DELETE("/namespace/:ns", h.DeleteNamespace)
+		v1.GET("/namespaces/:ns", h.GetNamespace)
+		v1.DELETE("/namespaces/:ns", h.DeleteNamespace)
+		v1.GET("/namespace/:ns", func(c *gin.Context) {
+			c.Header("Deprecation", "true")
+			c.Header("Sunset", "vNext")
+			h.GetNamespace(c)
+		})
+		v1.DELETE("/namespace/:ns", func(c *gin.Context) {
+			c.Header("Deprecation", "true")
+			c.Header("Sunset", "vNext")
+			h.DeleteNamespace(c)
+		})
 
 		// Pods
 		v1.GET("/pods", h.ListAllPods)
@@ -283,9 +291,7 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 	}
 
 	clusterAdmin := v1.Group("/clusters")
-	if authClient != nil {
-		clusterAdmin.Use(middleware.RequireRole("admin"))
-	}
+	clusterAdmin.Use(middleware.RequireRole("admin"))
 	{
 		clusterAdmin.POST("", h.AddCluster)
 		clusterAdmin.POST("/test", h.TestCluster)
@@ -294,10 +300,8 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 
 	// ========== 管理员 API（需要 admin 角色）==========
 	adminAPI := r.Group("/api/v1/admin")
-	if authClient != nil {
-		adminAPI.Use(middleware.AuthMiddleware(authClient))
-		adminAPI.Use(middleware.RequireRole("admin"))
-	}
+	adminAPI.Use(middleware.AuthMiddleware(authClient))
+	adminAPI.Use(middleware.RequireRole("admin"))
 	{
 		// 用户管理
 		adminAPI.GET("/users", authHandler.ListUsers)
@@ -315,6 +319,7 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 	// WebSocket 路由
 	ws := r.Group("/ws")
 	ws.Use(middleware.ClusterSelector(clusterManager))
+	ws.Use(middleware.WSAuthMiddleware(authClient))
 	{
 		ws.GET("/logs", h.StreamPodLogs)
 		ws.GET("/exec", h.ExecPod)

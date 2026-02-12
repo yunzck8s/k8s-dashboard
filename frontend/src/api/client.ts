@@ -125,20 +125,28 @@ export async function putYaml<T>(url: string, yamlContent: string): Promise<T> {
 }
 
 // WebSocket 连接
-export function createWebSocket(path: string): WebSocket {
+export function createWebSocket(
+  path: string,
+  params?: Record<string, string | undefined>
+): WebSocket {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
-  const token = localStorage.getItem('token');
   const cluster = localStorage.getItem('currentCluster');
 
   let url = `${protocol}//${host}${path}`;
-  const params = new URLSearchParams();
-  if (token) params.set('token', token);
-  if (cluster) params.set('cluster', cluster);
-  if (params.toString()) {
+  const searchParams = new URLSearchParams();
+  if (cluster) searchParams.set('cluster', cluster);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) {
+        searchParams.set(key, value);
+      }
+    });
+  }
+  if (searchParams.toString()) {
     // 如果 path 已包含查询参数，使用 & 连接；否则使用 ?
     const separator = path.includes('?') ? '&' : '?';
-    url += `${separator}${params.toString()}`;
+    url += `${separator}${searchParams.toString()}`;
   }
 
   return new WebSocket(url);

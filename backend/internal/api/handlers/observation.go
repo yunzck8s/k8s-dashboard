@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/k8s-dashboard/backend/internal/api/middleware"
 	"github.com/k8s-dashboard/backend/internal/observation"
 )
 
@@ -20,11 +21,15 @@ func NewObservationHandler(service *observation.Service) *ObservationHandler {
 	}
 }
 
+func (h *ObservationHandler) serviceForRequest(c *gin.Context) *observation.Service {
+	return h.service.WithK8sClient(middleware.GetClusterClient(c))
+}
+
 // GetObservationSummary 获取异常状态汇总
 func (h *ObservationHandler) GetObservationSummary(c *gin.Context) {
 	ctx := context.Background()
 
-	summary, err := h.service.GetSummary(ctx)
+	summary, err := h.serviceForRequest(c).GetSummary(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -38,7 +43,7 @@ func (h *ObservationHandler) GetPodAnomalies(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Query("namespace")
 
-	anomalies, err := h.service.GetPodAnomalies(ctx, namespace)
+	anomalies, err := h.serviceForRequest(c).GetPodAnomalies(ctx, namespace)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -54,7 +59,7 @@ func (h *ObservationHandler) GetPodAnomalies(c *gin.Context) {
 func (h *ObservationHandler) GetNodeAnomalies(c *gin.Context) {
 	ctx := context.Background()
 
-	anomalies, err := h.service.GetNodeAnomalies(ctx)
+	anomalies, err := h.serviceForRequest(c).GetNodeAnomalies(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -71,7 +76,7 @@ func (h *ObservationHandler) GetResourceExcess(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Query("namespace")
 
-	excess, err := h.service.GetResourceExcess(ctx, namespace)
+	excess, err := h.serviceForRequest(c).GetResourceExcess(ctx, namespace)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -89,7 +94,7 @@ func (h *ObservationHandler) GetResourceTrend(c *gin.Context) {
 	resourceType := observation.ResourceType(c.DefaultQuery("type", "cpu"))
 	timeRange := observation.ParseTimeRange(c.DefaultQuery("range", "24h"))
 
-	trend, err := h.service.GetResourceTrend(ctx, resourceType, timeRange)
+	trend, err := h.serviceForRequest(c).GetResourceTrend(ctx, resourceType, timeRange)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -103,7 +108,7 @@ func (h *ObservationHandler) GetAlertTrend(c *gin.Context) {
 	ctx := context.Background()
 	timeRange := observation.ParseTimeRange(c.DefaultQuery("range", "7d"))
 
-	trend, err := h.service.GetAlertTrend(ctx, timeRange)
+	trend, err := h.serviceForRequest(c).GetAlertTrend(ctx, timeRange)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -117,7 +122,7 @@ func (h *ObservationHandler) GetRestartTrend(c *gin.Context) {
 	ctx := context.Background()
 	timeRange := observation.ParseTimeRange(c.DefaultQuery("range", "24h"))
 
-	trend, err := h.service.GetRestartTrend(ctx, timeRange)
+	trend, err := h.serviceForRequest(c).GetRestartTrend(ctx, timeRange)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

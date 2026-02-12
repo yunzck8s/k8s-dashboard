@@ -4,6 +4,7 @@
 export interface ListResponse<T> {
   items: T[];
   total: number;
+  continue?: string;
   page?: number;
   pageSize?: number;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createWebSocket } from '../../api';
+import { api, createWebSocket } from '../../api';
 
 interface PodTerminalProps {
   namespace: string;
@@ -17,13 +17,30 @@ export default function PodTerminal({ namespace, name, container }: PodTerminalP
   const [error, setError] = useState<string | null>(null);
 
   const openSocket = useCallback(
-    (terminal: import('xterm').Terminal) => {
+    async (terminal: import('xterm').Terminal) => {
       if (wsRef.current) {
         wsRef.current.close();
       }
 
-      const wsUrl = `/ws/exec?namespace=${namespace}&name=${name}&container=${container}`;
-      const ws = createWebSocket(wsUrl);
+      let ticket = '';
+      try {
+        const cluster = localStorage.getItem('currentCluster') || 'default';
+        const response = await api.post<{ ticket: string }>('/ws/tickets', {
+          action: 'exec',
+          namespace,
+          name,
+          container,
+          cluster,
+        });
+        ticket = response.data.ticket;
+      } catch {
+        setConnected(false);
+        setError('获取终端票据失败');
+        terminal.writeln('\x1b[1;31m获取终端票据失败\x1b[0m');
+        return;
+      }
+
+      const ws = createWebSocket('/ws/exec', { ticket });
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -129,7 +146,7 @@ export default function PodTerminal({ namespace, name, container }: PodTerminalP
       terminal.writeln(`\x1b[90mContainer: ${container}\x1b[0m`);
       terminal.writeln('');
 
-      openSocket(terminal);
+      void openSocket(terminal);
 
       const handleResize = () => {
         fitAddonRef.current?.fit();
@@ -169,7 +186,7 @@ export default function PodTerminal({ namespace, name, container }: PodTerminalP
     setError(null);
     terminal.clear();
     terminal.writeln('\x1b[1;34m正在重新连接...\x1b[0m');
-    openSocket(terminal);
+    void openSocket(terminal);
   };
 
   return (

@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"log"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +24,7 @@ func Logger() gin.HandlerFunc {
 		method := c.Request.Method
 
 		if query != "" {
-			path = path + "?" + query
+			path = path + "?" + sanitizeQuery(query)
 		}
 
 		log.Printf("[%d] %s %s %s %v",
@@ -33,6 +35,22 @@ func Logger() gin.HandlerFunc {
 			latency,
 		)
 	}
+}
+
+func sanitizeQuery(raw string) string {
+	values, err := url.ParseQuery(raw)
+	if err != nil {
+		return raw
+	}
+
+	for key := range values {
+		lower := strings.ToLower(key)
+		if strings.Contains(lower, "token") || strings.Contains(lower, "ticket") || strings.Contains(lower, "authorization") {
+			values.Set(key, "[REDACTED]")
+		}
+	}
+
+	return values.Encode()
 }
 
 // Auth 认证中间件

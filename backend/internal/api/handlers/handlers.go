@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +17,7 @@ import (
 	"github.com/k8s-dashboard/backend/internal/alerts"
 	"github.com/k8s-dashboard/backend/internal/api/middleware"
 	"github.com/k8s-dashboard/backend/internal/audit"
+	"github.com/k8s-dashboard/backend/internal/auth"
 	"github.com/k8s-dashboard/backend/internal/clusters"
 	"github.com/k8s-dashboard/backend/internal/k8s"
 	"github.com/k8s-dashboard/backend/internal/metrics"
@@ -21,8 +25,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -39,10 +45,11 @@ type Handler struct {
 	alerts       *alertmanager.Client
 	alertService *alerts.Service
 	audit        *audit.Client
+	auth         *auth.Client
 }
 
 // NewHandler 创建处理器
-func NewHandler(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client) *Handler {
+func NewHandler(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *Handler {
 	return &Handler{
 		k8s:          k8sClient,
 		clusters:     clusterManager,
@@ -50,6 +57,7 @@ func NewHandler(k8sClient *k8s.Client, clusterManager *clusters.Manager, metrics
 		alerts:       alertClient,
 		alertService: alertService,
 		audit:        auditClient,
+		auth:         authClient,
 	}
 }
 
@@ -62,8 +70,141 @@ func (h *Handler) getK8s(c *gin.Context) *k8s.Client {
 
 // ListResponse 列表响应
 type ListResponse struct {
-	Items interface{} `json:"items"`
-	Total int         `json:"total"`
+	Items    interface{} `json:"items"`
+	Total    int         `json:"total"`
+	Continue string      `json:"continue,omitempty"`
+}
+
+type namespaceAccessScope struct {
+	unrestricted bool
+	allowed      []string
+}
+
+func parseListOptions(c *gin.Context) metav1.ListOptions {
+	var limit int64
+	if raw := c.Query("limit"); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	return metav1.ListOptions{
+		Limit:    limit,
+		Continue: c.Query("continue"),
+	}
+}
+
+func paginateSlice[T any](items []T, limit int64, continueToken string) ([]T, string, error) {
+	if limit <= 0 {
+		return items, "", nil
+	}
+
+	start := 0
+	if continueToken != "" {
+		offset, err := strconv.Atoi(continueToken)
+		if err != nil || offset < 0 {
+			return nil, "", fmt.Errorf("invalid continue token")
+		}
+		start = offset
+	}
+
+	if start >= len(items) {
+		return []T{}, "", nil
+	}
+
+	end := start + int(limit)
+	if end > len(items) {
+		end = len(items)
+	}
+
+	nextToken := ""
+	if end < len(items) {
+		nextToken = strconv.Itoa(end)
+	}
+
+	return items[start:end], nextToken, nil
+}
+
+func (h *Handler) getNamespaceAccessScope(c *gin.Context) (namespaceAccessScope, error) {
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return namespaceAccessScope{}, fmt.Errorf("unauthenticated")
+	}
+
+	if user.Role == "admin" || user.AllNamespaces {
+		return namespaceAccessScope{unrestricted: true}, nil
+	}
+
+	allowed := middleware.GetAllowedNamespaces(c)
+	if len(allowed) > 0 {
+		return namespaceAccessScope{allowed: allowed}, nil
+	}
+
+	if h.auth == nil {
+		return namespaceAccessScope{}, fmt.Errorf("auth service not available")
+	}
+
+	namespaces, err := h.auth.GetUserNamespaces(user.ID)
+	if err != nil {
+		return namespaceAccessScope{}, err
+	}
+
+	allowed = make([]string, 0, len(namespaces))
+	for _, ns := range namespaces {
+		if ns.Namespace != "" {
+			allowed = append(allowed, ns.Namespace)
+		}
+	}
+
+	return namespaceAccessScope{allowed: allowed}, nil
+}
+
+func namespaceAllowed(scope namespaceAccessScope, namespace string) bool {
+	if scope.unrestricted {
+		return true
+	}
+	for _, ns := range scope.allowed {
+		if ns == namespace {
+			return true
+		}
+	}
+	return false
+}
+
+func parseSecretView(c *gin.Context) string {
+	view := c.DefaultQuery("view", "masked")
+	if view != "metadata" {
+		return "masked"
+	}
+	return view
+}
+
+func maskSecret(secret corev1.Secret, view string) corev1.Secret {
+	masked := secret.DeepCopy()
+	masked.ManagedFields = nil
+	masked.StringData = nil
+
+	switch view {
+	case "metadata":
+		masked.Data = nil
+	default:
+		if masked.Data != nil {
+			redacted := make(map[string][]byte, len(masked.Data))
+			for key := range masked.Data {
+				redacted[key] = []byte("REDACTED")
+			}
+			masked.Data = redacted
+		}
+	}
+
+	return *masked
+}
+
+func maskSecrets(items []corev1.Secret, view string) []corev1.Secret {
+	masked := make([]corev1.Secret, 0, len(items))
+	for i := range items {
+		masked = append(masked, maskSecret(items[i], view))
+	}
+	return masked
 }
 
 // OverviewResponse 集群概览响应
@@ -273,17 +414,34 @@ func (h *Handler) GetOverview(c *gin.Context) {
 
 func (h *Handler) ListNamespaces(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Namespaces().List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	scope, scopeErr := h.getNamespaceAccessScope(c)
+	if scopeErr != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": scopeErr.Error()})
+		return
+	}
+	if scope.unrestricted {
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.Namespace, 0, len(list.Items))
+	for _, item := range list.Items {
+		if namespaceAllowed(scope, item.Name) {
+			items = append(items, item)
+		}
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: items, Total: len(items)})
 }
 
 func (h *Handler) GetNamespace(c *gin.Context) {
 	ctx := context.Background()
-	name := c.Param("name")
+	name := c.Param("ns")
 	ns, err := h.getK8s(c).Clientset.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -309,7 +467,7 @@ func (h *Handler) CreateNamespace(c *gin.Context) {
 
 func (h *Handler) DeleteNamespace(c *gin.Context) {
 	ctx := context.Background()
-	name := c.Param("name")
+	name := c.Param("ns")
 	err := h.getK8s(c).Clientset.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -322,23 +480,61 @@ func (h *Handler) DeleteNamespace(c *gin.Context) {
 
 func (h *Handler) ListAllPods(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.Pod, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListPods(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 func (h *Handler) GetPod(c *gin.Context) {
@@ -435,23 +631,61 @@ func (h *Handler) GetPodEvents(c *gin.Context) {
 
 func (h *Handler) ListAllDeployments(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.AppsV1().Deployments("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]appsv1.Deployment, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.AppsV1().Deployments(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListDeployments(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 func (h *Handler) GetDeployment(c *gin.Context) {
@@ -991,23 +1225,61 @@ func (h *Handler) TriggerCronJob(c *gin.Context) {
 
 func (h *Handler) ListAllServices(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().Services("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.Service, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().Services(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListServices(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 func (h *Handler) GetService(c *gin.Context) {
@@ -1249,23 +1521,61 @@ func (h *Handler) UpdateIngressYAML(c *gin.Context) {
 
 func (h *Handler) ListAllConfigMaps(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.ConfigMap, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListConfigMaps(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 func (h *Handler) GetConfigMap(c *gin.Context) {
@@ -1378,35 +1688,90 @@ func (h *Handler) UpdateConfigMapYAML(c *gin.Context) {
 
 func (h *Handler) ListAllSecrets(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
+	view := parseSecretView(c)
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().Secrets("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		masked := maskSecrets(list.Items, view)
+		c.JSON(http.StatusOK, ListResponse{Items: masked, Total: len(masked), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.Secret, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().Secrets(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	masked := maskSecrets(paged, view)
+	c.JSON(http.StatusOK, ListResponse{Items: masked, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListSecrets(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
+	view := parseSecretView(c)
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	masked := maskSecrets(list.Items, view)
+	c.JSON(http.StatusOK, ListResponse{Items: masked, Total: len(masked), Continue: list.Continue})
 }
 
 func (h *Handler) GetSecret(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
+	view := parseSecretView(c)
+
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
 	secret, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, secret)
+	c.JSON(http.StatusOK, maskSecret(*secret, view))
 }
 
 func (h *Handler) CreateSecret(c *gin.Context) {
@@ -1457,6 +1822,17 @@ func (h *Handler) GetSecretYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
+	view := parseSecretView(c)
+
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
 
 	// 获取 Secret
 	secret, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -1465,8 +1841,10 @@ func (h *Handler) GetSecretYAML(c *gin.Context) {
 		return
 	}
 
+	masked := maskSecret(*secret, view)
+
 	// 转换为 YAML
-	yamlBytes, err := yaml.Marshal(secret)
+	yamlBytes, err := yaml.Marshal(masked)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1541,23 +1919,61 @@ func (h *Handler) DeletePersistentVolume(c *gin.Context) {
 
 func (h *Handler) ListAllPersistentVolumeClaims(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.PersistentVolumeClaim, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListPersistentVolumeClaims(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 func (h *Handler) GetPersistentVolumeClaim(c *gin.Context) {
@@ -1752,21 +2168,43 @@ func (h *Handler) DrainNode(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
 
+	var req struct {
+		GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
+		TimeoutSeconds     int64  `json:"timeoutSeconds"`
+		IgnoreDaemonSets   *bool  `json:"ignoreDaemonSets"`
+		DeleteEmptyDirData *bool  `json:"deleteEmptyDirData"`
+	}
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid drain request"})
+			return
+		}
+	}
+	if req.TimeoutSeconds <= 0 {
+		req.TimeoutSeconds = 300
+	}
+	ignoreDaemonSets := true
+	if req.IgnoreDaemonSets != nil {
+		ignoreDaemonSets = *req.IgnoreDaemonSets
+	}
+
+	drainCtx, cancel := context.WithTimeout(ctx, time.Duration(req.TimeoutSeconds)*time.Second)
+	defer cancel()
+
 	// 先 cordon
-	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(drainCtx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 	node.Spec.Unschedulable = true
-	_, err = h.getK8s(c).Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.CoreV1().Nodes().Update(drainCtx, node, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 驱逐 Pods
-	pods, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(drainCtx, metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("spec.nodeName=%s", name),
 	})
 	if err != nil {
@@ -1774,47 +2212,169 @@ func (h *Handler) DrainNode(c *gin.Context) {
 		return
 	}
 
+	skipped := make([]string, 0)
+	failed := make([]string, 0)
+	evicted := make([]corev1.Pod, 0)
+
 	for _, pod := range pods.Items {
+		// mirror/static pod
+		if _, isMirror := pod.Annotations["kubernetes.io/config.mirror"]; isMirror {
+			skipped = append(skipped, pod.Namespace+"/"+pod.Name+"(mirror)")
+			continue
+		}
+
 		// 跳过 DaemonSet 管理的 Pod
 		skip := false
 		for _, ref := range pod.OwnerReferences {
 			if ref.Kind == "DaemonSet" {
-				skip = true
+				if ignoreDaemonSets {
+					skip = true
+				} else {
+					skip = true
+					failed = append(failed, pod.Namespace+"/"+pod.Name+" blocked by DaemonSet")
+				}
 				break
 			}
 		}
 		if skip {
+			skipped = append(skipped, pod.Namespace+"/"+pod.Name+"(daemonset)")
 			continue
 		}
 
-		// 删除 Pod（会被控制器重建到其他节点）
-		h.getK8s(c).Clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		eviction := &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+			DeleteOptions: &metav1.DeleteOptions{
+				GracePeriodSeconds: req.GracePeriodSeconds,
+			},
+		}
+
+		if err := h.getK8s(c).Clientset.CoreV1().Pods(pod.Namespace).EvictV1(drainCtx, eviction); err != nil {
+			if apierrors.IsTooManyRequests(err) {
+				failed = append(failed, pod.Namespace+"/"+pod.Name+" blocked by PDB")
+				continue
+			}
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			failed = append(failed, pod.Namespace+"/"+pod.Name+" eviction failed: "+err.Error())
+			continue
+		}
+		evicted = append(evicted, pod)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "drained"})
+	if len(failed) > 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":         "drain partially blocked",
+			"failed":        failed,
+			"skipped":       skipped,
+			"evictedCount":  len(evicted),
+			"timeoutSecond": req.TimeoutSeconds,
+		})
+		return
+	}
+
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		remaining := make([]string, 0)
+		for _, pod := range evicted {
+			_, err := h.getK8s(c).Clientset.CoreV1().Pods(pod.Namespace).Get(drainCtx, pod.Name, metav1.GetOptions{})
+			if err == nil {
+				remaining = append(remaining, pod.Namespace+"/"+pod.Name)
+				continue
+			}
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			remaining = append(remaining, pod.Namespace+"/"+pod.Name+" check failed: "+err.Error())
+		}
+
+		if len(remaining) == 0 {
+			break
+		}
+
+		select {
+		case <-drainCtx.Done():
+			c.JSON(http.StatusGatewayTimeout, gin.H{
+				"error":         "drain timeout",
+				"remainingPods": remaining,
+				"skipped":       skipped,
+			})
+			return
+		case <-ticker.C:
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "drained",
+		"evictedCount": len(evicted),
+		"skipped":      skipped,
+	})
 }
 
 // ========== Events ==========
 
 func (h *Handler) ListAllEvents(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().Events("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().Events("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.Event, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().Events(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListEvents(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 // ========== RBAC ==========
@@ -1863,23 +2423,61 @@ func (h *Handler) ListClusterRoleBindings(c *gin.Context) {
 
 func (h *Handler) ListAllServiceAccounts(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts("").List(ctx, metav1.ListOptions{})
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]corev1.ServiceAccount, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
 }
 
 func (h *Handler) ListServiceAccounts(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts(namespace).List(ctx, metav1.ListOptions{})
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts(namespace).List(ctx, parseListOptions(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items)})
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
 }
 
 // ========== WebSocket 占位 ==========
@@ -1895,6 +2493,14 @@ func (h *Handler) ExecPod(c *gin.Context) {
 	container := c.Query("container")
 	command := c.Query("command")
 
+	if ticket := middleware.GetWSTicket(c); ticket != nil {
+		namespace = ticket.Namespace
+		name = ticket.Name
+		if ticket.Container != "" {
+			container = ticket.Container
+		}
+	}
+
 	if namespace == "" || name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace and name are required"})
 		return
@@ -1907,7 +2513,7 @@ func (h *Handler) ExecPod(c *gin.Context) {
 	// 升级为 WebSocket 连接
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return true
+			return isAllowedExecOrigin(r)
 		},
 	}
 
@@ -1982,6 +2588,32 @@ func (h *Handler) ExecPod(c *gin.Context) {
 	if err != nil {
 		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\r\nSession ended: %v\r\n", err)))
 	}
+}
+
+func isAllowedExecOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return false
+	}
+
+	allowedEnv := strings.TrimSpace(os.Getenv("WS_ALLOWED_ORIGINS"))
+	if allowedEnv != "" {
+		for _, item := range strings.Split(allowedEnv, ",") {
+			if strings.EqualFold(strings.TrimSpace(item), origin) {
+				return true
+			}
+		}
+		return false
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	originHost := strings.TrimSuffix(strings.TrimSuffix(parsed.Host, ":80"), ":443")
+	reqHost := strings.TrimSuffix(strings.TrimSuffix(r.Host, ":80"), ":443")
+	return strings.EqualFold(originHost, reqHost)
 }
 
 func (h *Handler) WatchResources(c *gin.Context) {

@@ -9,18 +9,16 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: k8s-dashboard
+  name: k8s-dashboard-read
   labels:
     app.kubernetes.io/name: k8s-dashboard
 rules:
-  # 核心资源
   - apiGroups: [""]
     resources:
       - namespaces
       - nodes
       - pods
       - pods/log
-      - pods/exec
       - services
       - endpoints
       - persistentvolumes
@@ -31,8 +29,7 @@ rules:
       - events
       - resourcequotas
       - limitranges
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # 应用资源
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
     resources:
       - deployments
@@ -41,25 +38,21 @@ rules:
       - statefulsets
       - statefulsets/scale
       - daemonsets
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # 批处理资源
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["batch"]
     resources:
       - jobs
       - cronjobs
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # 网络资源
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["networking.k8s.io"]
     resources:
       - ingresses
       - networkpolicies
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # 存储资源
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources:
       - storageclasses
     verbs: ["get", "list", "watch"]
-  # RBAC 资源
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources:
       - roles
@@ -67,7 +60,6 @@ rules:
       - clusterroles
       - clusterrolebindings
     verbs: ["get", "list", "watch"]
-  # Metrics
   - apiGroups: ["metrics.k8s.io"]
     resources:
       - nodes
@@ -75,15 +67,72 @@ rules:
     verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-dashboard-operate
+  labels:
+    app.kubernetes.io/name: k8s-dashboard
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - nodes
+      - pods
+      - services
+      - persistentvolumes
+      - configmaps
+      - secrets
+      - serviceaccounts
+      - persistentvolumeclaims
+    verbs: ["create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources:
+      - pods/exec
+      - pods/eviction
+    verbs: ["create"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - deployments/scale
+      - statefulsets
+      - statefulsets/scale
+      - daemonsets
+    verbs: ["create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: k8s-dashboard
+  name: k8s-dashboard-read
   labels:
     app.kubernetes.io/name: k8s-dashboard
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: k8s-dashboard
+  name: k8s-dashboard-read
+subjects:
+  - kind: ServiceAccount
+    name: k8s-dashboard
+    namespace: k8s-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-dashboard-operate
+  labels:
+    app.kubernetes.io/name: k8s-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8s-dashboard-operate
 subjects:
   - kind: ServiceAccount
     name: k8s-dashboard

@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: k8s-dashboard-default-deny
+  namespace: k8s-dashboard
+  labels:
+    app.kubernetes.io/name: k8s-dashboard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-dashboard
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: k8s-dashboard-allow-ingress
+  namespace: k8s-dashboard
+  labels:
+    app.kubernetes.io/name: k8s-dashboard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-dashboard
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: k8s-dashboard-allow-egress-required
+  namespace: k8s-dashboard
+  labels:
+    app.kubernetes.io/name: k8s-dashboard
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-dashboard
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 31007
+        - protocol: TCP
+          port: 32607
+        - protocol: TCP
+          port: 5432

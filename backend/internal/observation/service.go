@@ -28,6 +28,16 @@ func NewService(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClien
 	}
 }
 
+// WithK8sClient 返回绑定到指定集群客户端的服务副本。
+func (s *Service) WithK8sClient(client *k8s.Client) *Service {
+	if client == nil {
+		return s
+	}
+	clone := *s
+	clone.k8s = client
+	return &clone
+}
+
 // GetSummary 获取异常状态汇总
 func (s *Service) GetSummary(ctx context.Context) (*ObservationSummary, error) {
 	summary := &ObservationSummary{}

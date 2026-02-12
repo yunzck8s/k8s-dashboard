@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"regexp"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/k8s-dashboard/backend/internal/audit"
+	"sigs.k8s.io/yaml"
 )
 
 // 需要记录审计日志的操作（写操作）
@@ -19,8 +21,7 @@ var auditableMethods = map[string]bool{
 	"DELETE": true,
 }
 
-// 敏感字段过滤
-var sensitiveFields = regexp.MustCompile(`(?i)"(password|secret|token|key|credential|authorization)":\s*"[^"]*"`)
+var sensitiveKeyPattern = regexp.MustCompile(`(?i)(password|secret|token|key|credential|authorization|stringdata|data)`)
 
 // 资源路径模式
 var resourcePatterns = []struct {
@@ -42,6 +43,7 @@ var resourcePatterns = []struct {
 	{regexp.MustCompile(`/api/v1/persistentvolumes/([^/]+)`), "persistentvolumes"},
 	{regexp.MustCompile(`/api/v1/storageclasses/([^/]+)`), "storageclasses"},
 	{regexp.MustCompile(`/api/v1/namespaces/([^/]+)`), "namespaces"},
+	{regexp.MustCompile(`/api/v1/namespace/([^/]+)`), "namespaces"},
 }
 
 // 解析资源信息
@@ -60,7 +62,6 @@ func parseResourceInfo(path string) (resource, namespace, name string) {
 		}
 	}
 
-	// 如果没有匹配到具体模式，尝试从路径提取
 	parts := strings.Split(strings.TrimPrefix(path, "/api/v1/"), "/")
 	if len(parts) > 0 {
 		resource = parts[0]
@@ -68,85 +69,41 @@ func parseResourceInfo(path string) (resource, namespace, name string) {
 	return
 }
 
-// 过滤敏感信息
-func filterSensitiveData(body string) string {
-	return sensitiveFields.ReplaceAllString(body, `"$1":"[FILTERED]"`)
-}
-
 // AuditMiddleware 审计日志中间件
 func AuditMiddleware(auditClient *audit.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 如果审计客户端未初始化，跳过
 		if auditClient == nil {
 			c.Next()
 			return
 		}
 
-		// 只记录写操作和重要的读操作
-		if !auditableMethods[c.Request.Method] {
-			// 对于 GET 请求，只记录特定的敏感资源
-			if c.Request.Method == "GET" && !strings.Contains(c.Request.URL.Path, "/secrets/") {
-				c.Next()
-				return
-			}
-		}
-
-		// 跳过非 API 路径
-		if !strings.HasPrefix(c.Request.URL.Path, "/api/") {
-			c.Next()
-			return
-		}
-
-		// 跳过审计日志自身的查询，避免循环
-		if strings.HasPrefix(c.Request.URL.Path, "/api/v1/audit") {
+		if !shouldAudit(c.Request.Method, c.Request.URL.Path) {
 			c.Next()
 			return
 		}
 
 		startTime := time.Now()
 
-		// 读取请求体
 		var requestBody string
 		if c.Request.Body != nil && c.Request.Method != "GET" {
 			bodyBytes, _ := io.ReadAll(c.Request.Body)
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-			requestBody = filterSensitiveData(string(bodyBytes))
-			// 限制请求体长度
-			if len(requestBody) > 2000 {
-				requestBody = requestBody[:2000] + "...[truncated]"
+
+			if shouldStoreRequestBody(c.Request.URL.Path) {
+				requestBody = sanitizeRequestBody(bodyBytes, c.ContentType())
+			} else {
+				requestBody = "[FILTERED]"
 			}
 		}
 
-		// 处理请求
 		c.Next()
 
-		// 计算耗时
 		duration := time.Since(startTime).Milliseconds()
-
-		// 解析资源信息
 		resource, namespace, resourceName := parseResourceInfo(c.Request.URL.Path)
-
-		// 获取用户信息（从请求头或上下文）
-		user := c.GetHeader("X-User")
-		if user == "" {
-			user = c.GetHeader("Authorization")
-			if user != "" {
-				user = "authenticated"
-			} else {
-				user = "anonymous"
-			}
-		}
-
-		// 获取集群信息
-		cluster := c.GetHeader("X-Cluster")
-		if cluster == "" {
-			cluster = "default"
-		}
-
-		// 生成操作描述
+		user := resolveAuditUser(c)
+		cluster := resolveCluster(c)
 		message := generateActionMessage(c.Request.Method, c.Request.URL.Path, resource, resourceName, namespace)
 
-		// 创建审计日志
 		log := &audit.AuditLog{
 			Timestamp:    startTime,
 			User:         user,
@@ -163,19 +120,128 @@ func AuditMiddleware(auditClient *audit.Client) gin.HandlerFunc {
 			Message:      message,
 		}
 
-		// 异步写入数据库
 		go func(l *audit.AuditLog) {
 			if err := auditClient.Log(l); err != nil {
-				// 记录错误但不影响请求
 				println("审计日志写入失败:", err.Error())
 			}
 		}(log)
 	}
 }
 
+func shouldAudit(method, path string) bool {
+	if !strings.HasPrefix(path, "/api/") {
+		return false
+	}
+	if strings.HasPrefix(path, "/api/v1/audit") {
+		return false
+	}
+	if auditableMethods[method] {
+		return true
+	}
+	return method == "GET" && strings.Contains(path, "/secrets/")
+}
+
+func shouldStoreRequestBody(path string) bool {
+	// Secret/YAML 相关请求默认不记录 payload，仅保留摘要。
+	return !strings.Contains(path, "/secrets") && !strings.Contains(path, "/yaml")
+}
+
+func resolveAuditUser(c *gin.Context) string {
+	if user := GetCurrentUser(c); user != nil {
+		if user.Username != "" {
+			return user.Username
+		}
+		return "authenticated"
+	}
+	return "anonymous"
+}
+
+func resolveCluster(c *gin.Context) string {
+	if cluster := GetClusterName(c); cluster != "" {
+		return cluster
+	}
+	cluster := c.GetHeader("X-Cluster")
+	if cluster == "" {
+		cluster = "default"
+	}
+	return cluster
+}
+
+func sanitizeRequestBody(body []byte, contentType string) string {
+	if len(body) == 0 {
+		return ""
+	}
+
+	redacted := redactStructuredPayload(body, contentType)
+	if redacted == "" {
+		redacted = fallbackMask(string(body))
+	}
+
+	if len(redacted) > 2000 {
+		return redacted[:2000] + "...[truncated]"
+	}
+	return redacted
+}
+
+func redactStructuredPayload(body []byte, contentType string) string {
+	jsonBody := body
+
+	trimmed := strings.TrimSpace(string(body))
+	if strings.Contains(contentType, "yaml") || looksLikeYAML(trimmed) {
+		converted, err := yaml.YAMLToJSON(body)
+		if err != nil {
+			return ""
+		}
+		jsonBody = converted
+	}
+
+	var payload interface{}
+	if err := json.Unmarshal(jsonBody, &payload); err != nil {
+		return ""
+	}
+
+	redacted := redactAny(payload)
+	data, err := json.Marshal(redacted)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func looksLikeYAML(body string) bool {
+	return strings.Contains(body, "\n") && strings.Contains(body, ":")
+}
+
+func redactAny(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{}, len(v))
+		for key, child := range v {
+			if sensitiveKeyPattern.MatchString(key) {
+				result[key] = "[FILTERED]"
+				continue
+			}
+			result[key] = redactAny(child)
+		}
+		return result
+	case []interface{}:
+		items := make([]interface{}, 0, len(v))
+		for _, child := range v {
+			items = append(items, redactAny(child))
+		}
+		return items
+	default:
+		return v
+	}
+}
+
+func fallbackMask(body string) string {
+	pattern := regexp.MustCompile(`(?i)("?(password|secret|token|key|credential|authorization|stringData|data)"?\s*:\s*)"[^"]*"`)
+	return pattern.ReplaceAllString(body, `$1"[FILTERED]"`)
+}
+
 // 生成操作描述
 func generateActionMessage(method, path, resource, name, namespace string) string {
-	// 首先检查是否是特殊操作
 	specialAction := detectSpecialAction(path)
 	if specialAction != "" {
 		if name != "" {
@@ -187,7 +253,6 @@ func generateActionMessage(method, path, resource, name, namespace string) strin
 		return specialAction + " " + resource
 	}
 
-	// 普通操作
 	var action string
 	switch method {
 	case "POST":
