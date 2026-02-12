@@ -143,12 +143,12 @@ export default function UpdateStrategyEditor({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">类型:</span>
+          <span className="text-text-muted">类型:</span>
           <span className={clsx(
             'px-2 py-0.5 rounded text-xs font-medium',
             strategy.type === 'RollingUpdate' ? 'bg-blue-500/20 text-blue-400' :
             strategy.type === 'Recreate' ? 'bg-orange-500/20 text-orange-400' :
-            'bg-slate-500/20 text-slate-400'
+            'bg-[color-mix(in_srgb,var(--color-border-hover)_20%,transparent)] text-text-muted'
           )}>
             {strategy.type}
           </span>
@@ -157,11 +157,11 @@ export default function UpdateStrategyEditor({
         {resourceType === 'Deployment' && deploymentStrategy.type === 'RollingUpdate' && (
           <>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">最大不可用:</span>
+              <span className="text-text-muted">最大不可用:</span>
               <span className="text-white">{deploymentStrategy.maxUnavailable || '25%'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">最大超额:</span>
+              <span className="text-text-muted">最大超额:</span>
               <span className="text-white">{deploymentStrategy.maxSurge || '25%'}</span>
             </div>
           </>
@@ -169,7 +169,7 @@ export default function UpdateStrategyEditor({
 
         {resourceType === 'StatefulSet' && statefulSetStrategy.type === 'RollingUpdate' && (
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">分区:</span>
+            <span className="text-text-muted">分区:</span>
             <span className="text-white">{statefulSetStrategy.partition ?? 0}</span>
           </div>
         )}
@@ -177,12 +177,12 @@ export default function UpdateStrategyEditor({
         {resourceType === 'DaemonSet' && daemonSetStrategy.type === 'RollingUpdate' && (
           <>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400">最大不可用:</span>
+              <span className="text-text-muted">最大不可用:</span>
               <span className="text-white">{daemonSetStrategy.maxUnavailable || '1'}</span>
             </div>
             {daemonSetStrategy.maxSurge && (
               <div className="flex items-center gap-2">
-                <span className="text-slate-400">最大超额:</span>
+                <span className="text-text-muted">最大超额:</span>
                 <span className="text-white">{daemonSetStrategy.maxSurge}</span>
               </div>
             )}
@@ -202,9 +202,9 @@ export default function UpdateStrategyEditor({
       <div className="space-y-4">
         {/* 策略类型 */}
         <div>
-          <label className="block text-sm text-slate-400 mb-1">更新策略类型</label>
+          <label className="block text-sm text-text-muted mb-1">更新策略类型</label>
           <select
-            className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-surface-tertiary border border-border-hover rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={strategy.type}
             onChange={(e) => setStrategy({ ...strategy, type: e.target.value as 'RollingUpdate' | 'Recreate' | 'OnDelete' })}
           >
@@ -220,36 +220,36 @@ export default function UpdateStrategyEditor({
         {resourceType === 'Deployment' && strategy.type === 'RollingUpdate' && (
           <>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">
+              <label className="block text-sm text-text-muted mb-1">
                 最大不可用 (maxUnavailable)
               </label>
               <input
                 type="text"
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-surface-tertiary border border-border-hover rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="例如: 25% 或 1"
                 value={deploymentStrategy.maxUnavailable || ''}
                 onChange={(e) =>
                   setStrategy({ ...strategy, maxUnavailable: e.target.value } as DeploymentStrategy)
                 }
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 更新期间最多可以有多少 Pod 不可用，可以是数字或百分比
               </p>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">
+              <label className="block text-sm text-text-muted mb-1">
                 最大超额 (maxSurge)
               </label>
               <input
                 type="text"
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-surface-tertiary border border-border-hover rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="例如: 25% 或 1"
                 value={deploymentStrategy.maxSurge || ''}
                 onChange={(e) =>
                   setStrategy({ ...strategy, maxSurge: e.target.value } as DeploymentStrategy)
                 }
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 更新期间最多可以创建多少额外 Pod，可以是数字或百分比
               </p>
             </div>
@@ -259,19 +259,19 @@ export default function UpdateStrategyEditor({
         {/* StatefulSet RollingUpdate 参数 */}
         {resourceType === 'StatefulSet' && strategy.type === 'RollingUpdate' && (
           <div>
-            <label className="block text-sm text-slate-400 mb-1">
+            <label className="block text-sm text-text-muted mb-1">
               分区 (partition)
             </label>
             <input
               type="number"
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-surface-tertiary border border-border-hover rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               min="0"
               value={statefulSetStrategy.partition ?? 0}
               onChange={(e) =>
                 setStrategy({ ...strategy, partition: parseInt(e.target.value, 10) } as StatefulSetStrategy)
               }
             />
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-text-muted mt-1">
               序号大于等于 partition 的 Pod 才会被更新
             </p>
           </div>
@@ -281,12 +281,12 @@ export default function UpdateStrategyEditor({
         {resourceType === 'DaemonSet' && strategy.type === 'RollingUpdate' && (
           <>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">
+              <label className="block text-sm text-text-muted mb-1">
                 最大不可用 (maxUnavailable)
               </label>
               <input
                 type="text"
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-surface-tertiary border border-border-hover rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="例如: 1 或 10%"
                 value={daemonSetStrategy.maxUnavailable || ''}
                 onChange={(e) =>
@@ -295,12 +295,12 @@ export default function UpdateStrategyEditor({
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">
+              <label className="block text-sm text-text-muted mb-1">
                 最大超额 (maxSurge)
               </label>
               <input
                 type="text"
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-surface-tertiary border border-border-hover rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="例如: 0 或 10%"
                 value={daemonSetStrategy.maxSurge || ''}
                 onChange={(e) =>
@@ -315,7 +315,7 @@ export default function UpdateStrategyEditor({
   };
 
   return (
-    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+    <div className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 border border-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Cog6ToothIcon className="w-5 h-5 text-blue-400" />
@@ -324,7 +324,7 @@ export default function UpdateStrategyEditor({
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-surface-tertiary hover:bg-surface-tertiary text-white rounded transition-colors"
           >
             <PencilSquareIcon className="w-4 h-4" />
             编辑
@@ -334,7 +334,7 @@ export default function UpdateStrategyEditor({
             <button
               onClick={handleCancel}
               disabled={isPending}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-surface-tertiary hover:bg-surface-tertiary text-white rounded transition-colors disabled:opacity-50"
             >
               <XMarkIcon className="w-4 h-4" />
               取消

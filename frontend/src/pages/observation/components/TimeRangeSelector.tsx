@@ -16,7 +16,7 @@ const timeRanges: { value: TimeRange; label: string }[] = [
 
 export default function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
   return (
-    <div className="flex items-center gap-1 bg-slate-800/60 backdrop-blur-sm rounded-lg p-1 border border-slate-700/50">
+    <div className="flex items-center gap-1 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm rounded-lg p-1 border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)]">
       {timeRanges.map((range) => (
         <button
           key={range.value}
@@ -25,7 +25,7 @@ export default function TimeRangeSelector({ value, onChange }: TimeRangeSelector
             'px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200',
             value === range.value
               ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
-              : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+              : 'text-text-muted hover:text-white hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)]'
           )}
         >
           {range.label}

@@ -100,12 +100,8 @@ export default function MainLayout() {
 
         {clusterError && (
           <div
-            className="mx-6 mt-4 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3"
-            style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: 'var(--color-text-primary)',
-            }}
+            className="mx-6 mt-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-[var(--color-text-primary)]"
+            style={{ background: 'var(--sys-error-soft-bg)', borderColor: 'var(--sys-error-soft-border)' }}
           >
             <span className="text-sm">
               当前集群 `{clusterError.cluster}` 不可达：{clusterError.error}
@@ -118,7 +114,7 @@ export default function MainLayout() {
                 打开集群管理
               </a>
             ) : (
-              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-xs text-[var(--color-text-muted)]">
                 你也可以使用顶部集群选择器切换
               </span>
             )}

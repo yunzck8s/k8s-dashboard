@@ -85,8 +85,8 @@ function ApprovalDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-slate-800 rounded-xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      <div className="bg-surface-secondary rounded-xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-white">审批详情</h2>
           <span
             className={clsx(
@@ -103,33 +103,33 @@ function ApprovalDetailModal({
           {/* 请求信息 */}
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-slate-400">申请人</span>
+              <span className="text-text-muted">申请人</span>
               <span className="text-white">{approval.username}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">操作</span>
+              <span className="text-text-muted">操作</span>
               <span className="text-white">
                 {actionLabels[approval.action] || approval.action}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">资源类型</span>
+              <span className="text-text-muted">资源类型</span>
               <span className="text-white">
                 {resourceLabels[approval.resource] || approval.resource}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">资源名称</span>
+              <span className="text-text-muted">资源名称</span>
               <span className="text-white font-mono">{approval.resourceName}</span>
             </div>
             {approval.namespace && (
               <div className="flex justify-between">
-                <span className="text-slate-400">命名空间</span>
+                <span className="text-text-muted">命名空间</span>
                 <span className="text-white font-mono">{approval.namespace}</span>
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-slate-400">申请时间</span>
+              <span className="text-text-muted">申请时间</span>
               <span className="text-white">
                 {new Date(approval.createdAt).toLocaleString()}
               </span>
@@ -139,8 +139,8 @@ function ApprovalDetailModal({
           {/* 申请原因 */}
           {approval.reason && (
             <div>
-              <label className="block text-slate-400 text-sm mb-1">申请原因</label>
-              <div className="bg-slate-700 rounded-lg p-3 text-slate-200 text-sm">
+              <label className="block text-text-muted text-sm mb-1">申请原因</label>
+              <div className="bg-surface-tertiary rounded-lg p-3 text-text-secondary text-sm">
                 {approval.reason}
               </div>
             </div>
@@ -148,13 +148,13 @@ function ApprovalDetailModal({
 
           {/* 审批结果（如果已处理） */}
           {approval.status !== 'pending' && (
-            <div className="border-t border-slate-700 pt-4 space-y-3">
+            <div className="border-t border-border pt-4 space-y-3">
               <div className="flex justify-between">
-                <span className="text-slate-400">审批人</span>
+                <span className="text-text-muted">审批人</span>
                 <span className="text-white">{approval.reviewerName || '-'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">审批时间</span>
+                <span className="text-text-muted">审批时间</span>
                 <span className="text-white">
                   {approval.reviewedAt
                     ? new Date(approval.reviewedAt).toLocaleString()
@@ -163,8 +163,8 @@ function ApprovalDetailModal({
               </div>
               {approval.reviewComment && (
                 <div>
-                  <label className="block text-slate-400 text-sm mb-1">审批意见</label>
-                  <div className="bg-slate-700 rounded-lg p-3 text-slate-200 text-sm">
+                  <label className="block text-text-muted text-sm mb-1">审批意见</label>
+                  <div className="bg-surface-tertiary rounded-lg p-3 text-text-secondary text-sm">
                     {approval.reviewComment}
                   </div>
                 </div>
@@ -174,23 +174,23 @@ function ApprovalDetailModal({
 
           {/* 审批操作 */}
           {canReview && (
-            <div className="border-t border-slate-700 pt-4">
-              <label className="block text-slate-400 text-sm mb-2">审批意见</label>
+            <div className="border-t border-border pt-4">
+              <label className="block text-text-muted text-sm mb-2">审批意见</label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="可选，填写审批意见..."
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white resize-none"
+                className="w-full bg-surface-tertiary border border-border-hover rounded-lg px-3 py-2 text-white resize-none"
                 rows={2}
               />
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-3 p-4 border-t border-slate-700">
+        <div className="flex justify-end gap-3 p-4 border-t border-border">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-slate-300 hover:text-white"
+            className="px-4 py-2 text-text-secondary hover:text-white"
           >
             关闭
           </button>
@@ -274,7 +274,7 @@ export default function Approvals() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">审批管理</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             审批危险操作请求
             {pendingData?.count ? (
               <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-sm">
@@ -287,7 +287,7 @@ export default function Approvals() {
 
       {/* 筛选 */}
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-slate-400">
+        <div className="flex items-center gap-2 text-text-muted">
           <FunnelIcon className="w-5 h-5" />
           <span>状态：</span>
         </div>
@@ -298,7 +298,7 @@ export default function Approvals() {
               'px-3 py-1.5 rounded-lg text-sm transition-colors',
               !statusFilter
                 ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                : 'bg-surface-tertiary text-text-secondary hover:bg-surface-tertiary'
             )}
           >
             全部
@@ -311,7 +311,7 @@ export default function Approvals() {
                 'px-3 py-1.5 rounded-lg text-sm transition-colors',
                 statusFilter === key
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  : 'bg-surface-tertiary text-text-secondary hover:bg-surface-tertiary'
               )}
             >
               {config.label}
@@ -321,43 +321,43 @@ export default function Approvals() {
       </div>
 
       {/* 审批列表 */}
-      <div className="bg-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-surface-secondary rounded-xl overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-slate-400">加载中...</div>
+          <div className="p-8 text-center text-text-muted">加载中...</div>
         ) : !data?.items?.length ? (
-          <div className="p-8 text-center text-slate-400">暂无审批记录</div>
+          <div className="p-8 text-center text-text-muted">暂无审批记录</div>
         ) : (
           <table className="w-full">
-            <thead className="bg-slate-700/50">
+            <thead className="bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)]">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">
                   申请人
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">
                   操作
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">
                   资源
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">
                   状态
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">
                   申请时间
                 </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">
+                <th className="px-4 py-3 text-right text-sm font-medium text-text-secondary">
                   操作
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700">
+            <tbody className="divide-y divide-border">
               {data.items.map((approval) => {
                 const StatusIcon = statusConfig[approval.status].icon;
                 return (
-                  <tr key={approval.id} className="hover:bg-slate-700/30">
+                  <tr key={approval.id} className="hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_30%,transparent)]">
                     <td className="px-4 py-3 text-white">{approval.username}</td>
                     <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-slate-700 rounded text-slate-200 text-sm">
+                      <span className="px-2 py-1 bg-surface-tertiary rounded text-text-secondary text-sm">
                         {actionLabels[approval.action] || approval.action}
                       </span>
                     </td>
@@ -365,7 +365,7 @@ export default function Approvals() {
                       <div className="text-white">
                         {resourceLabels[approval.resource] || approval.resource}
                       </div>
-                      <div className="text-slate-400 text-sm font-mono">
+                      <div className="text-text-muted text-sm font-mono">
                         {approval.namespace && `${approval.namespace}/`}
                         {approval.resourceName}
                       </div>
@@ -381,14 +381,14 @@ export default function Approvals() {
                         {statusConfig[approval.status].label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-400 text-sm">
+                    <td className="px-4 py-3 text-text-muted text-sm">
                       {new Date(approval.createdAt).toLocaleString()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setSelectedApproval(approval)}
-                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
+                          className="p-2 text-text-muted hover:text-white hover:bg-surface-tertiary rounded-lg"
                           title="查看详情"
                         >
                           <ChatBubbleLeftIcon className="w-4 h-4" />

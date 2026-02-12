@@ -174,23 +174,23 @@ export default function PodTerminal({ namespace, name, container }: PodTerminalP
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-sm text-slate-400">{connected ? '已连接' : '未连接'}</span>
-          <span className="text-sm text-slate-500">|</span>
-          <span className="text-sm text-slate-400">{container}</span>
+          <span className="text-sm text-text-muted">{connected ? '已连接' : '未连接'}</span>
+          <span className="text-sm text-text-muted">|</span>
+          <span className="text-sm text-text-muted">{container}</span>
         </div>
         <button
           onClick={reconnect}
-          className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
+          className="px-3 py-1 text-sm bg-surface-tertiary text-text-secondary rounded hover:bg-surface-tertiary transition-colors"
           aria-label="重新连接终端"
         >
           重新连接
         </button>
       </div>
 
-      <div ref={terminalRef} className="flex-1 bg-slate-900 p-2" style={{ minHeight: '400px' }} />
+      <div ref={terminalRef} className="flex-1 bg-surface-tertiary p-2" style={{ minHeight: '400px' }} />
 
       {error && (
         <div className="px-4 py-2 bg-red-500/10 border-t border-red-500/20 text-red-400 text-sm">

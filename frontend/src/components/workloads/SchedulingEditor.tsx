@@ -114,20 +114,20 @@ function SchedulingEditorContent({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+      <div className="bg-surface-secondary rounded-xl border border-border w-full max-w-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/10 rounded-lg">
               <ServerIcon className="w-5 h-5 text-purple-400" />
             </div>
             <h3 className="text-lg font-semibold text-white">调度配置</h3>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-1 text-text-muted hover:text-white transition-colors">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="border-b border-slate-700 px-6">
+        <div className="border-b border-border px-6">
           <nav className="flex gap-4">
             {[
               { id: 'nodeSelector' as const, label: '节点选择器' },
@@ -140,7 +140,7 @@ function SchedulingEditorContent({
                   'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
                   activeTab === tab.id
                     ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-300'
+                    : 'border-transparent text-text-muted hover:text-text-secondary'
                 )}
               >
                 {tab.label}
@@ -154,7 +154,7 @@ function SchedulingEditorContent({
             {activeTab === 'nodeSelector' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-400">指定 Pod 只能调度到带有特定标签的节点上</p>
+                  <p className="text-sm text-text-muted">指定 Pod 只能调度到带有特定标签的节点上</p>
                   <button
                     type="button"
                     onClick={addNodeSelector}
@@ -166,7 +166,7 @@ function SchedulingEditorContent({
                 </div>
 
                 {editedNodeSelector.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">暂无节点选择器配置</div>
+                  <div className="text-center py-8 text-text-muted">暂无节点选择器配置</div>
                 ) : (
                   <div className="space-y-3">
                     {editedNodeSelector.map((item, index) => (
@@ -176,15 +176,15 @@ function SchedulingEditorContent({
                           value={item.key}
                           onChange={(event) => updateNodeSelector(index, 'key', event.target.value)}
                           placeholder="标签键"
-                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="flex-1 px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
-                        <span className="text-slate-500">=</span>
+                        <span className="text-text-muted">=</span>
                         <input
                           type="text"
                           value={item.value}
                           onChange={(event) => updateNodeSelector(index, 'value', event.target.value)}
                           placeholder="标签值"
-                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          className="flex-1 px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                         <button
                           type="button"
@@ -198,11 +198,11 @@ function SchedulingEditorContent({
                   </div>
                 )}
 
-                <div className="mt-4 p-3 bg-slate-900/50 rounded-lg">
-                  <p className="text-xs text-slate-500">
-                    常用标签: <code className="text-slate-400">kubernetes.io/hostname</code>,
-                    <code className="text-slate-400 ml-1">node.kubernetes.io/instance-type</code>,
-                    <code className="text-slate-400 ml-1">topology.kubernetes.io/zone</code>
+                <div className="mt-4 p-3 bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg">
+                  <p className="text-xs text-text-muted">
+                    常用标签: <code className="text-text-muted">kubernetes.io/hostname</code>,
+                    <code className="text-text-muted ml-1">node.kubernetes.io/instance-type</code>,
+                    <code className="text-text-muted ml-1">topology.kubernetes.io/zone</code>
                   </p>
                 </div>
               </div>
@@ -211,7 +211,7 @@ function SchedulingEditorContent({
             {activeTab === 'tolerations' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-400">允许 Pod 调度到带有特定污点的节点上</p>
+                  <p className="text-sm text-text-muted">允许 Pod 调度到带有特定污点的节点上</p>
                   <button
                     type="button"
                     onClick={addToleration}
@@ -223,13 +223,13 @@ function SchedulingEditorContent({
                 </div>
 
                 {editedTolerations.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">暂无容忍度配置</div>
+                  <div className="text-center py-8 text-text-muted">暂无容忍度配置</div>
                 ) : (
                   <div className="space-y-3">
                     {editedTolerations.map((toleration, index) => (
-                      <div key={index} className="p-3 bg-slate-900/50 rounded-lg space-y-3">
+                      <div key={index} className="p-3 bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-400">容忍度 #{index + 1}</span>
+                          <span className="text-sm text-text-muted">容忍度 #{index + 1}</span>
                           <button
                             type="button"
                             onClick={() => removeToleration(index)}
@@ -240,21 +240,21 @@ function SchedulingEditorContent({
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs text-slate-500 mb-1">Key</label>
+                            <label className="block text-xs text-text-muted mb-1">Key</label>
                             <input
                               type="text"
                               value={toleration.key || ''}
                               onChange={(event) => updateToleration(index, 'key', event.target.value)}
                               placeholder="例: node.kubernetes.io/not-ready"
-                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full px-3 py-2 bg-surface-secondary border border-border-hover rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs text-slate-500 mb-1">Operator</label>
+                            <label className="block text-xs text-text-muted mb-1">Operator</label>
                             <select
                               value={toleration.operator || 'Equal'}
                               onChange={(event) => updateToleration(index, 'operator', event.target.value)}
-                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full px-3 py-2 bg-surface-secondary border border-border-hover rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                             >
                               <option value="Equal">Equal</option>
                               <option value="Exists">Exists</option>
@@ -262,21 +262,21 @@ function SchedulingEditorContent({
                           </div>
                           {toleration.operator !== 'Exists' && (
                             <div>
-                              <label className="block text-xs text-slate-500 mb-1">Value</label>
+                              <label className="block text-xs text-text-muted mb-1">Value</label>
                               <input
                                 type="text"
                                 value={toleration.value || ''}
                                 onChange={(event) => updateToleration(index, 'value', event.target.value)}
-                                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-full px-3 py-2 bg-surface-secondary border border-border-hover rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
                             </div>
                           )}
                           <div>
-                            <label className="block text-xs text-slate-500 mb-1">Effect</label>
+                            <label className="block text-xs text-text-muted mb-1">Effect</label>
                             <select
                               value={toleration.effect || ''}
                               onChange={(event) => updateToleration(index, 'effect', event.target.value)}
-                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-full px-3 py-2 bg-surface-secondary border border-border-hover rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                             >
                               <option value="">All</option>
                               <option value="NoSchedule">NoSchedule</option>
@@ -293,11 +293,11 @@ function SchedulingEditorContent({
             )}
           </div>
 
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+              className="px-4 py-2 text-text-secondary hover:text-white transition-colors"
             >
               取消
             </button>

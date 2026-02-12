@@ -8,46 +8,53 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Enterprise SaaS 主题色
+        // Semantic theme tokens (mapped to CSS vars)
         primary: {
-          DEFAULT: '#6366F1',
-          hover: '#818CF8',
-          light: 'rgba(99, 102, 241, 0.15)',
-          50: '#EEF2FF',
-          100: '#E0E7FF',
-          200: '#C7D2FE',
-          300: '#A5B4FC',
-          400: '#818CF8',
-          500: '#6366F1',
-          600: '#4F46E5',
-          700: '#4338CA',
-          800: '#3730A3',
-          900: '#312E81',
+          DEFAULT: 'var(--color-primary)',
+          hover: 'var(--color-primary-hover)',
+          light: 'var(--color-primary-light)',
         },
-        // 表面色
         surface: {
-          primary: '#0c0a1d',
-          secondary: '#13102a',
-          tertiary: '#1a1635',
-          elevated: '#211d40',
+          primary: 'var(--color-bg-primary)',
+          secondary: 'var(--color-bg-secondary)',
+          tertiary: 'var(--color-bg-tertiary)',
+          elevated: 'var(--color-bg-elevated)',
         },
-        // K8s 资源状态颜色
+        text: {
+          primary: 'var(--color-text-primary)',
+          secondary: 'var(--color-text-secondary)',
+          muted: 'var(--color-text-muted)',
+        },
         k8s: {
-          running: '#10B981',
-          pending: '#F59E0B',
-          failed: '#EF4444',
-          succeeded: '#3B82F6',
-          unknown: '#6B7280',
+          running: 'var(--color-success)',
+          pending: 'var(--color-warning)',
+          failed: 'var(--color-error)',
+          succeeded: 'var(--color-info)',
+          unknown: 'var(--color-text-muted)',
         },
-        // 语义色
-        success: '#10B981',
-        warning: '#F59E0B',
-        error: '#EF4444',
-        info: '#3B82F6',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        error: 'var(--color-error)',
+        info: 'var(--color-info)',
+        border: {
+          DEFAULT: 'var(--color-border)',
+          hover: 'var(--color-border-hover)',
+        },
+        chart: {
+          1: 'var(--chart-color-1)',
+          2: 'var(--chart-color-2)',
+          3: 'var(--chart-color-3)',
+          4: 'var(--chart-color-4)',
+          5: 'var(--chart-color-5)',
+          6: 'var(--chart-color-6)',
+          7: 'var(--chart-color-7)',
+          8: 'var(--chart-color-8)',
+        },
       },
       fontFamily: {
-        sans: ['Fira Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        mono: ['Fira Code', 'monospace'],
+        heading: ['var(--font-heading)'],
+        sans: ['var(--font-body)'],
+        mono: ['var(--font-mono)'],
       },
       borderRadius: {
         'xl': '12px',

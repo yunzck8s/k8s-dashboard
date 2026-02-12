@@ -129,7 +129,7 @@ export default function NodeDetail() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>{name}</h1>
+              <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">{name}</h1>
               <span className={clsx('badge', isReady ? 'badge-success' : 'badge-error')}>
                 {isReady ? 'Ready' : 'NotReady'}
               </span>
@@ -137,7 +137,7 @@ export default function NodeDetail() {
                 <span className="badge badge-warning">SchedulingDisabled</span>
               )}
             </div>
-            <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="mt-1 text-[var(--color-text-secondary)]">
               {node.status.nodeInfo?.kubeletVersion} | {node.status.nodeInfo?.osImage}
             </p>
           </div>
@@ -227,7 +227,7 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>基本信息</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={node.metadata.name} />
           <InfoRow label="UID" value={node.metadata.uid} mono />
@@ -251,7 +251,7 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>系统信息</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">系统信息</h3>
         <dl className="space-y-3">
           <InfoRow label="操作系统" value={node.status.nodeInfo?.osImage || '-'} />
           <InfoRow label="内核版本" value={node.status.nodeInfo?.kernelVersion || '-'} />
@@ -270,7 +270,7 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>资源容量</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">资源容量</h3>
         <dl className="space-y-3">
           <InfoRow label="CPU" value={node.status.capacity?.cpu || '-'} />
           <InfoRow label="内存" value={formatMemory(node.status.capacity?.memory)} />
@@ -287,7 +287,7 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>可分配资源</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">可分配资源</h3>
         <dl className="space-y-3">
           <InfoRow label="CPU" value={node.status.allocatable?.cpu || '-'} />
           <InfoRow label="内存" value={formatMemory(node.status.allocatable?.memory)} />
@@ -304,7 +304,7 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>地址</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">地址</h3>
         <dl className="space-y-3">
           {node.status.addresses?.map((addr) => (
             <InfoRow key={addr.type} label={addr.type} value={addr.address} mono />
@@ -320,7 +320,7 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>标签</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">标签</h3>
         <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
           {Object.entries(node.metadata.labels || {}).map(([key, value]) => (
             <span key={key} className="badge badge-default text-xs">
@@ -338,13 +338,13 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>污点 (Taints)</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">污点 (Taints)</h3>
         <div className="space-y-2">
           {node.spec.taints?.map((taint, idx) => (
             <div key={idx} className="badge badge-warning text-xs">
               {taint.key}={taint.value}:{taint.effect}
             </div>
-          )) || <span style={{ color: 'var(--color-text-muted)' }}>无污点</span>}
+          )) || <span className="text-[var(--color-text-muted)]">无污点</span>}
         </div>
       </div>
 
@@ -356,11 +356,11 @@ function OverviewTab({ node }: { node: Node }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>条件状态</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">条件状态</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              <tr className="text-left text-sm text-[var(--color-text-muted)]">
                 <th className="pb-3">类型</th>
                 <th className="pb-3">状态</th>
                 <th className="pb-3">原因</th>
@@ -371,7 +371,7 @@ function OverviewTab({ node }: { node: Node }) {
             <tbody className="text-sm">
               {node.status.conditions?.map((condition) => (
                 <tr key={condition.type} style={{ borderTop: '1px solid var(--color-border)' }}>
-                  <td className="py-3" style={{ color: 'var(--color-text-secondary)' }}>{condition.type}</td>
+                  <td className="py-3 text-[var(--color-text-secondary)]">{condition.type}</td>
                   <td className="py-3">
                     <span
                       className={clsx(
@@ -388,9 +388,9 @@ function OverviewTab({ node }: { node: Node }) {
                       {condition.status}
                     </span>
                   </td>
-                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>{condition.reason || '-'}</td>
-                  <td className="py-3 max-w-xs truncate" style={{ color: 'var(--color-text-muted)' }}>{condition.message || '-'}</td>
-                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>
+                  <td className="py-3 text-[var(--color-text-muted)]">{condition.reason || '-'}</td>
+                  <td className="py-3 max-w-xs truncate text-[var(--color-text-muted)]">{condition.message || '-'}</td>
+                  <td className="py-3 text-[var(--color-text-muted)]">
                     {condition.lastHeartbeatTime
                       ? formatDistanceToNow(new Date(condition.lastHeartbeatTime), {
                           addSuffix: true,
@@ -483,8 +483,8 @@ function PodsTab({ pods }: { pods: Pod[] }) {
                   </td>
                   <td>{ready}/{total}</td>
                   <td>{restarts}</td>
-                  <td className="font-mono text-sm" style={{ color: 'var(--color-text-muted)' }}>{pod.status.podIP || '-'}</td>
-                  <td style={{ color: 'var(--color-text-muted)' }}>
+                  <td className="font-mono text-sm text-[var(--color-text-muted)]">{pod.status.podIP || '-'}</td>
+                  <td className="text-[var(--color-text-muted)]">
                     {formatDistanceToNow(new Date(pod.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -497,7 +497,7 @@ function PodsTab({ pods }: { pods: Pod[] }) {
         </table>
       </div>
       {pods.length === 0 && (
-        <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>此节点上暂无 Pods</div>
+        <div className="text-center py-12 text-[var(--color-text-muted)]">此节点上暂无 Pods</div>
       )}
     </div>
   );
@@ -514,7 +514,7 @@ function MetricsTab({ metrics }: { metrics?: NodeMetrics }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <p style={{ color: 'var(--color-text-muted)' }}>暂无指标数据</p>
+        <p className="text-[var(--color-text-muted)]">暂无指标数据</p>
       </div>
     );
   }
@@ -535,11 +535,11 @@ function MetricsTab({ metrics }: { metrics?: NodeMetrics }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>CPU 使用率</h3>
-        <div className="text-4xl font-bold mb-4" style={{ color: 'var(--color-primary)' }}>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">CPU 使用率</h3>
+        <div className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
           {cpuPercentage.toFixed(1)}%
         </div>
-        <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+        <div className="text-sm text-[var(--color-text-muted)]">
           <div className="flex justify-between mb-1">
             <span>使用量:</span>
             <span className="font-mono">{(cpuUsage / 1000).toFixed(2)} cores</span>
@@ -569,11 +569,11 @@ function MetricsTab({ metrics }: { metrics?: NodeMetrics }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>内存使用率</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">内存使用率</h3>
         <div className="text-4xl font-bold mb-4" style={{ color: '#10B981' }}>
           {memoryPercentage.toFixed(1)}%
         </div>
-        <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+        <div className="text-sm text-[var(--color-text-muted)]">
           <div className="flex justify-between mb-1">
             <span>使用量:</span>
             <span className="font-mono">{(memoryUsage / 1024 / 1024 / 1024).toFixed(2)} GB</span>
@@ -621,7 +621,7 @@ function YamlTab({ yaml }: { yaml: string }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <pre className="text-sm font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+        <pre className="text-sm font-mono text-[var(--color-text-secondary)]">
           {yaml || '加载中...'}
         </pre>
       </div>
@@ -641,7 +641,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <dt style={{ color: 'var(--color-text-muted)' }}>{label}</dt>
+      <dt className="text-[var(--color-text-muted)]">{label}</dt>
       <dd className={clsx(mono && 'font-mono text-sm')} style={{ color: 'var(--color-text-secondary)' }}>{value}</dd>
     </div>
   );

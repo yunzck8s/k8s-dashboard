@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentType, type CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 import { overviewApi, alertApi } from '../../api';
 import StatsCard from '../../components/common/StatsCard';
 import ResourceChart from '../../components/charts/ResourceChart';
@@ -23,27 +24,182 @@ import {
   FolderIcon,
   BellAlertIcon,
 } from '@heroicons/react/24/outline';
-import clsx from 'clsx';
 
-// 过滤类型定义
 type AlertSeverityFilter = 'critical' | 'warning' | 'info' | null;
 type EventTypeFilter = 'Normal' | 'Warning' | null;
+type Tone = 'success' | 'warning' | 'error' | 'info';
 
-const quickLinks = [
-  { name: 'Pods', path: '/workloads/pods', icon: CubeIcon, color: '#60A5FA' },
-  { name: 'Deployments', path: '/workloads/deployments', icon: RectangleStackIcon, color: '#818CF8' },
-  { name: 'Services', path: '/network/services', icon: GlobeAltIcon, color: '#FBBF24' },
-  { name: 'Nodes', path: '/nodes', icon: ServerIcon, color: '#34D399' },
-  { name: 'ConfigMaps', path: '/config/configmaps', icon: FolderIcon, color: '#60A5FA' },
-  { name: 'Namespaces', path: '/namespaces', icon: FolderIcon, color: '#818CF8' },
+interface ToneStyle {
+  bg: string;
+  border: string;
+  text: string;
+  baseText: string;
+}
+
+interface HealthConfig {
+  label: string;
+  ringColor: string;
+  textColor: string;
+  chip: ToneStyle;
+}
+
+interface QuickLink {
+  name: string;
+  path: string;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
+  iconColor: string;
+}
+
+const toneStyles: Record<Tone, ToneStyle> = {
+  success: {
+    bg: 'var(--sys-success-soft-bg)',
+    border: 'var(--sys-success-soft-border)',
+    text: 'var(--sys-success-soft-text)',
+    baseText: 'var(--color-success)',
+  },
+  warning: {
+    bg: 'var(--sys-warning-soft-bg)',
+    border: 'var(--sys-warning-soft-border)',
+    text: 'var(--sys-warning-soft-text)',
+    baseText: 'var(--color-warning)',
+  },
+  error: {
+    bg: 'var(--sys-error-soft-bg)',
+    border: 'var(--sys-error-soft-border)',
+    text: 'var(--sys-error-soft-text)',
+    baseText: 'var(--color-error)',
+  },
+  info: {
+    bg: 'var(--sys-info-soft-bg)',
+    border: 'var(--sys-info-soft-border)',
+    text: 'var(--sys-info-soft-text)',
+    baseText: 'var(--color-info)',
+  },
+};
+
+const quickLinks: QuickLink[] = [
+  { name: 'Pods', path: '/workloads/pods', icon: CubeIcon, iconColor: 'var(--color-info)' },
+  { name: 'Deployments', path: '/workloads/deployments', icon: RectangleStackIcon, iconColor: 'var(--color-primary)' },
+  { name: 'Services', path: '/network/services', icon: GlobeAltIcon, iconColor: 'var(--color-warning)' },
+  { name: 'Nodes', path: '/nodes', icon: ServerIcon, iconColor: 'var(--color-success)' },
+  { name: 'ConfigMaps', path: '/config/configmaps', icon: FolderIcon, iconColor: 'var(--color-info)' },
+  { name: 'Namespaces', path: '/namespaces', icon: FolderIcon, iconColor: 'var(--color-primary)' },
 ];
+
+function getHealthConfig(score: number): HealthConfig {
+  if (score >= 90) {
+    return {
+      label: '健康',
+      ringColor: 'var(--color-success)',
+      textColor: 'var(--color-success)',
+      chip: toneStyles.success,
+    };
+  }
+  if (score >= 70) {
+    return {
+      label: '良好',
+      ringColor: 'var(--color-info)',
+      textColor: 'var(--color-info)',
+      chip: toneStyles.info,
+    };
+  }
+  if (score >= 50) {
+    return {
+      label: '警告',
+      ringColor: 'var(--color-warning)',
+      textColor: 'var(--color-warning)',
+      chip: toneStyles.warning,
+    };
+  }
+  return {
+    label: '异常',
+    ringColor: 'var(--color-error)',
+    textColor: 'var(--color-error)',
+    chip: toneStyles.error,
+  };
+}
+
+function StatFilterCard({
+  count,
+  label,
+  tone,
+  active,
+  onClick,
+}: {
+  count: number;
+  label: string;
+  tone: Tone;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const style = toneStyles[tone];
+
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-lg border p-3 text-center transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      style={{
+        background: style.bg,
+        borderColor: style.border,
+        boxShadow: active ? `0 0 0 2px ${style.border}` : 'none',
+      }}
+    >
+      <p className="text-2xl font-semibold" style={{ color: style.baseText }}>
+        {count}
+      </p>
+      <p className="text-xs text-[var(--color-text-muted)]">
+        {label}
+      </p>
+    </button>
+  );
+}
+
+function EventFilterCard({
+  count,
+  label,
+  icon: Icon,
+  tone,
+  active,
+  onClick,
+}: {
+  count: number;
+  label: string;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
+  tone: Tone;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const style = toneStyles[tone];
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-3 rounded-lg border p-4 text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      style={{
+        background: style.bg,
+        borderColor: style.border,
+        boxShadow: active ? `0 0 0 2px ${style.border}` : 'none',
+      }}
+    >
+      <Icon className="h-8 w-8" style={{ color: style.baseText }} />
+      <div>
+        <p className="text-2xl font-semibold" style={{ color: style.baseText }}>
+          {formatNumber(count, 0)}
+        </p>
+        <p className="text-xs text-[var(--color-text-muted)]">
+          {label}
+        </p>
+      </div>
+    </button>
+  );
+}
 
 export default function Dashboard() {
   const pollingInterval = usePollingInterval('standard');
   const fastPollingInterval = usePollingInterval('fast');
   const fastRefetchInterval = createVisibilityRefetchInterval(fastPollingInterval);
   const standardRefetchInterval = createVisibilityRefetchInterval(pollingInterval);
-  // 过滤状态
+
   const [alertFilter, setAlertFilter] = useState<AlertSeverityFilter>(null);
   const [eventFilter, setEventFilter] = useState<EventTypeFilter>(null);
 
@@ -58,14 +214,12 @@ export default function Dashboard() {
     refetchInterval: fastRefetchInterval,
   });
 
-  // 获取告警摘要
   const { data: alertSummary } = useQuery({
     queryKey: queryKeys.alertSummary,
     queryFn: alertApi.getSummary,
     refetchInterval: standardRefetchInterval,
   });
 
-  // 计算集群健康度
   const healthScore = useMemo(() => {
     if (!overview) return 0;
     const nodeHealth = overview.nodes.total > 0 ? (overview.nodes.ready / overview.nodes.total) * 100 : 0;
@@ -74,43 +228,32 @@ export default function Dashboard() {
     return Math.round((nodeHealth + podHealth + deployHealth) / 3);
   }, [overview]);
 
+  const healthConfig = useMemo(() => getHealthConfig(healthScore), [healthScore]);
+  const healthCircumference = 2 * Math.PI * 42;
+  const healthOffset = healthCircumference * (1 - healthScore / 100);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+      <div className="flex h-64 items-center justify-center">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-b-2"
+          style={{ borderColor: 'var(--color-primary)' }}
+        />
       </div>
     );
   }
 
-  const getHealthColor = (score: number) => {
-    if (score >= 90) return 'text-green-400';
-    if (score >= 70) return 'text-blue-400';
-    if (score >= 50) return 'text-amber-400';
-    return 'text-red-400';
-  };
-
-  const getHealthText = (score: number) => {
-    if (score >= 90) return '健康';
-    if (score >= 70) return '良好';
-    if (score >= 50) return '警告';
-    return '异常';
-  };
-
   return (
     <div className="space-y-6">
       {/* 页面头部 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            集群概览
-          </h1>
-          <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-            实时监控集群状态和资源使用情况
-          </p>
+          <h1 className="text-[var(--color-text-primary)]">集群概览</h1>
+          <p className="mt-1 text-[var(--color-text-secondary)]">实时监控集群状态和资源使用情况</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            <ClockIcon className="w-4 h-4" />
+          <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+            <ClockIcon className="h-4 w-4" />
             <span>
               更新于{' '}
               {new Date(dataUpdatedAt).toLocaleTimeString('zh-CN', {
@@ -120,68 +263,60 @@ export default function Dashboard() {
               })}
             </span>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="btn btn-secondary flex items-center gap-2"
-          >
-            <ArrowPathIcon className="w-4 h-4" />
+          <button onClick={() => refetch()} className="btn btn-secondary flex items-center gap-2">
+            <ArrowPathIcon className="h-4 w-4" />
             刷新
           </button>
         </div>
       </div>
 
       {/* 集群健康度和核心指标 */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* 集群健康度 */}
-        <div
-          className="p-6 lg:col-span-1 flex flex-col items-center justify-center min-h-[180px] rounded-xl"
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="card lg:col-span-1 flex min-h-[180px] flex-col items-center justify-center p-6">
           <div className="relative">
-            <svg width="100" height="100" className="transform -rotate-90">
+            <svg width="100" height="100" className="-rotate-90 transform">
               <circle
                 cx="50"
                 cy="50"
                 r="42"
-                stroke="currentColor"
+                stroke="var(--color-border)"
                 strokeWidth="8"
                 fill="none"
-                className="text-slate-700/30"
               />
               <circle
                 cx="50"
                 cy="50"
                 r="42"
-                stroke={healthScore >= 90 ? '#10B981' : healthScore >= 70 ? '#3B82F6' : healthScore >= 50 ? '#F59E0B' : '#EF4444'}
+                stroke={healthConfig.ringColor}
                 strokeWidth="8"
                 fill="none"
                 strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 42}
-                strokeDashoffset={2 * Math.PI * 42 * (1 - healthScore / 100)}
+                strokeDasharray={healthCircumference}
+                strokeDashoffset={healthOffset}
                 className="transition-all duration-500"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={clsx('text-2xl font-semibold', getHealthColor(healthScore))}>
+              <span className="text-2xl font-semibold" style={{ color: healthConfig.textColor }}>
                 {healthScore}%
               </span>
             </div>
           </div>
-          <div className="mt-2 text-center">
-            <div className={clsx('text-base font-medium', getHealthColor(healthScore))}>
-              {getHealthText(healthScore)}
+          <div className="mt-3 text-center">
+            <div
+              className="inline-flex rounded px-2 py-1 text-sm font-medium"
+              style={{
+                background: healthConfig.chip.bg,
+                color: healthConfig.chip.text,
+              }}
+            >
+              {healthConfig.label}
             </div>
-            <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-              集群健康度
-            </div>
+            <div className="mt-1 text-xs text-[var(--color-text-muted)]">集群健康度</div>
           </div>
         </div>
 
-        {/* 核心指标卡片 */}
-        <div className="lg:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="lg:col-span-4 grid grid-cols-2 gap-4 md:grid-cols-4">
           <StatsCard
             title="节点"
             value={overview?.nodes.total ?? 0}
@@ -217,23 +352,17 @@ export default function Dashboard() {
       </div>
 
       {/* 资源使用情况 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-medium flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-            <ChartBarIcon className="w-5 h-5" style={{ color: 'var(--color-text-muted)' }} />
+      <div className="card rounded-xl p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-lg font-medium text-[var(--color-text-primary)]">
+            <ChartBarIcon className="h-5 w-5 text-[var(--color-text-muted)]" />
             资源使用情况
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>CPU 使用率</h4>
-            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>容器 CPU 占用</p>
+            <h4 className="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">CPU 使用率</h4>
+            <p className="mb-3 text-xs text-[var(--color-text-muted)]">容器 CPU 占用</p>
             <ResourceChart
               used={overview?.resources.cpu.used ?? 0}
               total={overview?.resources.cpu.total ?? 100}
@@ -241,8 +370,8 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>容器内存</h4>
-            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>K8s Working Set</p>
+            <h4 className="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">容器内存</h4>
+            <p className="mb-3 text-xs text-[var(--color-text-muted)]">K8s Working Set</p>
             <ResourceChart
               used={overview?.resources.memory.used ?? 0}
               total={overview?.resources.memory.total ?? 100}
@@ -250,8 +379,8 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>节点内存</h4>
-            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>OS 可用内存</p>
+            <h4 className="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">节点内存</h4>
+            <p className="mb-3 text-xs text-[var(--color-text-muted)]">OS 可用内存</p>
             <ResourceChart
               used={overview?.resources.nodeMemory?.used ?? 0}
               total={overview?.resources.nodeMemory?.total ?? 100}
@@ -259,8 +388,8 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col items-center">
-            <h4 className="text-sm font-medium mb-2" style={{ color: 'var(--color-text-secondary)' }}>Pod 容量</h4>
-            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>运行中的 Pod</p>
+            <h4 className="mb-2 text-sm font-medium text-[var(--color-text-secondary)]">Pod 容量</h4>
+            <p className="mb-3 text-xs text-[var(--color-text-muted)]">运行中的 Pod</p>
             <ResourceChart
               used={overview?.resources.pods.used ?? 0}
               total={overview?.resources.pods.total ?? 100}
@@ -271,39 +400,28 @@ export default function Dashboard() {
       </div>
 
       {/* 告警和事件 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 告警概览 */}
-        <div
-          className="p-6 rounded-xl"
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-              <BellAlertIcon className="w-5 h-5" style={{ color: 'var(--color-text-muted)' }} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="card rounded-xl p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-lg font-medium text-[var(--color-text-primary)]">
+              <BellAlertIcon className="h-5 w-5 text-[var(--color-text-muted)]" />
               告警概览
             </h3>
             <div className="flex items-center gap-2 text-sm">
               {alertFilter && (
                 <button
                   onClick={() => setAlertFilter(null)}
-                  className="px-2 py-1 rounded text-xs transition-colors"
-                  style={{
-                    background: 'var(--color-bg-tertiary)',
-                    color: 'var(--color-text-secondary)',
-                  }}
+                  className="rounded bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   清除筛选
                 </button>
               )}
               {alertSummary && alertSummary.total > 0 && (
                 <span
-                  className="px-2 py-1 rounded"
+                  className="rounded px-2 py-1"
                   style={{
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    color: '#F87171',
+                    background: toneStyles.error.bg,
+                    color: toneStyles.error.text,
                   }}
                 >
                   {alertSummary.total} 个活跃告警
@@ -311,121 +429,70 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          {/* 告警统计 - 可点击筛选 */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <button
+          <div className="mb-4 grid grid-cols-3 gap-4">
+            <StatFilterCard
+              count={alertSummary?.critical ?? 0}
+              label="严重"
+              tone="error"
+              active={alertFilter === 'critical'}
               onClick={() => setAlertFilter(alertFilter === 'critical' ? null : 'critical')}
-              className={clsx(
-                'text-center p-3 rounded-lg border transition-all duration-150',
-                alertFilter === 'critical'
-                  ? 'bg-red-500/20 border-red-500/40 ring-2 ring-red-500/30'
-                  : 'bg-red-500/10 border-red-500/20'
-              )}
-            >
-              <p className="text-2xl font-semibold text-red-400">{alertSummary?.critical ?? 0}</p>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>严重</p>
-            </button>
-            <button
+            />
+            <StatFilterCard
+              count={alertSummary?.warning ?? 0}
+              label="警告"
+              tone="warning"
+              active={alertFilter === 'warning'}
               onClick={() => setAlertFilter(alertFilter === 'warning' ? null : 'warning')}
-              className={clsx(
-                'text-center p-3 rounded-lg border transition-all duration-150',
-                alertFilter === 'warning'
-                  ? 'bg-amber-500/20 border-amber-500/40 ring-2 ring-amber-500/30'
-                  : 'bg-amber-500/10 border-amber-500/20'
-              )}
-            >
-              <p className="text-2xl font-semibold text-amber-400">{alertSummary?.warning ?? 0}</p>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>警告</p>
-            </button>
-            <button
+            />
+            <StatFilterCard
+              count={alertSummary?.info ?? 0}
+              label="信息"
+              tone="info"
+              active={alertFilter === 'info'}
               onClick={() => setAlertFilter(alertFilter === 'info' ? null : 'info')}
-              className={clsx(
-                'text-center p-3 rounded-lg border transition-all duration-150',
-                alertFilter === 'info'
-                  ? 'bg-blue-500/20 border-blue-500/40 ring-2 ring-blue-500/30'
-                  : 'bg-blue-500/10 border-blue-500/20'
-              )}
-            >
-              <p className="text-2xl font-semibold text-blue-400">{alertSummary?.info ?? 0}</p>
-              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>信息</p>
-            </button>
+            />
           </div>
-          {/* 告警列表 */}
           <AlertsList limit={4} showTitle={false} severityFilter={alertFilter} />
         </div>
 
-        {/* 事件统计和最近事件 */}
-        <div
-          className="p-6 rounded-xl"
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-              <ExclamationTriangleIcon className="w-5 h-5" style={{ color: 'var(--color-text-muted)' }} />
+        <div className="card rounded-xl p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-lg font-medium text-[var(--color-text-primary)]">
+              <ExclamationTriangleIcon className="h-5 w-5 text-[var(--color-text-muted)]" />
               事件概览
             </h3>
             {eventFilter && (
               <button
                 onClick={() => setEventFilter(null)}
-                className="px-2 py-1 rounded text-xs transition-colors"
-                style={{
-                  background: 'var(--color-bg-tertiary)',
-                  color: 'var(--color-text-secondary)',
-                }}
+                className="rounded bg-[var(--color-bg-tertiary)] px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 清除筛选
               </button>
             )}
           </div>
-          {/* 事件统计 - 可点击筛选 */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <button
+          <div className="mb-4 grid grid-cols-2 gap-4">
+            <EventFilterCard
+              count={overview?.events.normal ?? 0}
+              label="正常事件"
+              icon={CheckCircleIcon}
+              tone="success"
+              active={eventFilter === 'Normal'}
               onClick={() => setEventFilter(eventFilter === 'Normal' ? null : 'Normal')}
-              className={clsx(
-                'flex items-center gap-3 p-4 rounded-lg border transition-all duration-150 text-left',
-                eventFilter === 'Normal'
-                  ? 'bg-emerald-500/20 border-emerald-500/40 ring-2 ring-emerald-500/30'
-                  : 'bg-emerald-500/10 border-emerald-500/20'
-              )}
-            >
-              <CheckCircleIcon className="w-8 h-8 text-emerald-500" />
-              <div>
-                <p className="text-2xl font-semibold text-emerald-400">
-                  {formatNumber(overview?.events.normal ?? 0, 0)}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>正常事件</p>
-              </div>
-            </button>
-            <button
+            />
+            <EventFilterCard
+              count={overview?.events.warning ?? 0}
+              label="警告事件"
+              icon={ExclamationTriangleIcon}
+              tone="warning"
+              active={eventFilter === 'Warning'}
               onClick={() => setEventFilter(eventFilter === 'Warning' ? null : 'Warning')}
-              className={clsx(
-                'flex items-center gap-3 p-4 rounded-lg border transition-all duration-150 text-left',
-                eventFilter === 'Warning'
-                  ? 'bg-amber-500/20 border-amber-500/40 ring-2 ring-amber-500/30'
-                  : 'bg-amber-500/10 border-amber-500/20'
-              )}
-            >
-              <ExclamationTriangleIcon className="w-8 h-8 text-amber-500" />
-              <div>
-                <p className="text-2xl font-semibold text-amber-400">
-                  {formatNumber(overview?.events.warning ?? 0, 0)}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>警告事件</p>
-              </div>
-            </button>
+            />
           </div>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-medium text-[var(--color-text-secondary)]">
               {eventFilter ? `${eventFilter === 'Normal' ? '正常' : '警告'}事件` : '最近事件'}
             </h4>
-            <Link
-              to="/events"
-              className="text-sm transition-colors"
-              style={{ color: 'var(--color-primary)' }}
-            >
+            <Link to="/events" className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
               查看全部 →
             </Link>
           </div>
@@ -434,30 +501,25 @@ export default function Dashboard() {
       </div>
 
       {/* 快捷导航 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-medium mb-4 flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-          <FolderIcon className="w-5 h-5" style={{ color: 'var(--color-text-muted)' }} />
+      <div className="card rounded-xl p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-medium text-[var(--color-text-primary)]">
+          <FolderIcon className="h-5 w-5 text-[var(--color-text-muted)]" />
           快捷导航
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6">
           {quickLinks.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className="flex flex-col items-center gap-2 p-4 rounded-lg border transition-all duration-150"
-              style={{
-                background: 'var(--color-bg-tertiary)',
-                borderColor: 'var(--color-border)',
-              }}
+              className={clsx(
+                'group flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] p-4 transition-all duration-150',
+                'hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+              )}
             >
-              <item.icon className="w-8 h-8" style={{ color: item.color }} />
-              <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{item.name}</span>
+              <item.icon className="h-8 w-8" style={{ color: item.iconColor }} />
+              <span className="text-sm text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]">
+                {item.name}
+              </span>
             </Link>
           ))}
         </div>

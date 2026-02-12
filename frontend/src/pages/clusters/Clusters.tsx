@@ -112,10 +112,10 @@ export default function Clusters() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
           集群管理
         </h1>
-        <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+        <p className="mt-1 text-[var(--color-text-secondary)]">
           管理多集群连接、连通性检测和请求级切换
         </p>
       </div>
@@ -135,16 +135,16 @@ export default function Clusters() {
 
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-lg font-medium text-[var(--color-text-primary)]">
             集群列表
           </h2>
-          <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="text-sm text-[var(--color-text-muted)]">
             当前集群：{currentCluster || defaultCluster}
           </span>
         </div>
 
         {isLoading ? (
-          <div className="py-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
+          <div className="py-8 text-center text-[var(--color-text-muted)]">
             正在加载集群列表...
           </div>
         ) : (
@@ -166,11 +166,11 @@ export default function Clusters() {
                   <tr key={cluster.name}>
                     <td>
                       <div className="flex items-center gap-2">
-                        <span style={{ color: 'var(--color-text-primary)' }}>{cluster.name}</span>
+                        <span className="text-[var(--color-text-primary)]">{cluster.name}</span>
                         {cluster.isDefault && <span className="badge badge-info">default</span>}
                       </div>
                       {cluster.lastError && (
-                        <div className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>
+                        <div className="text-xs mt-1 text-[var(--color-error)]">
                           {cluster.lastError}
                         </div>
                       )}
@@ -181,7 +181,7 @@ export default function Clusters() {
                           className="inline-block w-2 h-2 rounded-full"
                           style={{ background: statusColor(cluster.status) }}
                         />
-                        <span style={{ color: 'var(--color-text-secondary)' }}>{cluster.status}</span>
+                        <span className="text-[var(--color-text-secondary)]">{cluster.status}</span>
                       </div>
                     </td>
                     <td>{cluster.source}</td>
@@ -217,7 +217,7 @@ export default function Clusters() {
                 ))}
                 {clusters.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-10" style={{ color: 'var(--color-text-muted)' }}>
+                    <td colSpan={7} className="text-center py-10 text-[var(--color-text-muted)]">
                       暂无集群记录
                     </td>
                   </tr>
@@ -229,12 +229,12 @@ export default function Clusters() {
       </div>
 
       <div className="card p-5">
-        <h2 className="text-lg font-medium mb-4" style={{ color: 'var(--color-text-primary)' }}>
+        <h2 className="text-lg font-medium mb-4 text-[var(--color-text-primary)]">
           添加集群（kubeconfig）
         </h2>
         <form className="space-y-4" onSubmit={submitAddCluster}>
           <div>
-            <label className="block text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-1 text-[var(--color-text-secondary)]">
               集群名称
             </label>
             <input
@@ -245,7 +245,7 @@ export default function Clusters() {
             />
           </div>
           <div>
-            <label className="block text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-1 text-[var(--color-text-secondary)]">
               kubeconfig
             </label>
             <textarea

@@ -137,29 +137,22 @@ export default function Sidebar() {
   return (
     <aside
       className={clsx(
-        'fixed left-0 top-0 h-screen transition-all duration-200 z-40 flex flex-col',
+        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] transition-all duration-200',
         sidebarCollapsed ? 'w-16' : 'w-64'
       )}
-      style={{
-        background: 'var(--color-bg-secondary)',
-        borderRight: '1px solid var(--color-border)',
-      }}
     >
       {/* Logo */}
-      <div
-        className="h-16 flex items-center justify-center px-4"
-        style={{ borderBottom: '1px solid var(--color-border)' }}
-      >
+      <div className="flex h-16 items-center justify-center border-b border-[var(--color-border)] px-4">
         {sidebarCollapsed ? (
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <span className="text-white font-bold">K</span>
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <span className="text-white font-bold">K</span>
             </div>
-            <span className="text-white font-semibold text-lg">K8s Dashboard</span>
+            <span className="text-lg font-semibold text-[var(--color-text-primary)]">K8s Dashboard</span>
           </div>
         )}
       </div>
@@ -233,11 +226,8 @@ export default function Sidebar() {
       <button
         type="button"
         onClick={toggleSidebar}
-        className="h-12 flex items-center justify-center transition-colors duration-150 hover:bg-primary-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="flex min-h-[48px] items-center justify-center border-t border-[var(--color-border)] transition-colors duration-150 hover:bg-primary-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-        style={{
-          borderTop: '1px solid var(--color-border)',
-        }}
       >
         {sidebarCollapsed ? (
           <ChevronRightIcon className="w-5 h-5 text-[var(--color-text-secondary)]" />

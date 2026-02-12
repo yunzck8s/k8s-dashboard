@@ -36,11 +36,11 @@ function StatCard({ title, value, icon: Icon, color, bgColor, borderColor, isLoa
 
       <div className="relative flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-400 mb-1">{title}</p>
+          <p className="text-sm font-medium text-text-muted mb-1">{title}</p>
           {isLoading ? (
-            <div className="h-9 w-16 bg-slate-700 animate-pulse rounded" />
+            <div className="h-9 w-16 bg-surface-tertiary animate-pulse rounded" />
           ) : (
-            <p className={clsx('text-3xl font-bold', value > 0 ? color : 'text-slate-300')}>
+            <p className={clsx('text-3xl font-bold', value > 0 ? color : 'text-text-secondary')}>
               {value}
             </p>
           )}
@@ -48,10 +48,10 @@ function StatCard({ title, value, icon: Icon, color, bgColor, borderColor, isLoa
         <div
           className={clsx(
             'p-3 rounded-xl',
-            value > 0 ? bgColor : 'bg-slate-700/50'
+            value > 0 ? bgColor : 'bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)]'
           )}
         >
-          <Icon className={clsx('w-6 h-6', value > 0 ? color : 'text-slate-500')} />
+          <Icon className={clsx('w-6 h-6', value > 0 ? color : 'text-text-muted')} />
         </div>
       </div>
 

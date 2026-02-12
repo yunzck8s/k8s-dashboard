@@ -115,20 +115,20 @@ export default function IngressDetail() {
                 </span>
               )}
             </div>
-            <p className="text-slate-400 mt-1">命名空间: {namespace}</p>
+            <p className="text-text-muted mt-1">命名空间: {namespace}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowYamlEditor(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-secondary border border-border rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-surface-tertiary transition-colors"
           >
             <PencilIcon className="w-4 h-4" />
             编辑 YAML
           </button>
           <button
             onClick={() => refetch()}
-            className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="p-2 bg-surface-secondary border border-border rounded-lg text-text-secondary hover:text-white hover:bg-surface-tertiary transition-colors"
           >
             <ArrowPathIcon className="w-5 h-5" />
           </button>
@@ -143,7 +143,7 @@ export default function IngressDetail() {
       </div>
 
       {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
+      <div className="border-b border-border">
         <nav className="flex gap-4">
           {tabs.map((tab) => (
             <button
@@ -153,7 +153,7 @@ export default function IngressDetail() {
                 'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
                   ? 'border-green-500 text-green-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  : 'border-transparent text-text-muted hover:text-text-secondary'
               )}
             >
               {tab.label}
@@ -191,7 +191,7 @@ export default function IngressDetail() {
               <h3 className="text-lg font-semibold text-white">确认删除 Ingress</h3>
             </div>
             <div className="space-y-4 mb-6">
-              <p className="text-slate-300">
+              <p className="text-text-secondary">
                 您即将删除 Ingress <span className="font-semibold text-white">{name}</span>。
               </p>
               <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/5 rounded-lg p-3 border border-red-500/20">
@@ -250,7 +250,7 @@ function OverviewTab({ ingress }: { ingress: Ingress }) {
               {key}: {value}
             </span>
           ))}
-          {!ingress.metadata.labels && <span className="text-slate-500">无标签</span>}
+          {!ingress.metadata.labels && <span className="text-text-muted">无标签</span>}
         </div>
       </div>
 
@@ -260,7 +260,7 @@ function OverviewTab({ ingress }: { ingress: Ingress }) {
         </h3>
         <div className="space-y-4">
           {ingress.spec.rules?.map((rule, idx) => (
-            <div key={idx} className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+            <div key={idx} className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-sm font-medium text-white">Host:</span>
@@ -277,18 +277,18 @@ function OverviewTab({ ingress }: { ingress: Ingress }) {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="text-left pb-2 text-slate-400">路径</th>
-                      <th className="text-left pb-2 text-slate-400">路径类型</th>
-                      <th className="text-left pb-2 text-slate-400">Service</th>
-                      <th className="text-left pb-2 text-slate-400">Port</th>
+                    <tr className="border-b border-border">
+                      <th className="text-left pb-2 text-text-muted">路径</th>
+                      <th className="text-left pb-2 text-text-muted">路径类型</th>
+                      <th className="text-left pb-2 text-text-muted">Service</th>
+                      <th className="text-left pb-2 text-text-muted">Port</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rule.http?.paths?.map((path, pathIdx) => (
-                      <tr key={pathIdx} className="border-b border-slate-800">
+                      <tr key={pathIdx} className="border-b border-border">
                         <td className="py-2 text-white font-mono">{path.path || '/'}</td>
-                        <td className="py-2 text-slate-400">{path.pathType}</td>
+                        <td className="py-2 text-text-muted">{path.pathType}</td>
                         <td className="py-2 text-white">{path.backend.service?.name}</td>
                         <td className="py-2 text-white font-mono">
                           {path.backend.service?.port?.number || path.backend.service?.port?.name}
@@ -300,7 +300,7 @@ function OverviewTab({ ingress }: { ingress: Ingress }) {
               </div>
             </div>
           ))}
-          {!ingress.spec.rules && <span className="text-slate-500">无路由规则</span>}
+          {!ingress.spec.rules && <span className="text-text-muted">无路由规则</span>}
         </div>
       </div>
 
@@ -309,7 +309,7 @@ function OverviewTab({ ingress }: { ingress: Ingress }) {
           <h3 className="text-lg font-semibold text-white mb-4">TLS 配置</h3>
           <div className="space-y-3">
             {ingress.spec.tls.map((tls, idx) => (
-              <div key={idx} className="bg-slate-800/50 rounded-lg p-4">
+              <div key={idx} className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-white">Secret: {tls.secretName}</span>
                   <span className="badge badge-success text-xs">HTTPS</span>
@@ -339,8 +339,8 @@ function YamlTab({ yaml }: { yaml: string }) {
           复制 YAML
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-y-auto">
-        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
+      <div className="card p-4 bg-surface-tertiary max-h-[600px] overflow-y-auto">
+        <pre className="text-sm text-text-secondary font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );
@@ -349,7 +349,7 @@ function YamlTab({ yaml }: { yaml: string }) {
 function EventsTab() {
   return (
     <div className="card p-6 text-center">
-      <p className="text-slate-400">暂无事件</p>
+      <p className="text-text-muted">暂无事件</p>
     </div>
   );
 }
@@ -357,8 +357,8 @@ function EventsTab() {
 function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={clsx('text-slate-200', mono && 'font-mono text-sm')}>{value}</dd>
+      <dt className="text-text-muted">{label}</dt>
+      <dd className={clsx('text-text-secondary', mono && 'font-mono text-sm')}>{value}</dd>
     </div>
   );
 }

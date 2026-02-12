@@ -19,19 +19,19 @@ export default function ComparisonBadge({ label, value, trend }: ComparisonBadge
     }
   };
 
-  const getTrendColor = () => {
+  const getTrendClass = () => {
     switch (trend) {
       case 'up':
-        return 'text-red-400 bg-red-500/10 border-red-500/20';
+        return 'text-[var(--color-error)] bg-[var(--sys-error-soft-bg)] border-[var(--sys-error-soft-border)]';
       case 'down':
-        return 'text-green-400 bg-green-500/10 border-green-500/20';
+        return 'text-[var(--color-success)] bg-[var(--sys-success-soft-bg)] border-[var(--sys-success-soft-border)]';
       default:
-        return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+        return 'text-[var(--color-text-muted)] bg-[var(--color-bg-tertiary)] border-[var(--color-border)]';
     }
   };
 
   return (
-    <div className={clsx('flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm', getTrendColor())}>
+    <div className={clsx('flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-sm', getTrendClass())}>
       {getTrendIcon()}
       <span className="font-medium">
         {label}: {value >= 0 ? '+' : ''}{value.toFixed(1)}%

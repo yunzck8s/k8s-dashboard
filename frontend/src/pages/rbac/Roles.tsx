@@ -22,10 +22,10 @@ export default function Roles() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Roles</h1>
-          <p className="text-slate-400 mt-1">请选择一个命名空间来查看 Roles</p>
+          <p className="text-text-muted mt-1">请选择一个命名空间来查看 Roles</p>
         </div>
         <div className="card p-12 text-center">
-          <p className="text-slate-500">Roles 是命名空间级别的资源，请从侧边栏选择一个具体的命名空间</p>
+          <p className="text-text-muted">Roles 是命名空间级别的资源，请从侧边栏选择一个具体的命名空间</p>
         </div>
       </div>
     );
@@ -72,7 +72,7 @@ export default function Roles() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Roles</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {roles.length} 个 Role 在 {currentNamespace} 命名空间
           </p>
         </div>
@@ -99,11 +99,11 @@ export default function Roles() {
                   <td className="text-blue-400 font-medium">
                     {role.metadata.name}
                   </td>
-                  <td className="text-slate-400">{getRulesCount(role)} 条</td>
-                  <td className="text-slate-400 max-w-xs truncate">
+                  <td className="text-text-muted">{getRulesCount(role)} 条</td>
+                  <td className="text-text-muted max-w-xs truncate">
                     {getRulesSummary(role)}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {formatDistanceToNow(new Date(role.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -115,7 +115,7 @@ export default function Roles() {
           </table>
         </div>
         {roles.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 Role</div>
+          <div className="text-center py-12 text-text-muted">没有找到 Role</div>
         )}
       </div>
     </div>

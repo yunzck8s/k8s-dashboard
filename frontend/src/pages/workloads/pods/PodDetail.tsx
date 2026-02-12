@@ -142,12 +142,12 @@ export default function PodDetail() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>{name}</h1>
+              <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">{name}</h1>
               <span className={clsx('badge', getPodStatusColor(pod))}>
                 {pod.status.phase}
               </span>
             </div>
-            <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="mt-1 text-[var(--color-text-secondary)]">
               命名空间: {namespace} | 节点: {pod.spec.nodeName || 'Pending'}
             </p>
           </div>
@@ -220,7 +220,7 @@ export default function PodDetail() {
           >
             <div className="p-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
               <div className="flex items-center gap-4">
-                <label className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>选择容器:</label>
+                <label className="text-sm text-[var(--color-text-secondary)]">选择容器:</label>
                 <select
                   value={effectiveSelectedContainer}
                   onChange={(e) => setSelectedContainer(e.target.value)}
@@ -278,7 +278,7 @@ function OverviewTab({ pod }: { pod: Pod }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>基本信息</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">基本信息</h3>
         <dl className="space-y-3">
           <InfoRow label="名称" value={pod.metadata.name} />
           <InfoRow label="命名空间" value={pod.metadata.namespace || '-'} />
@@ -308,7 +308,7 @@ function OverviewTab({ pod }: { pod: Pod }) {
             border: '1px solid var(--color-border)',
           }}
         >
-          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>标签</h3>
+          <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">标签</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(pod.metadata.labels || {}).map(([key, value]) => (
               <span key={key} className="badge badge-default text-xs">
@@ -316,7 +316,7 @@ function OverviewTab({ pod }: { pod: Pod }) {
               </span>
             ))}
             {!pod.metadata.labels && (
-              <span style={{ color: 'var(--color-text-muted)' }}>无标签</span>
+              <span className="text-[var(--color-text-muted)]">无标签</span>
             )}
           </div>
         </div>
@@ -328,16 +328,16 @@ function OverviewTab({ pod }: { pod: Pod }) {
             border: '1px solid var(--color-border)',
           }}
         >
-          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>注解</h3>
+          <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">注解</h3>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {Object.entries(pod.metadata.annotations || {}).map(([key, value]) => (
               <div key={key} className="text-sm">
-                <span style={{ color: 'var(--color-text-muted)' }}>{key}:</span>
-                <span className="ml-2 break-all" style={{ color: 'var(--color-text-secondary)' }}>{value}</span>
+                <span className="text-[var(--color-text-muted)]">{key}:</span>
+                <span className="ml-2 break-all text-[var(--color-text-secondary)]">{value}</span>
               </div>
             ))}
             {!pod.metadata.annotations && (
-              <span style={{ color: 'var(--color-text-muted)' }}>无注解</span>
+              <span className="text-[var(--color-text-muted)]">无注解</span>
             )}
           </div>
         </div>
@@ -351,11 +351,11 @@ function OverviewTab({ pod }: { pod: Pod }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>条件状态</h3>
+        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">条件状态</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              <tr className="text-left text-sm text-[var(--color-text-muted)]">
                 <th className="pb-3">类型</th>
                 <th className="pb-3">状态</th>
                 <th className="pb-3">原因</th>
@@ -365,7 +365,7 @@ function OverviewTab({ pod }: { pod: Pod }) {
             <tbody className="text-sm">
               {pod.status.conditions?.map((condition) => (
                 <tr key={condition.type} style={{ borderTop: '1px solid var(--color-border)' }}>
-                  <td className="py-3" style={{ color: 'var(--color-text-secondary)' }}>{condition.type}</td>
+                  <td className="py-3 text-[var(--color-text-secondary)]">{condition.type}</td>
                   <td className="py-3">
                     <span
                       className={clsx(
@@ -376,8 +376,8 @@ function OverviewTab({ pod }: { pod: Pod }) {
                       {condition.status}
                     </span>
                   </td>
-                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>{condition.reason || '-'}</td>
-                  <td className="py-3" style={{ color: 'var(--color-text-muted)' }}>
+                  <td className="py-3 text-[var(--color-text-muted)]">{condition.reason || '-'}</td>
+                  <td className="py-3 text-[var(--color-text-muted)]">
                     {condition.lastTransitionTime
                       ? formatDistanceToNow(new Date(condition.lastTransitionTime), {
                           addSuffix: true,
@@ -414,7 +414,7 @@ function ContainersTab({ pod }: { pod: Pod }) {
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>{container.name}</h3>
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{container.name}</h3>
                 {status && (
                   <span
                     className={clsx(
@@ -427,7 +427,7 @@ function ContainersTab({ pod }: { pod: Pod }) {
                 )}
               </div>
               {status && (
-                <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-sm text-[var(--color-text-muted)]">
                   重启次数: {status.restartCount}
                 </span>
               )}
@@ -440,7 +440,7 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 端口 */}
               {container.ports && container.ports.length > 0 && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm text-slate-400">端口</dt>
+                  <dt className="text-sm text-text-muted">端口</dt>
                   <dd className="mt-1 flex flex-wrap gap-2">
                     {container.ports.map((port, idx) => (
                       <span key={idx} className="badge badge-default">
@@ -454,18 +454,18 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 资源限制 */}
               {container.resources && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>资源</dt>
+                  <dt className="text-sm mb-2 text-[var(--color-text-muted)]">资源</dt>
                   <dd className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span style={{ color: 'var(--color-text-muted)' }}>请求:</span>
-                      <span className="ml-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      <span className="text-[var(--color-text-muted)]">请求:</span>
+                      <span className="ml-2 text-[var(--color-text-secondary)]">
                         CPU: {container.resources.requests?.cpu || '-'},
                         内存: {container.resources.requests?.memory || '-'}
                       </span>
                     </div>
                     <div>
-                      <span style={{ color: 'var(--color-text-muted)' }}>限制:</span>
-                      <span className="ml-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      <span className="text-[var(--color-text-muted)]">限制:</span>
+                      <span className="ml-2 text-[var(--color-text-secondary)]">
                         CPU: {container.resources.limits?.cpu || '-'},
                         内存: {container.resources.limits?.memory || '-'}
                       </span>
@@ -477,16 +477,16 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 环境变量 */}
               {container.env && container.env.length > 0 && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>环境变量</dt>
+                  <dt className="text-sm mb-2 text-[var(--color-text-muted)]">环境变量</dt>
                   <dd
                     className="rounded p-3 max-h-40 overflow-y-auto"
                     style={{ background: 'var(--color-bg-tertiary)' }}
                   >
                     {container.env.map((env, idx) => (
                       <div key={idx} className="text-sm font-mono">
-                        <span style={{ color: 'var(--color-primary)' }}>{env.name}</span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>=</span>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>
+                        <span className="text-[var(--color-primary)]">{env.name}</span>
+                        <span className="text-[var(--color-text-muted)]">=</span>
+                        <span className="text-[var(--color-text-secondary)]">
                           {env.value || (env.valueFrom ? '[from secret/configmap]' : '')}
                         </span>
                       </div>
@@ -498,12 +498,12 @@ function ContainersTab({ pod }: { pod: Pod }) {
               {/* 挂载卷 */}
               {container.volumeMounts && container.volumeMounts.length > 0 && (
                 <div className="md:col-span-2">
-                  <dt className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>挂载卷</dt>
+                  <dt className="text-sm mb-2 text-[var(--color-text-muted)]">挂载卷</dt>
                   <dd className="space-y-1">
                     {container.volumeMounts.map((mount, idx) => (
                       <div key={idx} className="text-sm">
-                        <span className="font-mono" style={{ color: 'var(--color-text-secondary)' }}>{mount.mountPath}</span>
-                        <span className="ml-2" style={{ color: 'var(--color-text-muted)' }}>← {mount.name}</span>
+                        <span className="font-mono text-[var(--color-text-secondary)]">{mount.mountPath}</span>
+                        <span className="ml-2 text-[var(--color-text-muted)]">← {mount.name}</span>
                         {mount.readOnly && <span className="badge badge-default ml-2">只读</span>}
                       </div>
                     ))}
@@ -540,7 +540,7 @@ function LogsTab({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <label style={{ color: 'var(--color-text-muted)' }}>容器:</label>
+          <label className="text-[var(--color-text-muted)]">容器:</label>
           <select
             value={selectedContainer}
             onChange={(e) => onContainerChange(e.target.value)}
@@ -572,7 +572,7 @@ function LogsTab({
           border: '1px solid var(--color-border)',
         }}
       >
-        <pre className="text-sm font-mono whitespace-pre-wrap" style={{ color: 'var(--color-text-secondary)' }}>
+        <pre className="text-sm font-mono whitespace-pre-wrap text-[var(--color-text-secondary)]">
           {logs || '暂无日志'}
         </pre>
       </div>
@@ -601,7 +601,7 @@ function YamlTab({ yaml }: { yaml: string }) {
           border: '1px solid var(--color-border)',
         }}
       >
-        <pre className="text-sm font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+        <pre className="text-sm font-mono text-[var(--color-text-secondary)]">
           {yaml || '加载中...'}
         </pre>
       </div>
@@ -643,10 +643,10 @@ function EventsTab({ events }: { events: Event[] }) {
                     {event.type}
                   </span>
                 </td>
-                <td style={{ color: 'var(--color-text-secondary)' }}>{event.reason}</td>
-                <td className="max-w-md truncate" style={{ color: 'var(--color-text-muted)' }}>{event.message}</td>
-                <td style={{ color: 'var(--color-text-muted)' }}>{event.count || 1}</td>
-                <td style={{ color: 'var(--color-text-muted)' }}>
+                <td className="text-[var(--color-text-secondary)]">{event.reason}</td>
+                <td className="max-w-md truncate text-[var(--color-text-muted)]">{event.message}</td>
+                <td className="text-[var(--color-text-muted)]">{event.count || 1}</td>
+                <td className="text-[var(--color-text-muted)]">
                   {event.lastTimestamp
                     ? formatDistanceToNow(new Date(event.lastTimestamp), {
                         addSuffix: true,
@@ -660,7 +660,7 @@ function EventsTab({ events }: { events: Event[] }) {
         </table>
       </div>
       {events.length === 0 && (
-        <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>暂无事件</div>
+        <div className="text-center py-12 text-[var(--color-text-muted)]">暂无事件</div>
       )}
     </div>
   );
@@ -678,7 +678,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <dt style={{ color: 'var(--color-text-muted)' }}>{label}</dt>
+      <dt className="text-[var(--color-text-muted)]">{label}</dt>
       <dd className={clsx(mono && 'font-mono text-sm')} style={{ color: 'var(--color-text-secondary)' }}>{value}</dd>
     </div>
   );

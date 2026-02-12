@@ -56,7 +56,21 @@ export default function ActionDropdown({
   return (
     <div className="relative" ref={dropdownRef}>
       {trigger ? (
-        <div onClick={() => setIsOpen(!isOpen)}>
+        <div
+          role="button"
+          tabIndex={0}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+          aria-label={label}
+          className="inline-flex min-h-[44px] cursor-pointer items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          onClick={() => setIsOpen(!isOpen)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setIsOpen((prev) => !prev);
+            }
+          }}
+        >
           {trigger}
         </div>
       ) : (
@@ -64,15 +78,12 @@ export default function ActionDropdown({
           onClick={() => setIsOpen(!isOpen)}
           disabled={disabled}
           className={clsx(
-            'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-150',
+            'flex min-h-[44px] items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-4 py-2 font-medium text-[var(--color-text-primary)] transition-all duration-150 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)]',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             buttonClassName
           )}
-          style={{
-            background: 'var(--color-bg-tertiary)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
         >
           {label}
           <ChevronDownIcon className={clsx('w-4 h-4 transition-transform', isOpen && 'rotate-180')} />
@@ -103,19 +114,11 @@ export default function ActionDropdown({
                     disabled={item.disabled}
                     className={clsx(
                       'w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors duration-150',
-                      item.disabled && 'opacity-50 cursor-not-allowed'
+                      item.disabled && 'opacity-50 cursor-not-allowed',
+                      item.danger
+                        ? 'text-[var(--color-error)] hover:bg-[var(--sys-error-soft-bg)]'
+                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'
                     )}
-                    style={{
-                      color: item.danger ? '#F87171' : 'var(--color-text-secondary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = item.danger
-                        ? 'rgba(248, 113, 113, 0.1)'
-                        : 'var(--color-bg-tertiary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
                   >
                     {item.icon && <span className="w-5 h-5 flex-shrink-0">{item.icon}</span>}
                     {item.label}

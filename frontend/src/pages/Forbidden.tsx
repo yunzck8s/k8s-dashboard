@@ -10,10 +10,10 @@ export default function Forbidden() {
           border: '1px solid var(--color-border)',
         }}
       >
-        <h1 className="text-3xl font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>
+        <h1 className="text-3xl font-semibold mb-3 text-[var(--color-text-primary)]">
           403
         </h1>
-        <p className="mb-6" style={{ color: 'var(--color-text-secondary)' }}>
+        <p className="mb-6 text-[var(--color-text-secondary)]">
           你没有权限访问该页面。
         </p>
         <Link className="btn btn-primary" to="/dashboard">

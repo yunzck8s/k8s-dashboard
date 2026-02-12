@@ -77,10 +77,10 @@ export default function Login() {
               />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
+          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
             K8s Dashboard
           </h1>
-          <p className="mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="mt-2 text-[var(--color-text-secondary)]">
             Kubernetes 集群管理平台
           </p>
         </div>
@@ -212,16 +212,16 @@ export default function Login() {
 
           {/* 提示信息 */}
           <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--color-border)' }}>
-            <p className="text-sm text-center" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-sm text-center text-[var(--color-text-muted)]">
               默认管理员账号:{' '}
-              <span style={{ color: 'var(--color-text-secondary)' }}>admin</span> /{' '}
-              <span style={{ color: 'var(--color-text-secondary)' }}>admin123</span>
+              <span className="text-[var(--color-text-secondary)]">admin</span> /{' '}
+              <span className="text-[var(--color-text-secondary)]">admin123</span>
             </p>
           </div>
         </div>
 
         {/* 版权信息 */}
-        <p className="text-center text-sm mt-8" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-center text-sm mt-8 text-[var(--color-text-muted)]">
           © 2024 K8s Dashboard. All rights reserved.
         </p>
       </div>

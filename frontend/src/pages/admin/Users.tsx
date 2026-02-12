@@ -128,14 +128,14 @@ function UserFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-slate-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      <div className="bg-surface-secondary rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-white">
             {user ? '编辑用户' : '创建用户'}
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white"
+            className="p-1 text-text-muted hover:text-white"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -150,7 +150,7 @@ function UserFormModal({
 
           {/* 用户名 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1">
               用户名 {!user && <span className="text-red-400">*</span>}
             </label>
             <input
@@ -158,7 +158,7 @@ function UserFormModal({
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               disabled={!!user}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white disabled:opacity-50"
+              className="w-full bg-surface-tertiary border border-border-hover rounded-lg px-3 py-2 text-white disabled:opacity-50"
               placeholder="请输入用户名"
             />
           </div>
@@ -166,14 +166,14 @@ function UserFormModal({
           {/* 密码（仅创建时） */}
           {!user && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
+              <label className="block text-sm font-medium text-text-secondary mb-1">
                 密码 <span className="text-red-400">*</span>
               </label>
               <input
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
+                className="w-full bg-surface-tertiary border border-border-hover rounded-lg px-3 py-2 text-white"
                 placeholder="至少6位"
               />
             </div>
@@ -181,35 +181,35 @@ function UserFormModal({
 
           {/* 显示名 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1">
               显示名称
             </label>
             <input
               type="text"
               value={formData.displayName}
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
+              className="w-full bg-surface-tertiary border border-border-hover rounded-lg px-3 py-2 text-white"
               placeholder="用户显示名称"
             />
           </div>
 
           {/* 邮箱 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">
+            <label className="block text-sm font-medium text-text-secondary mb-1">
               邮箱
             </label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
+              className="w-full bg-surface-tertiary border border-border-hover rounded-lg px-3 py-2 text-white"
               placeholder="user@example.com"
             />
           </div>
 
           {/* 角色 */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               角色
             </label>
             <div className="space-y-2">
@@ -220,7 +220,7 @@ function UserFormModal({
                     'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
                     formData.role === role.value
                       ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-slate-600 hover:border-slate-500'
+                      : 'border-border-hover hover:border-border-hover'
                   )}
                 >
                   <input
@@ -233,7 +233,7 @@ function UserFormModal({
                   />
                   <div>
                     <div className="text-white font-medium">{role.label}</div>
-                    <div className="text-slate-400 text-sm">{role.description}</div>
+                    <div className="text-text-muted text-sm">{role.description}</div>
                   </div>
                 </label>
               ))}
@@ -243,33 +243,33 @@ function UserFormModal({
           {/* 命名空间权限 */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-slate-300">
+              <label className="block text-sm font-medium text-text-secondary">
                 命名空间权限
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-300">
+              <label className="flex items-center gap-2 text-sm text-text-secondary">
                 <input
                   type="checkbox"
                   checked={formData.allNamespaces}
                   onChange={(e) => setFormData({ ...formData, allNamespaces: e.target.checked })}
-                  className="rounded border-slate-600"
+                  className="rounded border-border-hover"
                 />
                 所有命名空间
               </label>
             </div>
             {!formData.allNamespaces && (
-              <div className="max-h-40 overflow-y-auto bg-slate-700 rounded-lg p-2">
+              <div className="max-h-40 overflow-y-auto bg-surface-tertiary rounded-lg p-2">
                 {nsData?.items?.map((ns) => (
                   <label
                     key={ns.metadata.name}
-                    className="flex items-center gap-2 p-2 hover:bg-slate-600 rounded cursor-pointer"
+                    className="flex items-center gap-2 p-2 hover:bg-surface-tertiary rounded cursor-pointer"
                   >
                     <input
                       type="checkbox"
                       checked={selectedNamespaces.includes(ns.metadata.name)}
                       onChange={() => toggleNamespace(ns.metadata.name)}
-                      className="rounded border-slate-500"
+                      className="rounded border-border-hover"
                     />
-                    <span className="text-slate-200">{ns.metadata.name}</span>
+                    <span className="text-text-secondary">{ns.metadata.name}</span>
                   </label>
                 ))}
               </div>
@@ -283,18 +283,18 @@ function UserFormModal({
                 type="checkbox"
                 checked={formData.enabled}
                 onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                className="rounded border-slate-600"
+                className="rounded border-border-hover"
               />
-              <span className="text-slate-300">启用用户</span>
+              <span className="text-text-secondary">启用用户</span>
             </label>
           )}
 
           {/* 操作按钮 */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-300 hover:text-white"
+              className="px-4 py-2 text-text-secondary hover:text-white"
             >
               取消
             </button>
@@ -348,15 +348,15 @@ function ResetPasswordModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-slate-800 rounded-xl shadow-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      <div className="bg-surface-secondary rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold text-white">重置密码</h2>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white">
+          <button onClick={onClose} className="p-1 text-text-muted hover:text-white">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          <p className="text-slate-300 text-sm">
+          <p className="text-text-secondary text-sm">
             重置用户 <span className="text-white font-medium">{user.username}</span> 的密码
           </p>
           <input
@@ -364,10 +364,10 @@ function ResetPasswordModal({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="新密码（至少6位）"
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white"
+            className="w-full bg-surface-tertiary border border-border-hover rounded-lg px-3 py-2 text-white"
           />
           <div className="flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-slate-300">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-text-secondary">
               取消
             </button>
             <button
@@ -455,7 +455,7 @@ export default function Users() {
       case 'operator':
         return 'bg-yellow-500/20 text-yellow-400';
       default:
-        return 'bg-slate-500/20 text-slate-400';
+        return 'bg-[color-mix(in_srgb,var(--color-border-hover)_20%,transparent)] text-text-muted';
     }
   };
 
@@ -470,7 +470,7 @@ export default function Users() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">用户管理</h1>
-          <p className="text-slate-400 mt-1">管理系统用户和权限</p>
+          <p className="text-text-muted mt-1">管理系统用户和权限</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -484,19 +484,19 @@ export default function Users() {
       {/* 筛选 */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-md">
-          <MagnifyingGlassIcon className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <MagnifyingGlassIcon className="w-5 h-5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索用户名或邮箱..."
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-white"
+            className="w-full bg-surface-secondary border border-border rounded-lg pl-10 pr-4 py-2 text-white"
           />
         </div>
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+          className="bg-surface-secondary border border-border rounded-lg px-3 py-2 text-white"
         >
           <option value="">所有角色</option>
           {roleOptions.map((r) => (
@@ -508,26 +508,26 @@ export default function Users() {
       </div>
 
       {/* 用户列表 */}
-      <div className="bg-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-surface-secondary rounded-xl overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-slate-400">加载中...</div>
+          <div className="p-8 text-center text-text-muted">加载中...</div>
         ) : !data?.items?.length ? (
-          <div className="p-8 text-center text-slate-400">暂无用户</div>
+          <div className="p-8 text-center text-text-muted">暂无用户</div>
         ) : (
           <table className="w-full">
-            <thead className="bg-slate-700/50">
+            <thead className="bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)]">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">用户</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">角色</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">命名空间</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">状态</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">最后登录</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">操作</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">用户</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">角色</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">命名空间</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">状态</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-text-secondary">最后登录</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-text-secondary">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700">
+            <tbody className="divide-y divide-border">
               {data.items.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-700/30">
+                <tr key={user.id} className="hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_30%,transparent)]">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
@@ -537,7 +537,7 @@ export default function Users() {
                       </div>
                       <div>
                         <div className="text-white font-medium">{user.displayName || user.username}</div>
-                        <div className="text-slate-400 text-sm">{user.email || user.username}</div>
+                        <div className="text-text-muted text-sm">{user.email || user.username}</div>
                       </div>
                     </div>
                   </td>
@@ -546,7 +546,7 @@ export default function Users() {
                       {getRoleLabel(user.role)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-300 text-sm">
+                  <td className="px-4 py-3 text-text-secondary text-sm">
                     {user.allNamespaces ? (
                       <span className="text-green-400">所有命名空间</span>
                     ) : (
@@ -559,12 +559,12 @@ export default function Users() {
                         <CheckIcon className="w-4 h-4" /> 启用
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-slate-400 text-sm">
+                      <span className="flex items-center gap-1 text-text-muted text-sm">
                         <XMarkIcon className="w-4 h-4" /> 禁用
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-400 text-sm">
+                  <td className="px-4 py-3 text-text-muted text-sm">
                     {user.lastLoginAt
                       ? new Date(user.lastLoginAt).toLocaleString()
                       : '-'}
@@ -573,14 +573,14 @@ export default function Users() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => setEditingUser(user)}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
+                        className="p-2 text-text-muted hover:text-white hover:bg-surface-tertiary rounded-lg"
                         title="编辑"
                       >
                         <PencilIcon className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setResetPasswordUser(user)}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg"
+                        className="p-2 text-text-muted hover:text-white hover:bg-surface-tertiary rounded-lg"
                         title="重置密码"
                       >
                         <KeyIcon className="w-4 h-4" />
@@ -588,7 +588,7 @@ export default function Users() {
                       <button
                         onClick={() => handleDelete(user)}
                         disabled={user.id === currentUser?.id}
-                        className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="p-2 text-text-muted hover:text-red-400 hover:bg-surface-tertiary rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                         title="删除"
                       >
                         <TrashIcon className="w-4 h-4" />

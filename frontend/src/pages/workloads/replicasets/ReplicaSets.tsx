@@ -55,7 +55,7 @@ export default function ReplicaSets() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">ReplicaSets</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {replicaSets.length} 个 ReplicaSet
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -107,8 +107,8 @@ export default function ReplicaSets() {
                     <td>{desired}</td>
                     <td>{ready}</td>
                     <td>{available}</td>
-                    <td className="text-slate-400">{getOwner(rs)}</td>
-                    <td className="text-slate-400">
+                    <td className="text-text-muted">{getOwner(rs)}</td>
+                    <td className="text-text-muted">
                       {formatDistanceToNow(new Date(rs.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -121,7 +121,7 @@ export default function ReplicaSets() {
           </table>
         </div>
         {replicaSets.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 ReplicaSet</div>
+          <div className="text-center py-12 text-text-muted">没有找到 ReplicaSet</div>
         )}
       </div>
     </div>

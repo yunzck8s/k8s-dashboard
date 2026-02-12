@@ -88,7 +88,7 @@ export default function Events() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">事件</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {events.length} 个事件
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -106,7 +106,7 @@ export default function Events() {
           </div>
           <div>
             <p className="text-2xl font-bold text-green-400">{normalCount}</p>
-            <p className="text-sm text-slate-400">正常事件</p>
+            <p className="text-sm text-text-muted">正常事件</p>
           </div>
         </div>
         <div className="card p-4 flex items-center gap-3">
@@ -115,7 +115,7 @@ export default function Events() {
           </div>
           <div>
             <p className="text-2xl font-bold text-yellow-400">{warningCount}</p>
-            <p className="text-sm text-slate-400">警告事件</p>
+            <p className="text-sm text-text-muted">警告事件</p>
           </div>
         </div>
       </div>
@@ -148,7 +148,7 @@ export default function Events() {
                       {event.type}
                     </span>
                   </td>
-                  <td className="font-medium text-slate-300">{event.reason || '-'}</td>
+                  <td className="font-medium text-text-secondary">{event.reason || '-'}</td>
                   <td className="text-blue-400">{getInvolvedObject(event)}</td>
                   {currentNamespace === 'all' && (
                     <td>
@@ -157,13 +157,13 @@ export default function Events() {
                       </span>
                     </td>
                   )}
-                  <td className="text-slate-400 max-w-md">
+                  <td className="text-text-muted max-w-md">
                     <p className="truncate" title={event.message || ''}>
                       {event.message || '-'}
                     </p>
                   </td>
-                  <td className="text-slate-400">{event.count || 1}</td>
-                  <td className="text-slate-400 whitespace-nowrap">
+                  <td className="text-text-muted">{event.count || 1}</td>
+                  <td className="text-text-muted whitespace-nowrap">
                     {getEventTime(event)}
                   </td>
                 </tr>
@@ -172,7 +172,7 @@ export default function Events() {
           </table>
         </div>
         {events.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到事件</div>
+          <div className="text-center py-12 text-text-muted">没有找到事件</div>
         )}
       </div>
     </div>

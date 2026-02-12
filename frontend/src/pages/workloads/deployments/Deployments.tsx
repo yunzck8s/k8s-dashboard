@@ -78,14 +78,14 @@ export default function Deployments() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
             Deployments
           </h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            共 <span style={{ color: 'var(--color-primary)' }}>{deployments.length}</span> 个 Deployment
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            共 <span className="text-[var(--color-primary)]">{deployments.length}</span> 个 Deployment
             {currentNamespace !== 'all' && (
               <>
-                {' '}在 <span style={{ color: 'var(--color-primary)' }}>{currentNamespace}</span> 命名空间
+                {' '}在 <span className="text-[var(--color-primary)]">{currentNamespace}</span> 命名空间
               </>
             )}
           </p>
@@ -161,10 +161,10 @@ export default function Deployments() {
                     </td>
                     <td>{deployment.status.updatedReplicas ?? 0}</td>
                     <td>{deployment.status.availableReplicas ?? 0}</td>
-                    <td className="max-w-xs truncate" style={{ color: 'var(--color-text-muted)' }} title={images}>
+                    <td className="max-w-xs truncate text-[var(--color-text-muted)]" title={images}>
                       {images}
                     </td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>
+                    <td className="text-[var(--color-text-muted)]">
                       {formatDistanceToNow(new Date(deployment.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -177,7 +177,7 @@ export default function Deployments() {
           </table>
         </div>
         {deployments.length === 0 && (
-          <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>没有找到 Deployment</div>
+          <div className="text-center py-12 text-[var(--color-text-muted)]">没有找到 Deployment</div>
         )}
       </div>
 

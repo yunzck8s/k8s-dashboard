@@ -51,7 +51,7 @@ export default function EventsList({ namespace, limit = 10, typeFilter = null }:
 
   if (events.length === 0) {
     return (
-      <div className="text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="text-center py-8 text-[var(--color-text-muted)]">
         <CalendarIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
         <p>{typeFilter ? `暂无${typeFilter === 'Normal' ? '正常' : '警告'}事件` : '暂无事件'}</p>
       </div>
@@ -65,23 +65,23 @@ export default function EventsList({ namespace, limit = 10, typeFilter = null }:
           key={event.metadata.uid}
           className="flex items-start gap-3 p-3 rounded-lg transition-colors duration-150"
           style={{
-            background: event.type === 'Warning' ? 'rgba(245, 158, 11, 0.1)' : 'var(--color-bg-tertiary)',
-            border: `1px solid ${event.type === 'Warning' ? 'rgba(245, 158, 11, 0.2)' : 'var(--color-border)'}`,
+            background: event.type === 'Warning' ? 'var(--sys-warning-soft-bg)' : 'var(--color-bg-tertiary)',
+            border: `1px solid ${event.type === 'Warning' ? 'var(--sys-warning-soft-border)' : 'var(--color-border)'}`,
           }}
         >
           {event.type === 'Warning' ? (
-            <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--color-warning)]" />
           ) : event.type === 'Normal' ? (
-            <CheckCircleIcon className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+            <CheckCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--color-success)]" />
           ) : (
-            <InformationCircleIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <InformationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--color-info)]" />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+              <p className="text-sm font-medium truncate text-[var(--color-text-primary)]">
                 {event.reason}
               </p>
-              <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-xs flex-shrink-0 text-[var(--color-text-muted)]">
                 {event.lastTimestamp &&
                   formatDistanceToNow(new Date(event.lastTimestamp), {
                     addSuffix: true,
@@ -89,10 +89,10 @@ export default function EventsList({ namespace, limit = 10, typeFilter = null }:
                   })}
               </span>
             </div>
-            <p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-sm mt-1 line-clamp-2 text-[var(--color-text-secondary)]">
               {event.message}
             </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-xs mt-1 text-[var(--color-text-muted)]">
               {event.involvedObject.kind}/{event.involvedObject.name}
               {event.involvedObject.namespace && ` in ${event.involvedObject.namespace}`}
             </p>

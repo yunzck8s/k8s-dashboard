@@ -81,7 +81,7 @@ export default function Namespaces() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">命名空间</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {namespaces.length} 个命名空间
           </p>
         </div>
@@ -132,15 +132,15 @@ export default function Namespaces() {
                         {ns.status?.phase || 'Unknown'}
                       </span>
                     </td>
-                    <td className="text-slate-400 max-w-xs truncate" title={labels}>
+                    <td className="text-text-muted max-w-xs truncate" title={labels}>
                       {labels}
                       {labelCount > 3 && (
-                        <span className="text-slate-500 ml-1">
+                        <span className="text-text-muted ml-1">
                           (+{labelCount - 3})
                         </span>
                       )}
                     </td>
-                    <td className="text-slate-400">
+                    <td className="text-text-muted">
                       {formatDistanceToNow(new Date(ns.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -164,7 +164,7 @@ export default function Namespaces() {
           </table>
         </div>
         {namespaces.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到命名空间</div>
+          <div className="text-center py-12 text-text-muted">没有找到命名空间</div>
         )}
       </div>
     </div>

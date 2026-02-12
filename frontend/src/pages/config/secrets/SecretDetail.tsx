@@ -133,14 +133,14 @@ export default function SecretDetail() {
               <h1 className="text-2xl font-bold text-white">{name}</h1>
               <span className="badge badge-purple">{secret.type || 'Opaque'}</span>
             </div>
-            <p className="text-slate-400 mt-1">命名空间: {namespace}</p>
+            <p className="text-text-muted mt-1">命名空间: {namespace}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {/* 编辑 YAML 按钮 */}
           <button
             onClick={() => setShowYamlEditor(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-secondary border border-border rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-surface-tertiary transition-colors"
           >
             <PencilIcon className="w-4 h-4" />
             编辑 YAML
@@ -149,7 +149,7 @@ export default function SecretDetail() {
           {/* 刷新按钮 */}
           <button
             onClick={() => refetch()}
-            className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="p-2 bg-surface-secondary border border-border rounded-lg text-text-secondary hover:text-white hover:bg-surface-tertiary transition-colors"
           >
             <ArrowPathIcon className="w-5 h-5" />
           </button>
@@ -166,7 +166,7 @@ export default function SecretDetail() {
       </div>
 
       {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
+      <div className="border-b border-border">
         <nav className="flex gap-4">
           {tabs.map((tab) => (
             <button
@@ -176,7 +176,7 @@ export default function SecretDetail() {
                 'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  : 'border-transparent text-text-muted hover:text-text-secondary'
               )}
             >
               {tab.label}
@@ -224,24 +224,24 @@ export default function SecretDetail() {
             </div>
 
             <div className="space-y-4 mb-6">
-              <p className="text-slate-300">
+              <p className="text-text-secondary">
                 您即将删除 Secret <span className="font-semibold text-white">{name}</span>。
               </p>
 
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <h4 className="text-sm font-medium text-slate-400 mb-3">资源信息</h4>
+              <div className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 border border-border">
+                <h4 className="text-sm font-medium text-text-muted mb-3">资源信息</h4>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">命名空间</dt>
-                    <dd className="text-slate-200 font-medium">{namespace}</dd>
+                    <dt className="text-text-muted">命名空间</dt>
+                    <dd className="text-text-secondary font-medium">{namespace}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">类型</dt>
-                    <dd className="text-slate-200 font-medium">{secret.type || 'Opaque'}</dd>
+                    <dt className="text-text-muted">类型</dt>
+                    <dd className="text-text-secondary font-medium">{secret.type || 'Opaque'}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">数据项数量</dt>
-                    <dd className="text-slate-200 font-medium">
+                    <dt className="text-text-muted">数据项数量</dt>
+                    <dd className="text-text-secondary font-medium">
                       {Object.keys(secret.data || {}).length} 个
                     </dd>
                   </div>
@@ -318,7 +318,7 @@ function OverviewTab({
               {key}: {value}
             </span>
           ))}
-          {!secret.metadata.labels && <span className="text-slate-500">无标签</span>}
+          {!secret.metadata.labels && <span className="text-text-muted">无标签</span>}
         </div>
       </div>
 
@@ -328,11 +328,11 @@ function OverviewTab({
         <div className="space-y-2">
           {Object.entries(secret.metadata.annotations || {}).map(([key, value]) => (
             <div key={key} className="flex items-start gap-2 text-sm">
-              <span className="text-slate-400 flex-shrink-0">{key}:</span>
-              <span className="text-slate-300 break-all">{value}</span>
+              <span className="text-text-muted flex-shrink-0">{key}:</span>
+              <span className="text-text-secondary break-all">{value}</span>
             </div>
           ))}
-          {!secret.metadata.annotations && <span className="text-slate-500">无注解</span>}
+          {!secret.metadata.annotations && <span className="text-text-muted">无注解</span>}
         </div>
       </div>
 
@@ -346,7 +346,7 @@ function OverviewTab({
             const isRevealed = revealedKeys.has(key);
             const decodedValue = decodeBase64(value);
             return (
-              <div key={key} className="bg-slate-800 rounded-lg p-4">
+              <div key={key} className="bg-surface-secondary rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-white">{key}</span>
                   <div className="flex items-center gap-2">
@@ -374,13 +374,13 @@ function OverviewTab({
                     </button>
                   </div>
                 </div>
-                <pre className="text-sm text-slate-300 font-mono bg-slate-900 rounded p-3 overflow-x-auto max-h-64">
+                <pre className="text-sm text-text-secondary font-mono bg-surface-tertiary rounded p-3 overflow-x-auto max-h-64">
                   {isRevealed ? decodedValue : '••••••••'}
                 </pre>
               </div>
             );
           })}
-          {!secret.data && <span className="text-slate-500">无数据</span>}
+          {!secret.data && <span className="text-text-muted">无数据</span>}
         </div>
       </div>
     </div>
@@ -401,8 +401,8 @@ function YamlTab({ yaml }: { yaml: string }) {
           复制 YAML
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-y-auto">
-        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
+      <div className="card p-4 bg-surface-tertiary max-h-[600px] overflow-y-auto">
+        <pre className="text-sm text-text-secondary font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );
@@ -412,7 +412,7 @@ function YamlTab({ yaml }: { yaml: string }) {
 function EventsTab() {
   return (
     <div className="card p-6 text-center">
-      <p className="text-slate-400">暂无事件</p>
+      <p className="text-text-muted">暂无事件</p>
     </div>
   );
 }
@@ -429,8 +429,8 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={clsx('text-slate-200', mono && 'font-mono text-sm')}>{value}</dd>
+      <dt className="text-text-muted">{label}</dt>
+      <dd className={clsx('text-text-secondary', mono && 'font-mono text-sm')}>{value}</dd>
     </div>
   );
 }

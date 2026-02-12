@@ -117,7 +117,7 @@ export default function AlertsActive() {
       <div className="card p-8 text-center">
         <ExclamationCircleIcon className="w-12 h-12 mx-auto text-red-400 mb-4" />
         <p className="text-red-400">加载告警失败</p>
-        <p className="text-slate-500 text-sm mt-2">{(error as Error).message}</p>
+        <p className="text-text-muted text-sm mt-2">{(error as Error).message}</p>
         <button
           onClick={() => refetch()}
           className="btn btn-primary mt-4"
@@ -133,7 +133,7 @@ export default function AlertsActive() {
       {/* 过滤器栏 */}
       <div className="card p-4">
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-2 text-text-muted">
             <FunnelIcon className="w-4 h-4" />
             <span className="text-sm">过滤</span>
           </div>
@@ -142,7 +142,7 @@ export default function AlertsActive() {
           <select
             value={filters.severity}
             onChange={(e) => updateFilter('severity', e.target.value)}
-            className="select select-sm bg-slate-800 border-slate-600 text-slate-300"
+            className="select select-sm bg-surface-secondary border-border-hover text-text-secondary"
           >
             <option value="">全部级别</option>
             <option value="critical">严重</option>
@@ -154,7 +154,7 @@ export default function AlertsActive() {
           <select
             value={filters.namespace}
             onChange={(e) => updateFilter('namespace', e.target.value)}
-            className="select select-sm bg-slate-800 border-slate-600 text-slate-300"
+            className="select select-sm bg-surface-secondary border-border-hover text-text-secondary"
           >
             <option value="">全部命名空间</option>
             {namespaces.map((ns) => (
@@ -166,7 +166,7 @@ export default function AlertsActive() {
           <select
             value={filters.alertname}
             onChange={(e) => updateFilter('alertname', e.target.value)}
-            className="select select-sm bg-slate-800 border-slate-600 text-slate-300"
+            className="select select-sm bg-surface-secondary border-border-hover text-text-secondary"
           >
             <option value="">全部告警</option>
             {alertNames.map((name) => (
@@ -178,7 +178,7 @@ export default function AlertsActive() {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="btn btn-ghost btn-sm text-slate-400 hover:text-white"
+              className="btn btn-ghost btn-sm text-text-muted hover:text-white"
             >
               <XMarkIcon className="w-4 h-4 mr-1" />
               清除
@@ -189,7 +189,7 @@ export default function AlertsActive() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="btn btn-ghost btn-sm text-slate-400 hover:text-white ml-auto"
+            className="btn btn-ghost btn-sm text-text-muted hover:text-white ml-auto"
           >
             <ArrowPathIcon className={clsx('w-4 h-4', isFetching && 'animate-spin')} />
           </button>
@@ -199,14 +199,14 @@ export default function AlertsActive() {
       {/* 告警列表 */}
       {isLoading ? (
         <div className="card p-8 text-center">
-          <ArrowPathIcon className="w-8 h-8 mx-auto text-slate-400 animate-spin mb-4" />
-          <p className="text-slate-400">加载告警中...</p>
+          <ArrowPathIcon className="w-8 h-8 mx-auto text-text-muted animate-spin mb-4" />
+          <p className="text-text-muted">加载告警中...</p>
         </div>
       ) : alerts.length === 0 ? (
         <div className="card p-12 text-center">
           <InformationCircleIcon className="w-12 h-12 mx-auto text-green-400 mb-4" />
-          <p className="text-slate-300">暂无活跃告警</p>
-          <p className="text-slate-500 text-sm mt-2">
+          <p className="text-text-secondary">暂无活跃告警</p>
+          <p className="text-text-muted text-sm mt-2">
             {hasActiveFilters ? '当前过滤条件下没有告警' : '集群运行正常'}
           </p>
         </div>
@@ -251,7 +251,7 @@ function AlertCard({ alert, onClick }: { alert: Alert; onClick: () => void }) {
         'card p-4 cursor-pointer transition-all hover:scale-[1.01]',
         'border-l-4',
         config.borderColor,
-        'hover:bg-slate-800/50'
+        'hover:bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)]'
       )}
     >
       <div className="flex items-start gap-4">
@@ -273,12 +273,12 @@ function AlertCard({ alert, onClick }: { alert: Alert; onClick: () => void }) {
           </div>
 
           {summary && (
-            <p className="text-sm text-slate-400 line-clamp-2 mb-2">
+            <p className="text-sm text-text-muted line-clamp-2 mb-2">
               {summary}
             </p>
           )}
 
-          <div className="flex items-center gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-4 text-xs text-text-muted">
             <span>
               开始于 {formatDistanceToNow(startedAt, { addSuffix: true, locale: zhCN })}
             </span>
@@ -289,7 +289,7 @@ function AlertCard({ alert, onClick }: { alert: Alert; onClick: () => void }) {
         </div>
 
         {/* 箭头 */}
-        <ChevronRightIcon className="w-5 h-5 text-slate-500" />
+        <ChevronRightIcon className="w-5 h-5 text-text-muted" />
       </div>
     </div>
   );
@@ -341,9 +341,9 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
       />
 
       {/* 抽屉 */}
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-slate-900 border-l border-slate-700 z-50 overflow-y-auto">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-surface-tertiary border-l border-border z-50 overflow-y-auto">
         {/* 头部 */}
-        <div className="sticky top-0 bg-slate-900 border-b border-slate-700 p-4">
+        <div className="sticky top-0 bg-surface-tertiary border-b border-border p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <div className={clsx('p-2 rounded-lg', config.bgColor)}>
@@ -403,11 +403,11 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
                 <CheckCircleIcon className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-yellow-400">已确认</p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-text-muted mt-1">
                     由 {ack.acknowledgedBy} 于 {new Date(ack.acknowledgedAt).toLocaleString('zh-CN')} 确认
                   </p>
                   {ack.comment && (
-                    <p className="text-sm text-slate-300 mt-2">{ack.comment}</p>
+                    <p className="text-sm text-text-secondary mt-2">{ack.comment}</p>
                   )}
                 </div>
               </div>
@@ -417,7 +417,7 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
           {/* 摘要 */}
           {alert.annotations.summary && (
             <div>
-              <h3 className="text-sm font-medium text-slate-400 mb-2">摘要</h3>
+              <h3 className="text-sm font-medium text-text-muted mb-2">摘要</h3>
               <p className="text-white">{alert.annotations.summary}</p>
             </div>
           )}
@@ -425,23 +425,23 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
           {/* 描述 */}
           {alert.annotations.description && (
             <div>
-              <h3 className="text-sm font-medium text-slate-400 mb-2">描述</h3>
+              <h3 className="text-sm font-medium text-text-muted mb-2">描述</h3>
               <p className="text-white whitespace-pre-wrap">{alert.annotations.description}</p>
             </div>
           )}
 
           {/* 时间信息 */}
           <div>
-            <h3 className="text-sm font-medium text-slate-400 mb-2">时间</h3>
+            <h3 className="text-sm font-medium text-text-muted mb-2">时间</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-500">开始时间</span>
+                <span className="text-text-muted">开始时间</span>
                 <span className="text-white">
                   {startedAt.toLocaleString('zh-CN')}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">持续时间</span>
+                <span className="text-text-muted">持续时间</span>
                 <span className="text-white">
                   {formatDistanceToNow(startedAt, { locale: zhCN })}
                 </span>
@@ -451,11 +451,11 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
 
           {/* 标签 */}
           <div>
-            <h3 className="text-sm font-medium text-slate-400 mb-2">标签</h3>
+            <h3 className="text-sm font-medium text-text-muted mb-2">标签</h3>
             <div className="space-y-1">
               {Object.entries(alert.labels).map(([key, value]) => (
                 <div key={key} className="flex items-start gap-2 text-sm">
-                  <span className="text-slate-500 min-w-0 break-all">{key}:</span>
+                  <span className="text-text-muted min-w-0 break-all">{key}:</span>
                   <span className="text-white min-w-0 break-all">{value}</span>
                 </div>
               ))}
@@ -464,15 +464,15 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
 
           {/* 状态 */}
           <div>
-            <h3 className="text-sm font-medium text-slate-400 mb-2">状态</h3>
+            <h3 className="text-sm font-medium text-text-muted mb-2">状态</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-500">状态</span>
+                <span className="text-text-muted">状态</span>
                 <span className="text-white">{alert.status.state}</span>
               </div>
               {alert.status.silencedBy.length > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">静默</span>
+                  <span className="text-text-muted">静默</span>
                   <span className="text-yellow-400">
                     {alert.status.silencedBy.join(', ')}
                   </span>
@@ -484,7 +484,7 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
           {/* 来源链接 */}
           {alert.generatorURL && (
             <div>
-              <h3 className="text-sm font-medium text-slate-400 mb-2">来源</h3>
+              <h3 className="text-sm font-medium text-text-muted mb-2">来源</h3>
               <a
                 href={alert.generatorURL}
                 target="_blank"
@@ -513,7 +513,7 @@ function AlertDetailDrawer({ alert, onClose }: { alert: Alert; onClose: () => vo
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="card max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-white mb-4">创建静默规则</h3>
-            <p className="text-slate-400 mb-4">
+            <p className="text-text-muted mb-4">
               静默规则功能正在开发中，请切换到"静默规则"标签页查看现有规则。
             </p>
             <button
@@ -554,7 +554,7 @@ function AcknowledgeModal({
         <h3 className="text-lg font-semibold text-white mb-4">确认告警</h3>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-400 mb-2">
+            <label className="block text-sm font-medium text-text-muted mb-2">
               备注（必填）
             </label>
             <textarea
@@ -565,7 +565,7 @@ function AcknowledgeModal({
               required
               autoFocus
             />
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-text-muted mt-1">
               确认后将标记此告警已知晓，但不会停止告警
             </p>
           </div>

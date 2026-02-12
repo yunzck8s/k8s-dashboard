@@ -107,7 +107,7 @@ export default function RevisionHistory({
 
   if (isLoading) {
     return (
-      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+      <div className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 border border-border">
         <div className="flex items-center gap-2 mb-4">
           <ClockIcon className="w-5 h-5 text-blue-400" />
           <h3 className="text-white font-medium">修订历史</h3>
@@ -121,7 +121,7 @@ export default function RevisionHistory({
 
   if (error) {
     return (
-      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+      <div className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 border border-border">
         <div className="flex items-center gap-2 mb-4">
           <ClockIcon className="w-5 h-5 text-blue-400" />
           <h3 className="text-white font-medium">修订历史</h3>
@@ -137,19 +137,19 @@ export default function RevisionHistory({
   const sortedRevisions = [...(revisions || [])].sort((a, b) => b.revision - a.revision);
 
   return (
-    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+    <div className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 border border-border">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <ClockIcon className="w-5 h-5 text-blue-400" />
           <h3 className="text-white font-medium">修订历史</h3>
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-text-muted">
             ({sortedRevisions.length} 个版本)
           </span>
         </div>
       </div>
 
       {sortedRevisions.length === 0 ? (
-        <div className="text-center py-8 text-slate-400">
+        <div className="text-center py-8 text-text-muted">
           <ClockIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
           <p>暂无修订历史</p>
         </div>
@@ -162,7 +162,7 @@ export default function RevisionHistory({
                 'flex items-center justify-between p-3 rounded-lg border transition-colors',
                 rev.current
                   ? 'bg-green-500/10 border-green-500/20'
-                  : 'bg-slate-700/50 border-slate-600/50 hover:bg-slate-700'
+                  : 'bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] border-[color-mix(in_srgb,var(--color-border-hover)_50%,transparent)] hover:bg-surface-tertiary'
               )}
             >
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -171,7 +171,7 @@ export default function RevisionHistory({
                     'inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium',
                     rev.current
                       ? 'bg-green-500/20 text-green-400'
-                      : 'bg-slate-600 text-slate-300'
+                      : 'bg-surface-tertiary text-text-secondary'
                   )}>
                     {rev.revision}
                   </span>
@@ -188,7 +188,7 @@ export default function RevisionHistory({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                  <div className="flex items-center gap-3 text-xs text-text-muted mt-1">
                     <span>
                       {rev.createdAt ? formatDistanceToNow(new Date(rev.createdAt), {
                         addSuffix: true,
@@ -209,7 +209,7 @@ export default function RevisionHistory({
                     setSelectedRevision(rev.revision);
                     setShowRollbackConfirm(true);
                   }}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-slate-600 hover:bg-slate-500 text-white rounded transition-colors ml-2"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-surface-tertiary hover:bg-border-hover text-white rounded transition-colors ml-2"
                 >
                   <ArrowPathIcon className="w-4 h-4" />
                   回滚
@@ -223,9 +223,9 @@ export default function RevisionHistory({
       {/* 回滚确认对话框 */}
       {showRollbackConfirm && selectedRevision !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 border border-slate-700">
+          <div className="bg-surface-secondary rounded-lg p-6 max-w-md w-full mx-4 border border-border">
             <h3 className="text-lg font-medium text-white mb-4">确认回滚</h3>
-            <p className="text-slate-300 mb-6">
+            <p className="text-text-secondary mb-6">
               确定要将 <span className="text-white font-medium">{name}</span> 回滚到版本{' '}
               <span className="text-blue-400 font-medium">{selectedRevision}</span> 吗？
             </p>
@@ -241,7 +241,7 @@ export default function RevisionHistory({
                   setSelectedRevision(null);
                 }}
                 disabled={isPending}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-surface-tertiary hover:bg-surface-tertiary text-white rounded transition-colors disabled:opacity-50"
               >
                 取消
               </button>

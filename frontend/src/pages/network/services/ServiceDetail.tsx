@@ -103,20 +103,20 @@ export default function ServiceDetail() {
                 {service.spec.type || 'ClusterIP'}
               </span>
             </div>
-            <p className="text-slate-400 mt-1">命名空间: {namespace}</p>
+            <p className="text-text-muted mt-1">命名空间: {namespace}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowYamlEditor(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-secondary border border-border rounded-lg text-sm font-medium text-text-secondary hover:text-white hover:bg-surface-tertiary transition-colors"
           >
             <PencilIcon className="w-4 h-4" />
             编辑 YAML
           </button>
           <button
             onClick={() => refetch()}
-            className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            className="p-2 bg-surface-secondary border border-border rounded-lg text-text-secondary hover:text-white hover:bg-surface-tertiary transition-colors"
           >
             <ArrowPathIcon className="w-5 h-5" />
           </button>
@@ -131,7 +131,7 @@ export default function ServiceDetail() {
       </div>
 
       {/* 标签页导航 */}
-      <div className="border-b border-slate-700">
+      <div className="border-b border-border">
         <nav className="flex gap-4">
           {tabs.map((tab) => (
             <button
@@ -141,7 +141,7 @@ export default function ServiceDetail() {
                 'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
                   ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-300'
+                  : 'border-transparent text-text-muted hover:text-text-secondary'
               )}
             >
               {tab.label}
@@ -179,7 +179,7 @@ export default function ServiceDetail() {
               <h3 className="text-lg font-semibold text-white">确认删除 Service</h3>
             </div>
             <div className="space-y-4 mb-6">
-              <p className="text-slate-300">
+              <p className="text-text-secondary">
                 您即将删除 Service <span className="font-semibold text-white">{name}</span>。
               </p>
               <div className="flex items-start gap-2 text-sm text-red-400 bg-red-500/5 rounded-lg p-3 border border-red-500/20">
@@ -252,7 +252,7 @@ function OverviewTab({ service }: { service: Service }) {
               {key}: {value}
             </span>
           ))}
-          {!service.metadata.labels && <span className="text-slate-500">无标签</span>}
+          {!service.metadata.labels && <span className="text-text-muted">无标签</span>}
         </div>
       </div>
 
@@ -264,7 +264,7 @@ function OverviewTab({ service }: { service: Service }) {
               {key}: {value}
             </span>
           ))}
-          {!service.spec.selector && <span className="text-slate-500">无选择器</span>}
+          {!service.spec.selector && <span className="text-text-muted">无选择器</span>}
         </div>
       </div>
 
@@ -275,21 +275,21 @@ function OverviewTab({ service }: { service: Service }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left pb-2 text-slate-400">名称</th>
-                <th className="text-left pb-2 text-slate-400">协议</th>
-                <th className="text-left pb-2 text-slate-400">端口</th>
-                <th className="text-left pb-2 text-slate-400">目标端口</th>
+              <tr className="border-b border-border">
+                <th className="text-left pb-2 text-text-muted">名称</th>
+                <th className="text-left pb-2 text-text-muted">协议</th>
+                <th className="text-left pb-2 text-text-muted">端口</th>
+                <th className="text-left pb-2 text-text-muted">目标端口</th>
                 {(service.spec.type === 'NodePort' || service.spec.type === 'LoadBalancer') && (
-                  <th className="text-left pb-2 text-slate-400">NodePort</th>
+                  <th className="text-left pb-2 text-text-muted">NodePort</th>
                 )}
               </tr>
             </thead>
             <tbody>
               {service.spec.ports?.map((port, idx) => (
-                <tr key={idx} className="border-b border-slate-800">
+                <tr key={idx} className="border-b border-border">
                   <td className="py-2 text-white">{port.name || '-'}</td>
-                  <td className="py-2 text-slate-400">{port.protocol || 'TCP'}</td>
+                  <td className="py-2 text-text-muted">{port.protocol || 'TCP'}</td>
                   <td className="py-2 text-white font-mono">{port.port}</td>
                   <td className="py-2 text-white font-mono">{port.targetPort}</td>
                   {(service.spec.type === 'NodePort' || service.spec.type === 'LoadBalancer') && (
@@ -314,8 +314,8 @@ function YamlTab({ yaml }: { yaml: string }) {
           复制 YAML
         </button>
       </div>
-      <div className="card p-4 bg-slate-900 max-h-[600px] overflow-y-auto">
-        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
+      <div className="card p-4 bg-surface-tertiary max-h-[600px] overflow-y-auto">
+        <pre className="text-sm text-text-secondary font-mono whitespace-pre-wrap break-words">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );
@@ -324,7 +324,7 @@ function YamlTab({ yaml }: { yaml: string }) {
 function EventsTab() {
   return (
     <div className="card p-6 text-center">
-      <p className="text-slate-400">暂无事件</p>
+      <p className="text-text-muted">暂无事件</p>
     </div>
   );
 }
@@ -332,8 +332,8 @@ function EventsTab() {
 function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={clsx('text-slate-200', mono && 'font-mono text-sm')}>{value}</dd>
+      <dt className="text-text-muted">{label}</dt>
+      <dd className={clsx('text-text-secondary', mono && 'font-mono text-sm')}>{value}</dd>
     </div>
   );
 }

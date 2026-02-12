@@ -1,74 +1,173 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600;700&display=swap');
+@font-face {
+  font-family: 'Lexend';
+  src: local('Lexend Variable'), local('Lexend'),
+    url('./assets/fonts/Lexend-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  src: local('Source Sans 3 Variable'), local('Source Sans 3'),
+    url('./assets/fonts/SourceSans3-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Fira Code';
+  src: local('Fira Code Variable'), local('Fira Code'),
+    url('./assets/fonts/FiraCode-Variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Enterprise SaaS Dark Theme */
 :root {
-  /* 背景色 - 深紫调 */
-  --color-bg-primary: #0c0a1d;
-  --color-bg-secondary: #13102a;
-  --color-bg-tertiary: #1a1635;
-  --color-bg-elevated: #211d40;
+  --font-heading: 'Lexend', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body: 'Source Sans 3', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Fira Code', 'IBM Plex Mono', monospace;
 
-  /* 文本色 */
-  --color-text-primary: #E8F0FF;
-  --color-text-secondary: #A5B4C8;
-  --color-text-muted: #6B7A8F;
+  --sys-bg-primary: #F6F8FC;
+  --sys-bg-secondary: #FFFFFF;
+  --sys-bg-tertiary: #EEF2F8;
+  --sys-bg-elevated: #FFFFFF;
 
-  /* 主色 - Indigo */
-  --color-primary: #6366F1;
-  --color-primary-hover: #818CF8;
-  --color-primary-light: rgba(99, 102, 241, 0.15);
+  --sys-text-primary: #0F172A;
+  --sys-text-secondary: #334155;
+  --sys-text-muted: #64748B;
 
-  /* 语义色 */
-  --color-success: #10B981;
-  --color-warning: #F59E0B;
-  --color-error: #EF4444;
-  --color-info: #3B82F6;
+  --sys-primary: #1D4ED8;
+  --sys-primary-hover: #1E40AF;
+  --sys-primary-light: rgba(29, 78, 216, 0.12);
 
-  /* 边框色 */
-  --color-border: rgba(99, 102, 241, 0.15);
-  --color-border-hover: rgba(99, 102, 241, 0.3);
+  --sys-success: #059669;
+  --sys-warning: #D97706;
+  --sys-error: #DC2626;
+  --sys-info: #2563EB;
 
-  /* 动效与圆角 */
+  --sys-border: rgba(148, 163, 184, 0.35);
+  --sys-border-hover: rgba(100, 116, 139, 0.55);
+
+  --sys-success-soft-bg: rgba(5, 150, 105, 0.12);
+  --sys-success-soft-border: rgba(5, 150, 105, 0.28);
+  --sys-success-soft-text: #059669;
+
+  --sys-warning-soft-bg: rgba(217, 119, 6, 0.12);
+  --sys-warning-soft-border: rgba(217, 119, 6, 0.30);
+  --sys-warning-soft-text: #B45309;
+
+  --sys-error-soft-bg: rgba(220, 38, 38, 0.12);
+  --sys-error-soft-border: rgba(220, 38, 38, 0.28);
+  --sys-error-soft-text: #B91C1C;
+
+  --sys-info-soft-bg: rgba(37, 99, 235, 0.12);
+  --sys-info-soft-border: rgba(37, 99, 235, 0.28);
+  --sys-info-soft-text: #1D4ED8;
+
+  --sys-heading-h1-size: 30px;
+  --sys-heading-h1-line: 38px;
+  --sys-heading-h2-size: 24px;
+  --sys-heading-h2-line: 32px;
+  --sys-heading-h3-size: 20px;
+  --sys-heading-h3-line: 28px;
+  --sys-heading-h4-size: 18px;
+  --sys-heading-h4-line: 26px;
+  --sys-body-l-size: 16px;
+  --sys-body-l-line: 24px;
+  --sys-body-size: 14px;
+  --sys-body-line: 22px;
+  --sys-caption-size: 12px;
+  --sys-caption-line: 18px;
+  --sys-kpi-size: 32px;
+  --sys-kpi-line: 40px;
+
+  --chart-color-1: #2563EB;
+  --chart-color-2: #0EA5E9;
+  --chart-color-3: #14B8A6;
+  --chart-color-4: #22C55E;
+  --chart-color-5: #F59E0B;
+  --chart-color-6: #F97316;
+  --chart-color-7: #A855F7;
+  --chart-color-8: #EC4899;
+
+  --color-bg-primary: var(--sys-bg-primary);
+  --color-bg-secondary: var(--sys-bg-secondary);
+  --color-bg-tertiary: var(--sys-bg-tertiary);
+  --color-bg-elevated: var(--sys-bg-elevated);
+  --color-text-primary: var(--sys-text-primary);
+  --color-text-secondary: var(--sys-text-secondary);
+  --color-text-muted: var(--sys-text-muted);
+  --color-primary: var(--sys-primary);
+  --color-primary-hover: var(--sys-primary-hover);
+  --color-primary-light: var(--sys-primary-light);
+  --color-success: var(--sys-success);
+  --color-warning: var(--sys-warning);
+  --color-error: var(--sys-error);
+  --color-info: var(--sys-info);
+  --color-border: var(--sys-border);
+  --color-border-hover: var(--sys-border-hover);
+
   --motion-fast: 160ms;
   --motion-medium: 220ms;
   --radius-md: 10px;
   --radius-lg: 12px;
 }
 
-[data-theme="light"] {
-  --color-bg-primary: #f4f6fb;
-  --color-bg-secondary: #ffffff;
-  --color-bg-tertiary: #eef2ff;
-  --color-bg-elevated: #ffffff;
+[data-theme='dark'] {
+  --sys-bg-primary: #0B1220;
+  --sys-bg-secondary: #101A2C;
+  --sys-bg-tertiary: #17233A;
+  --sys-bg-elevated: #1C2A45;
 
-  --color-text-primary: #111827;
-  --color-text-secondary: #374151;
-  --color-text-muted: #6b7280;
+  --sys-text-primary: #E6EDF7;
+  --sys-text-secondary: #B2C0D6;
+  --sys-text-muted: #7F93B2;
 
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
-  --color-primary-light: rgba(79, 70, 229, 0.12);
+  --sys-primary: #60A5FA;
+  --sys-primary-hover: #93C5FD;
+  --sys-primary-light: rgba(96, 165, 250, 0.18);
 
-  --color-success: #059669;
-  --color-warning: #d97706;
-  --color-error: #dc2626;
-  --color-info: #2563eb;
+  --sys-success: #34D399;
+  --sys-warning: #FBBF24;
+  --sys-error: #F87171;
+  --sys-info: #60A5FA;
 
-  --color-border: rgba(79, 70, 229, 0.15);
-  --color-border-hover: rgba(79, 70, 229, 0.28);
+  --sys-border: rgba(148, 163, 184, 0.22);
+  --sys-border-hover: rgba(148, 163, 184, 0.36);
+
+  --sys-success-soft-bg: rgba(52, 211, 153, 0.16);
+  --sys-success-soft-border: rgba(52, 211, 153, 0.32);
+  --sys-success-soft-text: #6EE7B7;
+
+  --sys-warning-soft-bg: rgba(251, 191, 36, 0.16);
+  --sys-warning-soft-border: rgba(251, 191, 36, 0.34);
+  --sys-warning-soft-text: #FCD34D;
+
+  --sys-error-soft-bg: rgba(248, 113, 113, 0.16);
+  --sys-error-soft-border: rgba(248, 113, 113, 0.34);
+  --sys-error-soft-text: #FCA5A5;
+
+  --sys-info-soft-bg: rgba(96, 165, 250, 0.16);
+  --sys-info-soft-border: rgba(96, 165, 250, 0.34);
+  --sys-info-soft-text: #93C5FD;
 }
 
 body {
   @apply antialiased;
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-family: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   margin: 0;
   min-height: 100vh;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: var(--sys-body-size);
+  line-height: var(--sys-body-line);
 }
 
 #root {
@@ -80,7 +179,6 @@ body {
   outline-offset: 2px;
 }
 
-/* 滚动条样式 - 简洁风格 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -99,13 +197,12 @@ body {
   background: var(--color-primary);
 }
 
-/* Enterprise SaaS 组件样式 */
 @layer components {
   .btn {
     @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
-    font-family: 'Fira Sans', sans-serif;
-    font-weight: 500;
+    font-family: var(--font-body);
     min-height: 44px;
+    line-height: var(--sys-body-line);
   }
 
   .btn:active {
@@ -114,7 +211,7 @@ body {
 
   .btn-primary {
     background: var(--color-primary);
-    color: white;
+    color: #ffffff;
   }
 
   .btn-primary:hover:not(:disabled) {
@@ -134,20 +231,20 @@ body {
 
   .btn-danger {
     background: var(--color-error);
-    color: white;
+    color: #ffffff;
   }
 
   .btn-danger:hover:not(:disabled) {
-    background: #DC2626;
+    filter: brightness(0.95);
   }
 
   .btn-success {
     background: var(--color-success);
-    color: white;
+    color: #ffffff;
   }
 
   .btn-success:hover:not(:disabled) {
-    background: #059669;
+    filter: brightness(1.05);
   }
 
   .btn-ghost {
@@ -185,8 +282,8 @@ body {
     border: 1px solid var(--color-border);
     border-radius: 8px;
     color: var(--color-text-primary);
-    font-family: 'Fira Sans', sans-serif;
-    transition: all 0.2s;
+    font-family: var(--font-body);
+    transition: all var(--motion-fast);
   }
 
   .input:focus {
@@ -204,7 +301,7 @@ body {
     border: 1px solid var(--color-border);
     border-radius: 8px;
     color: var(--color-text-primary);
-    font-family: 'Fira Sans', sans-serif;
+    font-family: var(--font-body);
   }
 
   .select:focus {
@@ -214,39 +311,40 @@ body {
 
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium;
-    font-family: 'Fira Sans', sans-serif;
+    font-family: var(--font-body);
     border-radius: 6px;
+    line-height: var(--sys-caption-line);
   }
 
   .badge-success {
-    background: rgba(16, 185, 129, 0.15);
-    color: #34D399;
+    background: var(--sys-success-soft-bg);
+    color: var(--sys-success-soft-text);
   }
 
   .badge-warning {
-    background: rgba(245, 158, 11, 0.15);
-    color: #FBBF24;
+    background: var(--sys-warning-soft-bg);
+    color: var(--sys-warning-soft-text);
   }
 
   .badge-error {
-    background: rgba(239, 68, 68, 0.15);
-    color: #F87171;
+    background: var(--sys-error-soft-bg);
+    color: var(--sys-error-soft-text);
   }
 
   .badge-info {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60A5FA;
+    background: var(--sys-info-soft-bg);
+    color: var(--sys-info-soft-text);
   }
 
   .badge-default {
-    background: rgba(165, 180, 200, 0.15);
-    color: #A5B4C8;
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
   }
 
   .sidebar-item {
     @apply flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer;
     color: var(--color-text-secondary);
-    font-family: 'Fira Sans', sans-serif;
+    font-family: var(--font-body);
     font-weight: 500;
     min-height: 44px;
   }
@@ -257,12 +355,12 @@ body {
   }
 
   .sidebar-item-active {
-    color: var(--color-primary);
+    color: var(--color-text-primary);
     background: var(--color-primary-light);
+    border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
   }
 }
 
-/* 表格样式 - 简洁专业 */
 .table-container {
   @apply overflow-x-auto;
   border: 1px solid var(--color-border);
@@ -272,7 +370,7 @@ body {
 
 table {
   @apply w-full text-left;
-  font-family: 'Fira Sans', sans-serif;
+  font-family: var(--font-body);
 }
 
 thead {
@@ -281,9 +379,10 @@ thead {
 }
 
 th {
-  @apply px-4 py-3 text-xs font-semibold uppercase tracking-wider;
+  @apply px-4 py-3 text-xs uppercase tracking-wider;
   color: var(--color-text-secondary);
-  font-family: 'Fira Sans', sans-serif;
+  font-family: var(--font-body);
+  font-weight: 500;
 }
 
 td {
@@ -293,7 +392,7 @@ td {
 }
 
 tbody tr {
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast);
 }
 
 tbody tr:hover {
@@ -304,7 +403,6 @@ tbody tr:last-child td {
   border-bottom: none;
 }
 
-/* 动画效果 - 简洁微妙 */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -317,21 +415,21 @@ tbody tr:last-child td {
 }
 
 .animate-fade-in {
-  animation: fade-in 0.2s ease-out forwards;
+  animation: fade-in var(--motion-fast) ease-out forwards;
 }
 
 .animate-fade-in-delay-1 {
-  animation: fade-in 0.2s ease-out 0.05s forwards;
+  animation: fade-in var(--motion-fast) ease-out 0.05s forwards;
   opacity: 0;
 }
 
 .animate-fade-in-delay-2 {
-  animation: fade-in 0.2s ease-out 0.1s forwards;
+  animation: fade-in var(--motion-fast) ease-out 0.1s forwards;
   opacity: 0;
 }
 
 .animate-fade-in-delay-3 {
-  animation: fade-in 0.2s ease-out 0.15s forwards;
+  animation: fade-in var(--motion-fast) ease-out 0.15s forwards;
   opacity: 0;
 }
 
@@ -356,7 +454,7 @@ tbody tr:last-child td {
 }
 
 .animate-slide-in-right {
-  animation: slide-in-right 0.2s ease-out forwards;
+  animation: slide-in-right var(--motion-fast) ease-out forwards;
 }
 
 @keyframes slide-in-left {
@@ -371,7 +469,7 @@ tbody tr:last-child td {
 }
 
 .animate-slide-in-left {
-  animation: slide-in-left 0.2s ease-out forwards;
+  animation: slide-in-left var(--motion-fast) ease-out forwards;
 }
 
 @keyframes scale-in {
@@ -386,10 +484,9 @@ tbody tr:last-child td {
 }
 
 .animate-scale-in {
-  animation: scale-in 0.2s ease-out forwards;
+  animation: scale-in var(--motion-fast) ease-out forwards;
 }
 
-/* 表格行入场动画 */
 @keyframes table-row-in {
   from {
     opacity: 0;
@@ -400,7 +497,7 @@ tbody tr:last-child td {
 }
 
 tbody tr {
-  animation: table-row-in 0.2s ease-out forwards;
+  animation: table-row-in var(--motion-fast) ease-out forwards;
 }
 
 tbody tr:nth-child(1) { animation-delay: 0.02s; }
@@ -410,7 +507,6 @@ tbody tr:nth-child(4) { animation-delay: 0.08s; }
 tbody tr:nth-child(5) { animation-delay: 0.1s; }
 tbody tr:nth-child(n+6) { animation-delay: 0.1s; }
 
-/* 加载骨架屏动画 */
 @keyframes skeleton-loading {
   0% {
     background-position: 200% 0;
@@ -432,17 +528,15 @@ tbody tr:nth-child(n+6) { animation-delay: 0.1s; }
   border-radius: 6px;
 }
 
-/* Monaco Editor 适配 */
 .monaco-editor {
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--color-border);
 }
 
-/* xterm 终端样式 */
 .xterm {
   @apply p-2;
-  font-family: 'Fira Code', monospace !important;
+  font-family: var(--font-mono) !important;
 }
 
 .xterm-viewport::-webkit-scrollbar {
@@ -454,49 +548,54 @@ tbody tr:nth-child(n+6) { animation-delay: 0.1s; }
   border-radius: 4px;
 }
 
-/* 状态颜色 */
-.status-running {
-  color: #34D399;
-}
-.status-pending {
-  color: #FBBF24;
-}
-.status-failed {
-  color: #F87171;
-}
-.status-succeeded {
-  color: #60A5FA;
-}
-.status-unknown {
-  color: #A5B4C8;
-}
+.status-running { color: var(--color-success); }
+.status-pending { color: var(--color-warning); }
+.status-failed { color: var(--color-error); }
+.status-succeeded { color: var(--color-info); }
+.status-unknown { color: var(--color-text-muted); }
 
-/* 图表容器 */
 .chart-container {
   @apply w-full h-64;
 }
 
-/* 标题样式 */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Fira Sans', sans-serif;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-/* 代码字体 */
-code, pre, .mono {
-  font-family: 'Fira Code', monospace;
+h1 { font-size: var(--sys-heading-h1-size); line-height: var(--sys-heading-h1-line); }
+h2 { font-size: var(--sys-heading-h2-size); line-height: var(--sys-heading-h2-line); }
+h3 { font-size: var(--sys-heading-h3-size); line-height: var(--sys-heading-h3-line); }
+h4 { font-size: var(--sys-heading-h4-size); line-height: var(--sys-heading-h4-line); }
+
+.kpi-number {
+  font-family: var(--font-heading);
+  font-size: var(--sys-kpi-size);
+  line-height: var(--sys-kpi-line);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
-/* 链接样式 */
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
+}
+
 a {
-  transition: color 0.15s;
+  transition: color var(--motion-fast);
 }
 
 a:hover {
   color: var(--color-primary);
 }
 
-/* 响应式工具 */
 @media (max-width: 768px) {
   .hide-mobile {
     display: none;

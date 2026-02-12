@@ -269,18 +269,18 @@ export default function Pods() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
             Pods
           </h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            共 <span style={{ color: 'var(--color-primary)' }}>{totalItems}</span> 个 Pod
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+            共 <span className="text-[var(--color-primary)]">{totalItems}</span> 个 Pod
             {currentNamespace !== 'all' && (
               <>
-                {' '}在 <span style={{ color: 'var(--color-primary)' }}>{currentNamespace}</span> 命名空间
+                {' '}在 <span className="text-[var(--color-primary)]">{currentNamespace}</span> 命名空间
               </>
             )}
             {totalPages > 1 && (
-              <span className="ml-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="ml-2 text-xs text-[var(--color-text-muted)]">
                 (第 {currentPage}/{totalPages} 页)
               </span>
             )}
@@ -357,7 +357,7 @@ export default function Pods() {
                         <span style={{ color: '#34D399' }}>
                           {metrics ? formatCpuUsage(metrics.cpuUsage) : '-'}
                         </span>
-                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-xs text-[var(--color-text-muted)]">
                           请求: <span style={{ color: '#60A5FA' }}>{resources.cpuRequest}</span>
                           {resources.cpuLimit !== '-' && (
                             <> / 限制: <span style={{ color: '#FBBF24' }}>{resources.cpuLimit}</span></>
@@ -370,7 +370,7 @@ export default function Pods() {
                         <span style={{ color: '#34D399' }}>
                           {metrics ? formatMemory(metrics.memoryUsage) : '-'}
                         </span>
-                        <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-xs text-[var(--color-text-muted)]">
                           请求: <span style={{ color: '#60A5FA' }}>{resources.memRequest}</span>
                           {resources.memLimit !== '-' && (
                             <> / 限制: <span style={{ color: '#FBBF24' }}>{resources.memLimit}</span></>
@@ -378,10 +378,10 @@ export default function Pods() {
                         </span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--color-text-secondary)' }}>
+                    <td className="text-[var(--color-text-secondary)]">
                       {pod.spec.nodeName || '-'}
                     </td>
-                    <td style={{ color: 'var(--color-text-secondary)' }}>
+                    <td className="text-[var(--color-text-secondary)]">
                       {formatDistanceToNow(
                         new Date(pod.metadata.creationTimestamp),
                         { addSuffix: true, locale: zhCN }
@@ -396,7 +396,7 @@ export default function Pods() {
 
         {/* 空状态 */}
         {pods.length === 0 && (
-          <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>
+          <div className="text-center py-12 text-[var(--color-text-muted)]">
             没有找到 Pod
           </div>
         )}

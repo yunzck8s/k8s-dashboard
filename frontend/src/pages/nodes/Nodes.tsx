@@ -60,8 +60,8 @@ function ResourceBar({
   return (
     <div className="min-w-[120px]">
       <div className="flex items-center justify-between text-xs mb-1">
-        <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
-        <span style={{ color: 'var(--color-text-secondary)' }}>{percentage.toFixed(0)}%</span>
+        <span className="text-[var(--color-text-muted)]">{label}</span>
+        <span className="text-[var(--color-text-secondary)]">{percentage.toFixed(0)}%</span>
       </div>
       <div
         className="h-2 rounded-full overflow-hidden"
@@ -196,8 +196,8 @@ export default function Nodes() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>节点</h1>
-          <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>共 {nodes.length} 个节点</p>
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">节点</h1>
+          <p className="mt-1 text-[var(--color-text-secondary)]">共 {nodes.length} 个节点</p>
         </div>
         <button onClick={() => refetch()} className="btn btn-secondary">
           刷新
@@ -266,7 +266,7 @@ export default function Nodes() {
                         )}
                       </div>
                     </td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{getNodeRoles(node)}</td>
+                    <td className="text-[var(--color-text-muted)]">{getNodeRoles(node)}</td>
                     <td>
                       <ResourceBar
                         used={resourceUsage.cpuRequest}
@@ -285,13 +285,13 @@ export default function Nodes() {
                     </td>
                     <td>
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>{podCount}</span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>/</span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>{podCapacity}</span>
+                        <span className="text-lg font-semibold text-[var(--color-text-primary)]">{podCount}</span>
+                        <span className="text-[var(--color-text-muted)]">/</span>
+                        <span className="text-[var(--color-text-muted)]">{podCapacity}</span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{node.status.nodeInfo?.kubeletVersion || '-'}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>
+                    <td className="text-[var(--color-text-muted)]">{node.status.nodeInfo?.kubeletVersion || '-'}</td>
+                    <td className="text-[var(--color-text-muted)]">
                       {formatDistanceToNow(new Date(node.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -304,7 +304,7 @@ export default function Nodes() {
           </table>
         </div>
         {nodes.length === 0 && (
-          <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>没有找到节点</div>
+          <div className="text-center py-12 text-[var(--color-text-muted)]">没有找到节点</div>
         )}
       </div>
 

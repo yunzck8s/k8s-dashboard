@@ -156,12 +156,12 @@ export function getUsageColor(percentage: number): string {
   const level = getUsageLevel(percentage);
   switch (level) {
     case 'low':
-      return '#22c55e'; // green
+      return 'var(--color-success)';
     case 'medium':
-      return '#3b82f6'; // blue
+      return 'var(--color-info)';
     case 'high':
-      return '#f59e0b'; // amber
+      return 'var(--color-warning)';
     case 'critical':
-      return '#ef4444'; // red
+      return 'var(--color-error)';
   }
 }

@@ -174,23 +174,23 @@ export default function ServiceForm({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-surface-secondary rounded-xl border border-border w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <GlobeAltIcon className="w-5 h-5 text-blue-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">创建 Service</h3>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <p className="text-sm text-text-muted mt-0.5">
                 在命名空间 <span className="text-blue-400">{namespace}</span> 中创建新的 Service
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="p-1 text-slate-400 hover:text-white transition-colors"
+            className="p-1 text-text-muted hover:text-white transition-colors"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
@@ -205,7 +205,7 @@ export default function ServiceForm({
 
               {/* 名称 */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   名称 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -213,8 +213,8 @@ export default function ServiceForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="my-service"
-                  className={`w-full px-4 py-2.5 bg-slate-900 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.name ? 'border-red-500' : 'border-slate-600'
+                  className={`w-full px-4 py-2.5 bg-surface-tertiary border rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    errors.name ? 'border-red-500' : 'border-border-hover'
                   }`}
                 />
                 {errors.name && <p className="text-sm text-red-400 mt-1">{errors.name}</p>}
@@ -222,7 +222,7 @@ export default function ServiceForm({
 
               {/* Service 类型 */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   Service 类型 <span className="text-red-400">*</span>
                 </label>
                 <div className="grid grid-cols-3 gap-3">
@@ -234,11 +234,11 @@ export default function ServiceForm({
                       className={`p-4 rounded-lg border-2 transition-colors text-left ${
                         serviceType === type.value
                           ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-slate-700 hover:border-slate-600 bg-slate-900'
+                          : 'border-border hover:border-border-hover bg-surface-tertiary'
                       }`}
                     >
                       <div className="font-medium text-white mb-1">{type.label}</div>
-                      <div className="text-xs text-slate-400">{type.description}</div>
+                      <div className="text-xs text-text-muted">{type.description}</div>
                     </button>
                   ))}
                 </div>
@@ -265,7 +265,7 @@ export default function ServiceForm({
                 required
               />
               {errors.selector && <p className="text-sm text-red-400 mt-1">{errors.selector}</p>}
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 选择器用于匹配目标 Pod，必须与 Pod 的标签匹配
               </p>
             </div>
@@ -281,9 +281,9 @@ export default function ServiceForm({
 
               <div className="space-y-3">
                 {ports.map((port, index) => (
-                  <div key={index} className="bg-slate-900/50 rounded-lg p-4 space-y-3">
+                  <div key={index} className="bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-400">端口 {index + 1}</span>
+                      <span className="text-sm text-text-muted">端口 {index + 1}</span>
                       {ports.length > 1 && (
                         <button
                           type="button"
@@ -299,23 +299,23 @@ export default function ServiceForm({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {/* Port 名称 */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">名称（可选）</label>
+                        <label className="block text-xs text-text-muted mb-1">名称（可选）</label>
                         <input
                           type="text"
                           value={port.name}
                           onChange={(e) => updatePort(index, 'name', e.target.value)}
                           placeholder="http"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                       </div>
 
                       {/* 协议 */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">协议</label>
+                        <label className="block text-xs text-text-muted mb-1">协议</label>
                         <select
                           value={port.protocol}
                           onChange={(e) => updatePort(index, 'protocol', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         >
                           <option value="TCP">TCP</option>
                           <option value="UDP">UDP</option>
@@ -325,7 +325,7 @@ export default function ServiceForm({
 
                       {/* Port */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">
+                        <label className="block text-xs text-text-muted mb-1">
                           Service 端口 <span className="text-red-400">*</span>
                         </label>
                         <input
@@ -335,13 +335,13 @@ export default function ServiceForm({
                           placeholder="80"
                           min="1"
                           max="65535"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                       </div>
 
                       {/* Target Port */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">
+                        <label className="block text-xs text-text-muted mb-1">
                           目标端口 <span className="text-red-400">*</span>
                         </label>
                         <input
@@ -352,7 +352,7 @@ export default function ServiceForm({
                             updatePort(index, 'targetPort', isNaN(Number(val)) ? val : parseInt(val));
                           }}
                           placeholder="8080"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                         />
                       </div>
                     </div>
@@ -361,7 +361,7 @@ export default function ServiceForm({
                     {(serviceType === 'NodePort' || serviceType === 'LoadBalancer') && (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs text-slate-500 mb-1">
+                          <label className="block text-xs text-text-muted mb-1">
                             NodePort（可选，30000-32767）
                           </label>
                           <input
@@ -374,7 +374,7 @@ export default function ServiceForm({
                             placeholder="自动分配"
                             min="30000"
                             max="32767"
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                           />
                         </div>
                       </div>
@@ -395,11 +395,11 @@ export default function ServiceForm({
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)]">
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 text-slate-300 hover:text-white transition-colors font-medium"
+              className="px-5 py-2.5 text-text-secondary hover:text-white transition-colors font-medium"
               disabled={isPending}
             >
               取消

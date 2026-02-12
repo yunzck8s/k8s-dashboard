@@ -49,7 +49,7 @@ export default function StatefulSets() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-purple-100 to-pink-100 bg-clip-text text-transparent">
             StatefulSets
           </h1>
-          <p className="text-slate-400 mt-2 text-sm font-medium">
+          <p className="text-text-muted mt-2 text-sm font-medium">
             共 <span className="text-purple-400 font-semibold">{statefulSets.length}</span> 个 StatefulSet
             {currentNamespace !== 'all' && (
               <>
@@ -60,7 +60,7 @@ export default function StatefulSets() {
         </div>
         <button
           onClick={() => refetch()}
-          className="group relative px-5 py-2.5 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-purple-500/50 rounded-lg text-sm font-semibold text-slate-300 hover:text-white shadow-lg hover:shadow-purple-500/20 transition-all duration-300 overflow-hidden"
+          className="group relative px-5 py-2.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_80%,transparent)] border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] hover:border-purple-500/50 rounded-lg text-sm font-semibold text-text-secondary hover:text-white shadow-lg hover:shadow-purple-500/20 transition-all duration-300 overflow-hidden"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
           <span className="relative z-10 flex items-center gap-2">
@@ -117,10 +117,10 @@ export default function StatefulSets() {
                     <td>
                       {sts.status.readyReplicas ?? 0}/{sts.status.replicas ?? 0}
                     </td>
-                    <td className="text-slate-400 max-w-xs truncate" title={images}>
+                    <td className="text-text-muted max-w-xs truncate" title={images}>
                       {images}
                     </td>
-                    <td className="text-slate-400">
+                    <td className="text-text-muted">
                       {formatDistanceToNow(new Date(sts.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -133,7 +133,7 @@ export default function StatefulSets() {
           </table>
         </div>
         {statefulSets.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 StatefulSet</div>
+          <div className="text-center py-12 text-text-muted">没有找到 StatefulSet</div>
         )}
       </div>
     </div>

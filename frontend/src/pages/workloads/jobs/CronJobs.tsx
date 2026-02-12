@@ -77,7 +77,7 @@ export default function CronJobs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">CronJobs</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {cronJobs.length} 个 CronJob
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -121,7 +121,7 @@ export default function CronJobs() {
                         <span className="badge badge-default">{cronJob.metadata.namespace}</span>
                       </td>
                     )}
-                    <td className="font-mono text-sm text-slate-300">
+                    <td className="font-mono text-sm text-text-secondary">
                       {cronJob.spec.schedule}
                     </td>
                     <td>
@@ -135,7 +135,7 @@ export default function CronJobs() {
                       </span>
                     </td>
                     <td>{activeJobs}</td>
-                    <td className="text-slate-400">{getLastSchedule(cronJob)}</td>
+                    <td className="text-text-muted">{getLastSchedule(cronJob)}</td>
                     <td>
                       <div className="flex items-center gap-2">
                         <button
@@ -175,7 +175,7 @@ export default function CronJobs() {
           </table>
         </div>
         {cronJobs.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 CronJob</div>
+          <div className="text-center py-12 text-text-muted">没有找到 CronJob</div>
         )}
       </div>
     </div>

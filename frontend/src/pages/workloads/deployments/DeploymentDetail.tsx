@@ -198,13 +198,13 @@ export default function DeploymentDetail() {
         <div className="flex items-center gap-4">
           <Link
             to="/workloads/deployments"
-            className="group p-2 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-slate-600 rounded-lg transition-all duration-200 hover:scale-105"
+            className="group p-2 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_80%,transparent)] border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] hover:border-border-hover rounded-lg transition-all duration-200 hover:scale-105"
           >
-            <ArrowLeftIcon className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
+            <ArrowLeftIcon className="w-5 h-5 text-text-muted group-hover:text-white transition-colors" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">{name}</h1>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-text-secondary bg-clip-text text-transparent">{name}</h1>
               <span className={clsx(
                 'px-3 py-1 rounded-full text-xs font-semibold tracking-wide backdrop-blur-sm',
                 isHealthy
@@ -214,18 +214,18 @@ export default function DeploymentDetail() {
                 {deployment.status.readyReplicas || 0}/{deployment.status.replicas || 0} Ready
               </span>
             </div>
-            <p className="text-slate-400 mt-1.5 text-sm font-medium">命名空间: <span className="text-slate-300">{namespace}</span></p>
+            <p className="text-text-muted mt-1.5 text-sm font-medium">命名空间: <span className="text-text-secondary">{namespace}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {/* 主要操作按钮组 */}
-          <div className="flex items-center bg-slate-800/60 backdrop-blur-sm rounded-lg border border-slate-700/50 shadow-xl overflow-hidden">
+          <div className="flex items-center bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm rounded-lg border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] shadow-xl overflow-hidden">
             <button
               onClick={() => {
                 setNewReplicas(deployment.spec.replicas || 0);
                 setShowScaleModal(true);
               }}
-              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white transition-all duration-200 border-r border-slate-700/50 overflow-hidden"
+              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-white transition-all duration-200 border-r border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-blue-600/10 to-blue-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
               <ArrowsPointingOutIcon className="w-4 h-4 relative z-10 group-hover:scale-110 transition-transform" />
@@ -234,7 +234,7 @@ export default function DeploymentDetail() {
             <button
               onClick={() => setShowRestartModal(true)}
               disabled={restartMutation.isPending}
-              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+              className="group relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-600/0 via-cyan-600/10 to-cyan-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
               <ArrowPathIcon className={clsx('w-4 h-4 relative z-10 group-hover:scale-110 transition-transform', restartMutation.isPending && 'animate-spin')} />
@@ -268,8 +268,8 @@ export default function DeploymentDetail() {
           {/* 更多操作下拉菜单 */}
           <ActionDropdown
             trigger={
-              <button className="group relative flex items-center gap-2 px-3 py-2.5 bg-slate-800/60 backdrop-blur-sm border border-slate-700/50 hover:border-slate-600 rounded-lg text-sm font-medium text-slate-300 hover:text-white shadow-lg transition-all duration-200 hover:scale-105 overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-600/0 via-slate-600/20 to-slate-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <button className="group relative flex items-center gap-2 px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] hover:border-border-hover rounded-lg text-sm font-medium text-text-secondary hover:text-white shadow-lg transition-all duration-200 hover:scale-105 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[color-mix(in_srgb,var(--color-border-hover)_20%,transparent)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <Cog6ToothIcon className="w-4 h-4 relative z-10 group-hover:rotate-90 transition-transform duration-300" />
                 <span className="relative z-10">配置</span>
                 <EllipsisVerticalIcon className="w-4 h-4 relative z-10" />
@@ -305,8 +305,8 @@ export default function DeploymentDetail() {
       {/* 标签页导航 - 现代胶囊式设计 */}
       <div className="relative">
         {/* 背景装饰 */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 via-slate-800/10 to-slate-800/30 rounded-xl blur-xl" />
-        <nav className="relative flex gap-2 p-1.5 bg-slate-800/40 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-[color-mix(in_srgb,var(--color-bg-secondary)_30%,transparent)] via-[color-mix(in_srgb,var(--color-bg-secondary)_10%,transparent)] to-[color-mix(in_srgb,var(--color-bg-secondary)_30%,transparent)] rounded-xl blur-xl" />
+        <nav className="relative flex gap-2 p-1.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_40%,transparent)] backdrop-blur-xl border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] rounded-xl shadow-2xl">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -315,7 +315,7 @@ export default function DeploymentDetail() {
                 'relative px-6 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300',
                 activeTab === tab.id
                   ? 'text-white shadow-lg'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
+                  : 'text-text-muted hover:text-text-secondary hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_30%,transparent)]'
               )}
             >
               {/* 激活状态背景 */}
@@ -402,30 +402,30 @@ export default function DeploymentDetail() {
             </div>
 
             <div className="space-y-4 mb-6">
-              <p className="text-slate-300">
+              <p className="text-text-secondary">
                 您即将重启 Deployment <span className="font-semibold text-white">{name}</span>，这将触发滚动重启所有 Pod。
               </p>
 
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <h4 className="text-sm font-medium text-slate-400 mb-3">当前状态</h4>
+              <div className="bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] rounded-lg p-4 border border-border">
+                <h4 className="text-sm font-medium text-text-muted mb-3">当前状态</h4>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">命名空间</dt>
-                    <dd className="text-slate-200 font-medium">{namespace}</dd>
+                    <dt className="text-text-muted">命名空间</dt>
+                    <dd className="text-text-secondary font-medium">{namespace}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">期望副本数</dt>
-                    <dd className="text-slate-200 font-medium">{deployment.spec.replicas || 0}</dd>
+                    <dt className="text-text-muted">期望副本数</dt>
+                    <dd className="text-text-secondary font-medium">{deployment.spec.replicas || 0}</dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">就绪副本数</dt>
-                    <dd className="text-slate-200 font-medium">
+                    <dt className="text-text-muted">就绪副本数</dt>
+                    <dd className="text-text-secondary font-medium">
                       {deployment.status.readyReplicas || 0}/{deployment.status.replicas || 0}
                     </dd>
                   </div>
                   <div className="flex justify-between">
-                    <dt className="text-slate-400">更新策略</dt>
-                    <dd className="text-slate-200 font-medium">
+                    <dt className="text-text-muted">更新策略</dt>
+                    <dd className="text-text-secondary font-medium">
                       {deployment.spec.strategy?.type || 'RollingUpdate'}
                     </dd>
                   </div>
@@ -583,7 +583,7 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
               {key}: {value}
             </span>
           ))}
-          {!deployment.metadata.labels && <span className="text-slate-500">无标签</span>}
+          {!deployment.metadata.labels && <span className="text-text-muted">无标签</span>}
         </div>
       </div>
 
@@ -604,25 +604,25 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
         <h3 className="text-lg font-semibold text-white mb-4">容器模板</h3>
         <div className="space-y-4">
           {deployment.spec.template.spec.containers.map((container) => (
-            <div key={container.name} className="bg-slate-800 rounded-lg p-4">
+            <div key={container.name} className="bg-surface-secondary rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
                 <span className="font-medium text-white">{container.name}</span>
               </div>
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-slate-400">镜像</dt>
-                <dd className="text-slate-200 font-mono text-xs break-all">{container.image}</dd>
+                <dt className="text-text-muted">镜像</dt>
+                <dd className="text-text-secondary font-mono text-xs break-all">{container.image}</dd>
                 {container.ports && container.ports.length > 0 && (
                   <>
-                    <dt className="text-slate-400">端口</dt>
-                    <dd className="text-slate-200">
+                    <dt className="text-text-muted">端口</dt>
+                    <dd className="text-text-secondary">
                       {container.ports.map((p) => `${p.containerPort}/${p.protocol || 'TCP'}`).join(', ')}
                     </dd>
                   </>
                 )}
                 {container.resources?.requests && (
                   <>
-                    <dt className="text-slate-400">资源请求</dt>
-                    <dd className="text-slate-200">
+                    <dt className="text-text-muted">资源请求</dt>
+                    <dd className="text-text-secondary">
                       CPU: {container.resources.requests.cpu || '-'},
                       内存: {container.resources.requests.memory || '-'}
                     </dd>
@@ -630,8 +630,8 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
                 )}
                 {container.resources?.limits && (
                   <>
-                    <dt className="text-slate-400">资源限制</dt>
-                    <dd className="text-slate-200">
+                    <dt className="text-text-muted">资源限制</dt>
+                    <dd className="text-text-secondary">
                       CPU: {container.resources.limits.cpu || '-'},
                       内存: {container.resources.limits.memory || '-'}
                     </dd>
@@ -649,7 +649,7 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-slate-400 text-sm">
+              <tr className="text-left text-text-muted text-sm">
                 <th className="pb-3">类型</th>
                 <th className="pb-3">状态</th>
                 <th className="pb-3">原因</th>
@@ -659,8 +659,8 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
             </thead>
             <tbody className="text-sm">
               {deployment.status.conditions?.map((condition) => (
-                <tr key={condition.type} className="border-t border-slate-700">
-                  <td className="py-3 text-slate-300">{condition.type}</td>
+                <tr key={condition.type} className="border-t border-border">
+                  <td className="py-3 text-text-secondary">{condition.type}</td>
                   <td className="py-3">
                     <span
                       className={clsx(
@@ -671,9 +671,9 @@ function OverviewTab({ deployment, namespace, name }: { deployment: Deployment; 
                       {condition.status}
                     </span>
                   </td>
-                  <td className="py-3 text-slate-400">{condition.reason || '-'}</td>
-                  <td className="py-3 text-slate-400 max-w-xs truncate">{condition.message || '-'}</td>
-                  <td className="py-3 text-slate-400">
+                  <td className="py-3 text-text-muted">{condition.reason || '-'}</td>
+                  <td className="py-3 text-text-muted max-w-xs truncate">{condition.message || '-'}</td>
+                  <td className="py-3 text-text-muted">
                     {condition.lastUpdateTime
                       ? formatDistanceToNow(new Date(condition.lastUpdateTime), {
                           addSuffix: true,
@@ -756,9 +756,9 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
                   </td>
                   <td>{ready}/{total}</td>
                   <td>{restarts}</td>
-                  <td className="text-slate-400 font-mono text-sm">{pod.status.podIP || '-'}</td>
-                  <td className="text-slate-400">{pod.spec.nodeName || '-'}</td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted font-mono text-sm">{pod.status.podIP || '-'}</td>
+                  <td className="text-text-muted">{pod.spec.nodeName || '-'}</td>
+                  <td className="text-text-muted">
                     {formatDistanceToNow(new Date(pod.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -771,7 +771,7 @@ function PodsTab({ pods, namespace }: { pods: Pod[]; namespace: string }) {
         </table>
       </div>
       {pods.length === 0 && (
-        <div className="text-center py-12 text-slate-400">暂无 Pods</div>
+        <div className="text-center py-12 text-text-muted">暂无 Pods</div>
       )}
     </div>
   );
@@ -790,11 +790,11 @@ function YamlTab({ yaml, onEditYaml }: { yaml: string; onEditYaml: () => void })
   return (
     <div className="relative">
       {/* 浮动工具栏 - 毛玻璃效果 */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-1 px-2 py-1.5 bg-slate-800/60 backdrop-blur-xl border border-slate-700/50 rounded-lg shadow-lg">
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-1 px-2 py-1.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-xl border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] rounded-lg shadow-lg">
         {/* 复制按钮 */}
         <button
           onClick={copyYaml}
-          className="group relative p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 hover:scale-105"
+          className="group relative p-2 text-text-muted hover:text-blue-400 hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-md transition-all duration-200 hover:scale-105"
           title="复制 YAML"
         >
           <ClipboardDocumentIcon className="w-4 h-4" />
@@ -806,12 +806,12 @@ function YamlTab({ yaml, onEditYaml }: { yaml: string; onEditYaml: () => void })
         </button>
 
         {/* 分隔线 */}
-        <div className="w-px h-4 bg-slate-700/50" />
+        <div className="w-px h-4 bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)]" />
 
         {/* 编辑按钮 */}
         <button
           onClick={onEditYaml}
-          className="group relative p-2 text-slate-400 hover:text-blue-400 hover:bg-slate-700/50 rounded-md transition-all duration-200 hover:scale-105"
+          className="group relative p-2 text-text-muted hover:text-blue-400 hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-md transition-all duration-200 hover:scale-105"
           title="编辑 YAML"
         >
           <PencilIcon className="w-4 h-4" />
@@ -819,8 +819,8 @@ function YamlTab({ yaml, onEditYaml }: { yaml: string; onEditYaml: () => void })
       </div>
 
       {/* YAML 代码块 */}
-      <div className="card p-6 bg-slate-900 max-h-[600px] overflow-y-auto border border-slate-800/50">
-        <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words leading-relaxed">{yaml || '加载中...'}</pre>
+      <div className="card p-6 bg-surface-tertiary max-h-[600px] overflow-y-auto border border-[color-mix(in_srgb,var(--color-border)_55%,transparent)]">
+        <pre className="text-sm text-text-secondary font-mono whitespace-pre-wrap break-words leading-relaxed">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );
@@ -848,7 +848,7 @@ function EventsTab({ namespace, name }: { namespace: string; name: string }) {
   if (events.length === 0) {
     return (
       <div className="card p-6 text-center">
-        <p className="text-slate-400">暂无事件</p>
+        <p className="text-text-muted">暂无事件</p>
       </div>
     );
   }
@@ -862,7 +862,7 @@ function EventsTab({ namespace, name }: { namespace: string; name: string }) {
             'flex items-start gap-3 p-4 rounded-lg border',
             event.type === 'Warning'
               ? 'bg-yellow-500/10 border-yellow-500/20'
-              : 'bg-slate-700/50 border-slate-600/50'
+              : 'bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] border-[color-mix(in_srgb,var(--color-border-hover)_50%,transparent)]'
           )}
         >
           {event.type === 'Warning' ? (
@@ -875,7 +875,7 @@ function EventsTab({ namespace, name }: { namespace: string; name: string }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium text-white">{event.reason}</p>
-              <span className="text-xs text-slate-500 flex-shrink-0">
+              <span className="text-xs text-text-muted flex-shrink-0">
                 {event.lastTimestamp &&
                   formatDistanceToNow(new Date(event.lastTimestamp), {
                     addSuffix: true,
@@ -883,8 +883,8 @@ function EventsTab({ namespace, name }: { namespace: string; name: string }) {
                   })}
               </span>
             </div>
-            <p className="text-sm text-slate-400 mt-1">{event.message}</p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-sm text-text-muted mt-1">{event.message}</p>
+            <p className="text-xs text-text-muted mt-1">
               {event.involvedObject.kind}/{event.involvedObject.name}
             </p>
           </div>
@@ -906,8 +906,8 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-slate-400">{label}</dt>
-      <dd className={clsx('text-slate-200', mono && 'font-mono text-sm')}>{value}</dd>
+      <dt className="text-text-muted">{label}</dt>
+      <dd className={clsx('text-text-secondary', mono && 'font-mono text-sm')}>{value}</dd>
     </div>
   );
 }

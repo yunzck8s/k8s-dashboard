@@ -88,7 +88,7 @@ export default function ConfigMaps() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-amber-100 to-orange-100 bg-clip-text text-transparent">
             ConfigMaps
           </h1>
-          <p className="text-slate-400 mt-2 text-sm font-medium">
+          <p className="text-text-muted mt-2 text-sm font-medium">
             共 <span className="text-amber-400 font-semibold">{configMaps.length}</span> 个 ConfigMap
             {currentNamespace !== 'all' && (
               <>
@@ -111,7 +111,7 @@ export default function ConfigMaps() {
           )}
           <button
             onClick={() => refetch()}
-            className="group relative px-5 py-2.5 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-amber-500/50 rounded-lg text-sm font-semibold text-slate-300 hover:text-white shadow-lg hover:shadow-amber-500/20 transition-all duration-300 overflow-hidden"
+            className="group relative px-5 py-2.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_80%,transparent)] border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] hover:border-amber-500/50 rounded-lg text-sm font-semibold text-text-secondary hover:text-white shadow-lg hover:shadow-amber-500/20 transition-all duration-300 overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-amber-600/0 via-amber-600/10 to-amber-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
             <span className="relative z-10 flex items-center gap-2">
@@ -152,10 +152,10 @@ export default function ConfigMaps() {
                       <span className="badge badge-default">{cm.metadata.namespace}</span>
                     </td>
                   )}
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {Object.keys(cm.data || {}).length} 条
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {formatDistanceToNow(new Date(cm.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -167,7 +167,7 @@ export default function ConfigMaps() {
           </table>
         </div>
         {configMaps.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 ConfigMap</div>
+          <div className="text-center py-12 text-text-muted">没有找到 ConfigMap</div>
         )}
       </div>
 

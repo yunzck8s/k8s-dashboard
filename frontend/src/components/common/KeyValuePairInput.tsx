@@ -67,13 +67,13 @@ export default function KeyValuePairInput({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-slate-300">
+      <label className="block text-sm font-medium text-text-secondary">
         {label}
         {required && <span className="text-red-400 ml-1">*</span>}
       </label>
 
       {pairs.length === 0 ? (
-        <div className="text-sm text-slate-500 italic py-2">
+        <div className="text-sm text-text-muted italic py-2">
           暂无{label}，点击下方按钮添加
         </div>
       ) : (
@@ -87,11 +87,11 @@ export default function KeyValuePairInput({
                 onChange={(e) => handleKeyChange(index, e.target.value)}
                 placeholder={placeholder.key}
                 disabled={disabled}
-                className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
+                className="flex-1 px-4 py-2.5 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
               />
 
               {/* 分隔符 */}
-              <div className="flex items-center px-2 text-slate-500 font-bold">
+              <div className="flex items-center px-2 text-text-muted font-bold">
                 :
               </div>
 
@@ -102,7 +102,7 @@ export default function KeyValuePairInput({
                 onChange={(e) => handleValueChange(index, e.target.value)}
                 placeholder={placeholder.value}
                 disabled={disabled}
-                className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
+                className="flex-1 px-4 py-2.5 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
               />
 
               {/* 删除按钮 */}
@@ -133,7 +133,7 @@ export default function KeyValuePairInput({
 
       {/* 帮助文本 */}
       {!disabled && pairs.length === 0 && (
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-text-muted mt-1">
           提示：键名遵循 Kubernetes 标签规范（字母数字、-、_、.）
         </p>
       )}

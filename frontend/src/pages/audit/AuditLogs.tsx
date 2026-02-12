@@ -157,7 +157,7 @@ export default function AuditLogs() {
     if (code >= 200 && code < 300) return 'text-green-400';
     if (code >= 400 && code < 500) return 'text-yellow-400';
     if (code >= 500) return 'text-red-400';
-    return 'text-slate-400';
+    return 'text-text-muted';
   };
 
   // 获取状态图标
@@ -230,7 +230,7 @@ export default function AuditLogs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">审计日志</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             记录所有 API 操作，共 {total} 条记录
           </p>
         </div>
@@ -239,7 +239,7 @@ export default function AuditLogs() {
             onClick={() => setShowFilters(!showFilters)}
             className={clsx(
               'btn btn-secondary flex items-center gap-2',
-              showFilters && 'bg-slate-600'
+              showFilters && 'bg-surface-tertiary'
             )}
           >
             <FunnelIcon className="w-4 h-4" />
@@ -261,7 +261,7 @@ export default function AuditLogs() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">{stats.total}</p>
-                <p className="text-sm text-slate-400">总操作数</p>
+                <p className="text-sm text-text-muted">总操作数</p>
               </div>
             </div>
           </div>
@@ -274,7 +274,7 @@ export default function AuditLogs() {
                 <p className="text-2xl font-bold text-green-400">
                   {stats.byAction?.POST || 0}
                 </p>
-                <p className="text-sm text-slate-400">创建操作</p>
+                <p className="text-sm text-text-muted">创建操作</p>
               </div>
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function AuditLogs() {
                 <p className="text-2xl font-bold text-yellow-400">
                   {(stats.byAction?.PUT || 0) + (stats.byAction?.PATCH || 0)}
                 </p>
-                <p className="text-sm text-slate-400">更新操作</p>
+                <p className="text-sm text-text-muted">更新操作</p>
               </div>
             </div>
           </div>
@@ -300,7 +300,7 @@ export default function AuditLogs() {
                 <p className="text-2xl font-bold text-red-400">
                   {stats.byAction?.DELETE || 0}
                 </p>
-                <p className="text-sm text-slate-400">删除操作</p>
+                <p className="text-sm text-text-muted">删除操作</p>
               </div>
             </div>
           </div>
@@ -313,7 +313,7 @@ export default function AuditLogs() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* 时间范围 */}
             <div>
-              <label className="block text-sm text-slate-400 mb-2">
+              <label className="block text-sm text-text-muted mb-2">
                 <ClockIcon className="w-4 h-4 inline mr-1" />
                 时间范围
               </label>
@@ -335,7 +335,7 @@ export default function AuditLogs() {
 
             {/* 操作类型 */}
             <div>
-              <label className="block text-sm text-slate-400 mb-2">
+              <label className="block text-sm text-text-muted mb-2">
                 <UserIcon className="w-4 h-4 inline mr-1" />
                 操作类型
               </label>
@@ -358,7 +358,7 @@ export default function AuditLogs() {
 
             {/* 资源类型 */}
             <div>
-              <label className="block text-sm text-slate-400 mb-2">
+              <label className="block text-sm text-text-muted mb-2">
                 <ServerIcon className="w-4 h-4 inline mr-1" />
                 资源类型
               </label>
@@ -402,7 +402,7 @@ export default function AuditLogs() {
       {/* 资源分布统计 */}
       {stats?.byResource && Object.keys(stats.byResource).length > 0 && (
         <div className="card p-4">
-          <h3 className="text-sm font-medium text-slate-300 mb-3">资源操作分布</h3>
+          <h3 className="text-sm font-medium text-text-secondary mb-3">资源操作分布</h3>
           <div className="flex flex-wrap gap-2">
             {Object.entries(stats.byResource)
               .sort(([, a], [, b]) => b - a)
@@ -419,11 +419,11 @@ export default function AuditLogs() {
                     'px-3 py-1.5 rounded-lg text-sm transition-colors',
                     resourceFilter === resource
                       ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      : 'bg-surface-tertiary text-text-secondary hover:bg-surface-tertiary'
                   )}
                 >
                   {resourceLabels[resource] || resource}{' '}
-                  <span className="text-slate-400">({count})</span>
+                  <span className="text-text-muted">({count})</span>
                 </button>
               ))}
           </div>
@@ -435,7 +435,7 @@ export default function AuditLogs() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-slate-400 text-sm border-b border-slate-700">
+              <tr className="text-left text-text-muted text-sm border-b border-border">
                 <th className="pb-3 px-4 w-8"></th>
                 <th className="pb-3 px-2">时间</th>
                 <th className="pb-3 px-2">操作描述</th>
@@ -449,11 +449,11 @@ export default function AuditLogs() {
                 <>
                   <tr
                     key={log.id}
-                    className="border-t border-slate-700 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                    className="border-t border-border hover:bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)] cursor-pointer transition-colors"
                     onClick={() => toggleRowExpand(log.id)}
                   >
                     <td className="py-3 px-4">
-                      <button className="text-slate-400 hover:text-slate-300">
+                      <button className="text-text-muted hover:text-text-secondary">
                         {expandedRows.has(log.id) ? (
                           <ChevronUpIcon className="w-4 h-4" />
                         ) : (
@@ -463,10 +463,10 @@ export default function AuditLogs() {
                     </td>
                     <td className="py-3 px-2 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <span className="text-slate-300 text-sm">
+                        <span className="text-text-secondary text-sm">
                           {formatTime(log.timestamp)}
                         </span>
-                        <span className="text-slate-500 text-xs">
+                        <span className="text-text-muted text-xs">
                           {formatRelativeTime(log.timestamp)}
                         </span>
                       </div>
@@ -483,7 +483,7 @@ export default function AuditLogs() {
                           {getActionIcon(log.action)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-slate-200 text-sm leading-relaxed">
+                          <p className="text-text-secondary text-sm leading-relaxed">
                             {getActionDescription(log)}
                           </p>
                         </div>
@@ -504,14 +504,14 @@ export default function AuditLogs() {
                       <span className={clsx(
                         'text-sm',
                         log.duration > 1000 ? 'text-yellow-400' :
-                        log.duration > 3000 ? 'text-red-400' : 'text-slate-400'
+                        log.duration > 3000 ? 'text-red-400' : 'text-text-muted'
                       )}>
                         {log.duration}ms
                       </span>
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex flex-col">
-                        <span className="text-slate-400 text-xs font-mono">
+                        <span className="text-text-muted text-xs font-mono">
                           {log.clientIP}
                         </span>
                       </div>
@@ -520,68 +520,68 @@ export default function AuditLogs() {
 
                   {/* 展开的详情行 */}
                   {expandedRows.has(log.id) && (
-                    <tr className="border-t border-slate-700 bg-slate-800/30">
+                    <tr className="border-t border-border bg-[color-mix(in_srgb,var(--color-bg-secondary)_30%,transparent)]">
                       <td colSpan={6} className="px-4 py-4">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                           {/* 基本信息 */}
                           <div className="space-y-3">
-                            <h4 className="text-slate-300 font-medium mb-2 flex items-center gap-2">
+                            <h4 className="text-text-secondary font-medium mb-2 flex items-center gap-2">
                               <DocumentTextIcon className="w-4 h-4" />
                               基本信息
                             </h4>
-                            <div className="space-y-2 bg-slate-900/50 rounded-lg p-3">
+                            <div className="space-y-2 bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg p-3">
                               <div className="flex justify-between">
-                                <span className="text-slate-500">用户:</span>
-                                <span className="text-slate-300 font-medium">{log.user}</span>
+                                <span className="text-text-muted">用户:</span>
+                                <span className="text-text-secondary font-medium">{log.user}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-500">操作类型:</span>
+                                <span className="text-text-muted">操作类型:</span>
                                 <span className={clsx('badge', actionColors[log.action] || 'badge-default')}>
                                   {actionLabels[log.action] || log.action}
                                 </span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-500">资源类型:</span>
-                                <span className="text-slate-300">{resourceLabels[log.resource] || log.resource}</span>
+                                <span className="text-text-muted">资源类型:</span>
+                                <span className="text-text-secondary">{resourceLabels[log.resource] || log.resource}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-500">资源名称:</span>
+                                <span className="text-text-muted">资源名称:</span>
                                 <span className="text-blue-400 font-mono text-xs">{log.resourceName || '-'}</span>
                               </div>
                               {log.namespace && (
                                 <div className="flex justify-between">
-                                  <span className="text-slate-500">命名空间:</span>
+                                  <span className="text-text-muted">命名空间:</span>
                                   <span className="badge badge-default">{log.namespace}</span>
                                 </div>
                               )}
                               <div className="flex justify-between">
-                                <span className="text-slate-500">集群:</span>
-                                <span className="text-slate-300">{log.cluster || '-'}</span>
+                                <span className="text-text-muted">集群:</span>
+                                <span className="text-text-secondary">{log.cluster || '-'}</span>
                               </div>
                             </div>
                           </div>
 
                           {/* 请求信息 */}
                           <div className="space-y-3">
-                            <h4 className="text-slate-300 font-medium mb-2 flex items-center gap-2">
+                            <h4 className="text-text-secondary font-medium mb-2 flex items-center gap-2">
                               <ServerIcon className="w-4 h-4" />
                               请求信息
                             </h4>
-                            <div className="space-y-2 bg-slate-900/50 rounded-lg p-3">
+                            <div className="space-y-2 bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg p-3">
                               <div className="flex justify-between">
-                                <span className="text-slate-500">客户端 IP:</span>
-                                <span className="text-slate-300 font-mono text-xs">{log.clientIP}</span>
+                                <span className="text-text-muted">客户端 IP:</span>
+                                <span className="text-text-secondary font-mono text-xs">{log.clientIP}</span>
                               </div>
                               {log.userAgent && (
                                 <div className="flex flex-col gap-1">
-                                  <span className="text-slate-500">User Agent:</span>
-                                  <span className="text-slate-400 text-xs font-mono break-all">
+                                  <span className="text-text-muted">User Agent:</span>
+                                  <span className="text-text-muted text-xs font-mono break-all">
                                     {log.userAgent}
                                   </span>
                                 </div>
                               )}
                               <div className="flex justify-between">
-                                <span className="text-slate-500">响应状态:</span>
+                                <span className="text-text-muted">响应状态:</span>
                                 <div className="flex items-center gap-2">
                                   {getStatusIcon(log.statusCode)}
                                   <span className={getStatusColor(log.statusCode)}>
@@ -590,7 +590,7 @@ export default function AuditLogs() {
                                 </div>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-500">请求耗时:</span>
+                                <span className="text-text-muted">请求耗时:</span>
                                 <span className={clsx(
                                   'font-medium',
                                   log.duration > 1000 ? 'text-yellow-400' :
@@ -605,11 +605,11 @@ export default function AuditLogs() {
                           {/* 请求体 */}
                           {log.requestBody && (
                             <div className="lg:col-span-2 space-y-2">
-                              <h4 className="text-slate-300 font-medium flex items-center gap-2">
+                              <h4 className="text-text-secondary font-medium flex items-center gap-2">
                                 <DocumentTextIcon className="w-4 h-4" />
                                 请求体
                               </h4>
-                              <pre className="bg-slate-900 rounded-lg p-3 text-xs text-slate-300 font-mono overflow-x-auto max-h-64">
+                              <pre className="bg-surface-tertiary rounded-lg p-3 text-xs text-text-secondary font-mono overflow-x-auto max-h-64">
                                 {formatJSON(log.requestBody)}
                               </pre>
                             </div>
@@ -625,15 +625,15 @@ export default function AuditLogs() {
         </div>
 
         {logs.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-text-muted">
             没有找到审计日志
           </div>
         )}
 
         {/* 分页 */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700">
-            <div className="text-sm text-slate-400">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+            <div className="text-sm text-text-muted">
               第 {page} 页，共 {totalPages} 页（{total} 条记录）
             </div>
             <div className="flex items-center gap-2">
@@ -664,7 +664,7 @@ export default function AuditLogs() {
                         'w-8 h-8 rounded text-sm',
                         page === pageNum
                           ? 'bg-blue-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          : 'bg-surface-tertiary text-text-secondary hover:bg-surface-tertiary'
                       )}
                     >
                       {pageNum}
@@ -685,7 +685,7 @@ export default function AuditLogs() {
       </div>
 
       {/* 操作说明 */}
-      <div className="text-sm text-slate-500">
+      <div className="text-sm text-text-muted">
         <p>审计日志记录所有对 Kubernetes 资源的写操作（创建、更新、删除）以及对 Secrets 的访问。</p>
         <p>敏感信息（密码、Token 等）已自动过滤。</p>
       </div>

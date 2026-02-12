@@ -67,21 +67,17 @@ export default function Pagination({
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
+    <div className="flex flex-col gap-4 border-t border-[var(--color-border)] px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
       {/* 左侧：每页显示数量 */}
-      <div className="flex items-center gap-4">
-        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+      <div className="flex flex-wrap items-center gap-3 md:gap-4">
+        <span className="text-sm text-[var(--color-text-secondary)]">
           每页显示
         </span>
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
-          className="px-3 py-1 rounded-lg text-sm font-medium transition-all duration-150"
-          style={{
-            background: 'var(--color-bg-tertiary)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
+          className="min-h-[40px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-3 py-1 text-sm font-medium text-[var(--color-text-primary)] transition-all duration-150 hover:border-[var(--color-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="每页显示条数"
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
@@ -89,26 +85,22 @@ export default function Pagination({
             </option>
           ))}
         </select>
-        <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-          显示 <span style={{ color: 'var(--color-primary)' }}>{startItem}</span> -{' '}
-          <span style={{ color: 'var(--color-primary)' }}>{endItem}</span> / 共{' '}
-          <span style={{ color: 'var(--color-primary)' }}>{totalItems}</span> 项
+        <span className="text-sm text-[var(--color-text-muted)]">
+          显示 <span className="text-[var(--color-primary)]">{startItem}</span> -{' '}
+          <span className="text-[var(--color-primary)]">{endItem}</span> / 共{' '}
+          <span className="text-[var(--color-primary)]">{totalItems}</span> 项
         </span>
       </div>
 
       {/* 右侧：页码导航 */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {/* 上一页按钮 */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="p-2 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{
-            background: 'var(--color-bg-tertiary)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
+          className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)] disabled:cursor-not-allowed disabled:opacity-30"
           title="上一页"
+          aria-label="上一页"
         >
           <ChevronLeftIcon className="w-4 h-4" />
         </button>
@@ -120,8 +112,7 @@ export default function Pagination({
               return (
                 <span
                   key={`ellipsis-${index}`}
-                  className="px-3 py-1 text-sm"
-                  style={{ color: 'var(--color-text-muted)' }}
+                  className="px-3 py-1 text-sm text-[var(--color-text-muted)]"
                 >
                   ...
                 </span>
@@ -134,13 +125,13 @@ export default function Pagination({
                 key={page}
                 onClick={() => onPageChange(page as number)}
                 className={clsx(
-                  'px-3 py-1 rounded-lg text-sm font-medium transition-all duration-150'
+                  'min-h-[40px] rounded-lg border px-3 py-1 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                  isActive
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)]'
                 )}
-                style={{
-                  background: isActive ? 'var(--color-primary)' : 'var(--color-bg-tertiary)',
-                  border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
-                  color: isActive ? 'white' : 'var(--color-text-primary)',
-                }}
+                aria-label={`跳转到第 ${page} 页`}
+                aria-current={isActive ? 'page' : undefined}
               >
                 {page}
               </button>
@@ -152,21 +143,17 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="p-2 rounded transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          style={{
-            background: 'var(--color-bg-tertiary)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
+          className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)] transition-all hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)] disabled:cursor-not-allowed disabled:opacity-30"
           title="下一页"
+          aria-label="下一页"
         >
           <ChevronRightIcon className="w-4 h-4" />
         </button>
 
         {/* 快速跳转 */}
         {totalPages > 10 && (
-          <div className="flex items-center gap-2 ml-4">
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          <div className="ml-2 flex items-center gap-2 md:ml-4">
+            <span className="text-sm text-[var(--color-text-secondary)]">
               跳转至
             </span>
             <input
@@ -182,12 +169,8 @@ export default function Pagination({
                   }
                 }
               }}
-              className="w-16 px-2 py-1 rounded-lg text-sm text-center transition-all duration-150"
-              style={{
-                background: 'var(--color-bg-tertiary)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className="input h-10 w-16 rounded-lg px-2 py-1 text-center text-sm"
+              aria-label="输入页码后回车跳转"
             />
           </div>
         )}

@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import type { RestartTrend } from '../../../api';
 import ComparisonBadge from './ComparisonBadge';
+import { chartPalette } from '../../../types/theme';
 
 interface RestartTrendChartProps {
   title: string;
@@ -31,9 +32,15 @@ function RestartTooltip({ active, payload, label }: RestartTooltipProps) {
   }
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-slate-400 text-xs mb-1">{label}</p>
-      <p className="text-white font-semibold">{payload[0].value} 次重启</p>
+    <div
+      className="rounded-lg px-3 py-2 shadow-xl"
+      style={{
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      <p className="text-xs mb-1 text-[var(--color-text-muted)]">{label}</p>
+      <p className="font-semibold text-[var(--color-text-primary)]">{payload[0].value} 次重启</p>
     </div>
   );
 }
@@ -48,7 +55,7 @@ export default function RestartTrendChart({ title, data }: RestartTrendChartProp
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h3>
         {data?.comparison && (
           <div className="flex items-center gap-4">
             <ComparisonBadge
@@ -57,8 +64,8 @@ export default function RestartTrendChart({ title, data }: RestartTrendChartProp
               trend={data.comparison.trend}
             />
             <div className="text-right">
-              <p className="text-xs text-slate-400">当前平均</p>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-xs text-[var(--color-text-muted)]">当前平均</p>
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {data.comparison.currentAvg.toFixed(1)} 次/周期
               </p>
             </div>
@@ -72,21 +79,21 @@ export default function RestartTrendChart({ title, data }: RestartTrendChartProp
             <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <defs>
                 <linearGradient id="restartGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.3} />
+                  <stop offset="5%" stopColor={chartPalette.qualitative[4]} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={chartPalette.qualitative[4]} stopOpacity={0.3} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="date"
-                stroke="#64748b"
-                tick={{ fill: '#64748b', fontSize: 12 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                stroke="#64748b"
-                tick={{ fill: '#64748b', fontSize: 12 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
                 allowDecimals={false}
@@ -105,7 +112,7 @@ export default function RestartTrendChart({ title, data }: RestartTrendChartProp
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="h-64 flex items-center justify-center text-slate-400">
+        <div className="h-64 flex items-center justify-center text-[var(--color-text-muted)]">
           <p>暂无数据</p>
         </div>
       )}

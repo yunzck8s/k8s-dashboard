@@ -207,23 +207,23 @@ export default function SecretForm({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-surface-secondary rounded-xl border border-border w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/10 rounded-lg">
               <KeyIcon className="w-5 h-5 text-purple-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">创建 Secret</h3>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <p className="text-sm text-text-muted mt-0.5">
                 在命名空间 <span className="text-purple-400">{namespace}</span> 中创建新的 Secret
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="p-1 text-slate-400 hover:text-white transition-colors"
+            className="p-1 text-text-muted hover:text-white transition-colors"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
@@ -238,7 +238,7 @@ export default function SecretForm({
 
               {/* 名称 */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   名称 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -246,27 +246,27 @@ export default function SecretForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="my-secret"
-                  className={`w-full px-4 py-2.5 bg-slate-900 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                    errors.name ? 'border-red-500' : 'border-slate-600'
+                  className={`w-full px-4 py-2.5 bg-surface-tertiary border rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    errors.name ? 'border-red-500' : 'border-border-hover'
                   }`}
                 />
                 {errors.name && (
                   <p className="text-sm text-red-400 mt-1">{errors.name}</p>
                 )}
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   只能包含小写字母、数字和连字符（-），必须以字母或数字开头和结尾
                 </p>
               </div>
 
               {/* Secret 类型 */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   Secret 类型 <span className="text-red-400">*</span>
                 </label>
                 <select
                   value={secretType}
                   onChange={(e) => handleTypeChange(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 bg-surface-tertiary border border-border-hover rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   {SECRET_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -274,7 +274,7 @@ export default function SecretForm({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   选择 Secret 类型，不同类型有不同的数据字段要求
                 </p>
               </div>
@@ -313,9 +313,9 @@ export default function SecretForm({
 
               <div className="space-y-3">
                 {dataItems.map((item, index) => (
-                  <div key={index} className="bg-slate-900/50 rounded-lg p-4 space-y-3">
+                  <div key={index} className="bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-400">数据项 {index + 1}</span>
+                      <span className="text-sm text-text-muted">数据项 {index + 1}</span>
                       {dataItems.length > 1 && (
                         <button
                           type="button"
@@ -329,7 +329,7 @@ export default function SecretForm({
 
                     {/* 键 */}
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">键名</label>
+                      <label className="block text-xs text-text-muted mb-1">键名</label>
                       <input
                         type="text"
                         value={item.key}
@@ -341,21 +341,21 @@ export default function SecretForm({
                             ? '.dockerconfigjson'
                             : 'password'
                         }
-                        className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                        className="w-full px-4 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
                       />
                     </div>
 
                     {/* 值 */}
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1">值</label>
+                      <label className="block text-xs text-text-muted mb-1">值</label>
                       <textarea
                         value={item.value}
                         onChange={(e) => updateDataValue(index, e.target.value)}
                         placeholder="敏感数据内容..."
                         rows={4}
-                        className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm resize-none"
+                        className="w-full px-4 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm resize-none"
                       />
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-text-muted mt-1">
                         数据会自动进行 Base64 编码
                       </p>
                     </div>
@@ -377,11 +377,11 @@ export default function SecretForm({
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)]">
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 text-slate-300 hover:text-white transition-colors font-medium"
+              className="px-5 py-2.5 text-text-secondary hover:text-white transition-colors font-medium"
               disabled={isPending}
             >
               取消

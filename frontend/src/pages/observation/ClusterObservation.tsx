@@ -54,7 +54,7 @@ export default function ClusterObservation() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-indigo-100 to-purple-100 bg-clip-text text-transparent">
             集群状态观测
           </h1>
-          <p className="text-slate-400 mt-2 text-sm font-medium">
+          <p className="text-text-muted mt-2 text-sm font-medium">
             实时监控集群异常状态、资源使用趋势与告警信息
           </p>
         </div>
@@ -62,7 +62,7 @@ export default function ClusterObservation() {
           <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           <button
             onClick={handleRefresh}
-            className="group relative px-5 py-2.5 bg-slate-800/60 backdrop-blur-sm hover:bg-slate-700/80 border border-slate-700/50 hover:border-indigo-500/50 rounded-lg text-sm font-semibold text-slate-300 hover:text-white shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 overflow-hidden"
+            className="group relative px-5 py-2.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_80%,transparent)] border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] hover:border-indigo-500/50 rounded-lg text-sm font-semibold text-text-secondary hover:text-white shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-600/10 to-indigo-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
             <span className="relative z-10 flex items-center gap-2">

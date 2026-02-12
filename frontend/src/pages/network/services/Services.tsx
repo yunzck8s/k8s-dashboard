@@ -123,8 +123,8 @@ export default function Services() {
       {/* 页面头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Services</h1>
-          <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">Services</h1>
+          <p className="mt-1 text-[var(--color-text-secondary)]">
             共 {services.length} 个 Service
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -195,12 +195,12 @@ export default function Services() {
                         {service.spec.type || 'ClusterIP'}
                       </span>
                     </td>
-                    <td className="font-mono text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    <td className="font-mono text-sm text-[var(--color-text-muted)]">
                       {service.spec.clusterIP || '-'}
                     </td>
-                    <td className="font-mono text-sm" style={{ color: 'var(--color-text-muted)' }}>{externalIPs}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{formatPorts(service)}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>
+                    <td className="font-mono text-sm text-[var(--color-text-muted)]">{externalIPs}</td>
+                    <td className="text-[var(--color-text-muted)]">{formatPorts(service)}</td>
+                    <td className="text-[var(--color-text-muted)]">
                       {formatDistanceToNow(new Date(service.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -213,7 +213,7 @@ export default function Services() {
           </table>
         </div>
         {services.length === 0 && (
-          <div className="text-center py-12" style={{ color: 'var(--color-text-muted)' }}>没有找到 Service</div>
+          <div className="text-center py-12 text-[var(--color-text-muted)]">没有找到 Service</div>
         )}
       </div>
 

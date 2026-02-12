@@ -89,7 +89,7 @@ export default function Jobs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Jobs</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {jobs.length} 个 Job
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -141,11 +141,11 @@ export default function Jobs() {
                       </span>
                     </td>
                     <td>{formatCompletions(job)}</td>
-                    <td className="text-slate-400">{formatDuration(job)}</td>
-                    <td className="text-slate-400 max-w-xs truncate" title={images}>
+                    <td className="text-text-muted">{formatDuration(job)}</td>
+                    <td className="text-text-muted max-w-xs truncate" title={images}>
                       {images}
                     </td>
-                    <td className="text-slate-400">
+                    <td className="text-text-muted">
                       {formatDistanceToNow(new Date(job.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -158,7 +158,7 @@ export default function Jobs() {
           </table>
         </div>
         {jobs.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 Job</div>
+          <div className="text-center py-12 text-text-muted">没有找到 Job</div>
         )}
       </div>
     </div>

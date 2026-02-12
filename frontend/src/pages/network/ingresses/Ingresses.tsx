@@ -120,7 +120,7 @@ export default function Ingresses() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Ingresses</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {ingresses.length} 个 Ingress
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -176,7 +176,7 @@ export default function Ingresses() {
                         <span className="badge badge-default">{ingress.metadata.namespace}</span>
                       </td>
                     )}
-                    <td className="text-slate-400">
+                    <td className="text-text-muted">
                       {ingress.spec.ingressClassName || '-'}
                     </td>
                     <td>
@@ -194,10 +194,10 @@ export default function Ingresses() {
                         ))}
                       </div>
                     </td>
-                    <td className="text-slate-400 max-w-xs truncate">
+                    <td className="text-text-muted max-w-xs truncate">
                       {getPaths(ingress)}
                     </td>
-                    <td className="text-slate-400 font-mono text-sm">
+                    <td className="text-text-muted font-mono text-sm">
                       {getAddress(ingress)}
                     </td>
                     <td>
@@ -210,7 +210,7 @@ export default function Ingresses() {
                         {hasTLS(ingress) ? 'Yes' : 'No'}
                       </span>
                     </td>
-                    <td className="text-slate-400">
+                    <td className="text-text-muted">
                       {formatDistanceToNow(new Date(ingress.metadata.creationTimestamp), {
                         addSuffix: true,
                         locale: zhCN,
@@ -223,7 +223,7 @@ export default function Ingresses() {
           </table>
         </div>
         {ingresses.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 Ingress</div>
+          <div className="text-center py-12 text-text-muted">没有找到 Ingress</div>
         )}
       </div>
 

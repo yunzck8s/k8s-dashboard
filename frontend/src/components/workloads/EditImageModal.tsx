@@ -96,15 +96,15 @@ function EditImageModalContent({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+      <div className="bg-surface-secondary rounded-xl border border-border w-full max-w-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-500/10 rounded-lg">
               <PhotoIcon className="w-5 h-5 text-blue-400" />
             </div>
             <h3 className="text-lg font-semibold text-white">修改容器镜像</h3>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="p-1 text-text-muted hover:text-white transition-colors">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
@@ -119,7 +119,7 @@ function EditImageModalContent({
               return (
                 <div key={container.name} className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-300">{container.name}</label>
+                    <label className="text-sm font-medium text-text-secondary">{container.name}</label>
                     {isChanged && (
                       <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded">
                         已修改
@@ -129,38 +129,38 @@ function EditImageModalContent({
 
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <label className="block text-xs text-slate-500 mb-1">镜像仓库</label>
+                      <label className="block text-xs text-text-muted mb-1">镜像仓库</label>
                       <input
                         type="text"
                         value={container.repository}
                         onChange={(event) => handleRepositoryChange(index, event.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                        className="w-full px-4 py-2.5 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                         placeholder="nginx 或 registry.cn/repo/image"
                       />
                     </div>
 
                     <div className="flex items-end pb-2.5">
-                      <span className="text-slate-500 text-lg font-bold">:</span>
+                      <span className="text-text-muted text-lg font-bold">:</span>
                     </div>
 
                     <div className="w-36">
-                      <label className="block text-xs text-slate-500 mb-1">标签</label>
+                      <label className="block text-xs text-text-muted mb-1">标签</label>
                       <input
                         type="text"
                         value={container.tag}
                         onChange={(event) => handleTagChange(index, event.target.value)}
-                        className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                        className="w-full px-4 py-2.5 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                         placeholder="latest"
                       />
                     </div>
                   </div>
 
                   {isChanged && (
-                    <div className="text-xs space-y-1 p-2 bg-slate-900/50 rounded-lg">
-                      <p className="text-slate-500">
-                        原镜像: <span className="text-slate-400 font-mono">{originalImage}</span>
+                    <div className="text-xs space-y-1 p-2 bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg">
+                      <p className="text-text-muted">
+                        原镜像: <span className="text-text-muted font-mono">{originalImage}</span>
                       </p>
-                      <p className="text-slate-500">
+                      <p className="text-text-muted">
                         新镜像: <span className="text-blue-400 font-mono">{newImage}</span>
                       </p>
                     </div>
@@ -170,11 +170,11 @@ function EditImageModalContent({
             })}
           </div>
 
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+              className="px-4 py-2 text-text-secondary hover:text-white transition-colors"
             >
               取消
             </button>

@@ -5,7 +5,6 @@ import { queryKeys } from '../../api/queryKeys';
 import { createVisibilityRefetchInterval } from '../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import clsx from 'clsx';
 import {
   ExclamationTriangleIcon,
   ExclamationCircleIcon,
@@ -34,29 +33,29 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
       case 'critical':
         return {
           icon: ExclamationCircleIcon,
-          bgColor: 'bg-red-500/10',
-          borderColor: 'border-red-500/30',
-          iconColor: 'text-red-500',
-          textColor: 'text-red-400',
+          background: 'var(--sys-error-soft-bg)',
+          border: 'var(--sys-error-soft-border)',
+          iconColor: 'var(--color-error)',
+          textColor: 'var(--sys-error-soft-text)',
           label: '严重',
         };
       case 'warning':
         return {
           icon: ExclamationTriangleIcon,
-          bgColor: 'bg-amber-500/10',
-          borderColor: 'border-amber-500/30',
-          iconColor: 'text-amber-500',
-          textColor: 'text-amber-400',
+          background: 'var(--sys-warning-soft-bg)',
+          border: 'var(--sys-warning-soft-border)',
+          iconColor: 'var(--color-warning)',
+          textColor: 'var(--sys-warning-soft-text)',
           label: '警告',
         };
       case 'info':
       default:
         return {
           icon: InformationCircleIcon,
-          bgColor: 'bg-blue-500/10',
-          borderColor: 'border-blue-500/30',
-          iconColor: 'text-blue-500',
-          textColor: 'text-blue-400',
+          background: 'var(--sys-info-soft-bg)',
+          border: 'var(--sys-info-soft-border)',
+          iconColor: 'var(--color-info)',
+          textColor: 'var(--sys-info-soft-text)',
           label: '信息',
         };
     }
@@ -75,7 +74,7 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
 
   if (error) {
     return (
-      <div className="text-center py-4" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="text-center py-4 text-[var(--color-text-muted)]">
         加载告警失败
       </div>
     );
@@ -97,7 +96,7 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
 
   if (alerts.length === 0) {
     return (
-      <div className="text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="text-center py-8 text-[var(--color-text-muted)]">
         <BellAlertIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
         <p>{severityFilter ? `暂无${getSeverityConfig(severityFilter).label}告警` : '暂无活跃告警'}</p>
       </div>
@@ -108,10 +107,10 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
     <div className="space-y-3">
       {showTitle && (
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          <h4 className="text-sm font-medium text-[var(--color-text-secondary)]">
             {severityFilter ? `${getSeverityConfig(severityFilter).label}告警` : '活跃告警'}
           </h4>
-          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="text-xs text-[var(--color-text-muted)]">
             {filteredAlerts.length} 个告警
           </span>
         </div>
@@ -128,42 +127,42 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
         return (
           <div
             key={alert.fingerprint}
-            className={clsx(
-              'p-3 rounded-lg border transition-all duration-150',
-              config.bgColor,
-              config.borderColor
-            )}
+            className="p-3 rounded-lg border transition-all duration-150"
+            style={{
+              background: config.background,
+              borderColor: config.border,
+            }}
           >
             <div className="flex items-start gap-3">
-              <Icon className={clsx('w-5 h-5 flex-shrink-0 mt-0.5', config.iconColor)} />
+              <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: config.iconColor }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={clsx('font-medium text-sm', config.textColor)}>
+                  <span className="font-medium text-sm" style={{ color: config.textColor }}>
                     {alertName}
                   </span>
                   <span
-                    className={clsx(
-                      'px-1.5 py-0.5 text-xs rounded',
-                      config.bgColor,
-                      config.textColor
-                    )}
+                    className="px-1.5 py-0.5 text-xs rounded"
+                    style={{
+                      background: config.background,
+                      color: config.textColor,
+                    }}
                   >
                     {config.label}
                   </span>
                 </div>
                 {(namespace || pod) && (
-                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  <div className="text-xs mt-1 text-[var(--color-text-muted)]">
                     {namespace && <span>{namespace}</span>}
                     {namespace && pod && <span> / </span>}
                     {pod && <span>{pod}</span>}
                   </div>
                 )}
                 {description && (
-                  <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--color-text-secondary)' }}>
+                  <p className="text-xs mt-1 line-clamp-2 text-[var(--color-text-secondary)]">
                     {description}
                   </p>
                 )}
-                <div className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="text-xs mt-2 text-[var(--color-text-muted)]">
                   开始于{' '}
                   {formatDistanceToNow(new Date(alert.startsAt), {
                     addSuffix: true,

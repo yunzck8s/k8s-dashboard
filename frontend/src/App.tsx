@@ -11,7 +11,7 @@ const queryClient = createQueryClient();
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center h-[40vh]">
-      <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+      <div className="flex items-center gap-3 text-sm text-[var(--color-text-secondary)]">
         <div
           className="animate-spin rounded-full h-5 w-5 border-b-2"
           style={{ borderColor: 'var(--color-primary)' }}

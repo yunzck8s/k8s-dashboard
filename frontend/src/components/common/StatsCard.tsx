@@ -14,39 +14,39 @@ interface StatsCardProps {
 
 const colorStyles = {
   blue: {
-    bg: 'rgba(59, 130, 246, 0.1)',
-    border: 'rgba(59, 130, 246, 0.3)',
-    iconBg: 'rgba(59, 130, 246, 0.15)',
-    iconColor: '#60A5FA',
-    text: '#60A5FA',
+    bg: 'var(--sys-info-soft-bg)',
+    border: 'var(--sys-info-soft-border)',
+    iconBg: 'var(--sys-info-soft-bg)',
+    iconColor: 'var(--color-info)',
+    text: 'var(--color-info)',
   },
   green: {
-    bg: 'rgba(16, 185, 129, 0.1)',
-    border: 'rgba(16, 185, 129, 0.3)',
-    iconBg: 'rgba(16, 185, 129, 0.15)',
-    iconColor: '#34D399',
-    text: '#34D399',
+    bg: 'var(--sys-success-soft-bg)',
+    border: 'var(--sys-success-soft-border)',
+    iconBg: 'var(--sys-success-soft-bg)',
+    iconColor: 'var(--color-success)',
+    text: 'var(--color-success)',
   },
   purple: {
-    bg: 'rgba(99, 102, 241, 0.1)',
-    border: 'rgba(99, 102, 241, 0.3)',
-    iconBg: 'rgba(99, 102, 241, 0.15)',
-    iconColor: '#818CF8',
-    text: '#818CF8',
+    bg: 'var(--color-primary-light)',
+    border: 'var(--color-border-hover)',
+    iconBg: 'var(--color-primary-light)',
+    iconColor: 'var(--color-primary)',
+    text: 'var(--color-primary)',
   },
   orange: {
-    bg: 'rgba(245, 158, 11, 0.1)',
-    border: 'rgba(245, 158, 11, 0.3)',
-    iconBg: 'rgba(245, 158, 11, 0.15)',
-    iconColor: '#FBBF24',
-    text: '#FBBF24',
+    bg: 'var(--sys-warning-soft-bg)',
+    border: 'var(--sys-warning-soft-border)',
+    iconBg: 'var(--sys-warning-soft-bg)',
+    iconColor: 'var(--color-warning)',
+    text: 'var(--color-warning)',
   },
   red: {
-    bg: 'rgba(239, 68, 68, 0.1)',
-    border: 'rgba(239, 68, 68, 0.3)',
-    iconBg: 'rgba(239, 68, 68, 0.15)',
-    iconColor: '#F87171',
-    text: '#F87171',
+    bg: 'var(--sys-error-soft-bg)',
+    border: 'var(--sys-error-soft-border)',
+    iconBg: 'var(--sys-error-soft-bg)',
+    iconColor: 'var(--color-error)',
+    text: 'var(--color-error)',
   },
 };
 
@@ -74,13 +74,13 @@ export default function StatsCard({
             {title}
           </p>
           <p
-            className="text-3xl font-semibold mb-1"
+            className="kpi-number mb-1"
             style={{ color: styles.text }}
           >
             {value}
           </p>
           {subtitle && (
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-xs text-[var(--color-text-muted)]">
               {subtitle}
             </p>
           )}
@@ -100,8 +100,8 @@ export default function StatsCard({
           <div
             className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium"
             style={{
-              background: trend === 'up' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: trend === 'up' ? '#34D399' : '#F87171',
+              background: trend === 'up' ? 'var(--sys-success-soft-bg)' : 'var(--sys-error-soft-bg)',
+              color: trend === 'up' ? 'var(--sys-success-soft-text)' : 'var(--sys-error-soft-text)',
             }}
           >
             <span>{trend === 'up' ? '↑' : '↓'}</span>

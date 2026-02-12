@@ -81,10 +81,10 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+        <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
           设置
         </h1>
-        <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+        <p className="mt-1 text-[var(--color-text-secondary)]">
           账户安全、会话管理和个人偏好配置
         </p>
       </div>
@@ -103,36 +103,36 @@ export default function Settings() {
       )}
 
       <section className="card p-5">
-        <h2 className="text-lg font-medium mb-4" style={{ color: 'var(--color-text-primary)' }}>
+        <h2 className="text-lg font-medium mb-4 text-[var(--color-text-primary)]">
           账户信息
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
-            <div style={{ color: 'var(--color-text-muted)' }}>用户名</div>
-            <div style={{ color: 'var(--color-text-primary)' }}>{user?.username || '-'}</div>
+            <div className="text-[var(--color-text-muted)]">用户名</div>
+            <div className="text-[var(--color-text-primary)]">{user?.username || '-'}</div>
           </div>
           <div>
-            <div style={{ color: 'var(--color-text-muted)' }}>显示名称</div>
-            <div style={{ color: 'var(--color-text-primary)' }}>{user?.displayName || '-'}</div>
+            <div className="text-[var(--color-text-muted)]">显示名称</div>
+            <div className="text-[var(--color-text-primary)]">{user?.displayName || '-'}</div>
           </div>
           <div>
-            <div style={{ color: 'var(--color-text-muted)' }}>邮箱</div>
-            <div style={{ color: 'var(--color-text-primary)' }}>{user?.email || '-'}</div>
+            <div className="text-[var(--color-text-muted)]">邮箱</div>
+            <div className="text-[var(--color-text-primary)]">{user?.email || '-'}</div>
           </div>
           <div>
-            <div style={{ color: 'var(--color-text-muted)' }}>角色</div>
-            <div style={{ color: 'var(--color-text-primary)' }}>{user?.role || '-'}</div>
+            <div className="text-[var(--color-text-muted)]">角色</div>
+            <div className="text-[var(--color-text-primary)]">{user?.role || '-'}</div>
           </div>
         </div>
       </section>
 
       <section className="card p-5">
-        <h2 className="text-lg font-medium mb-4" style={{ color: 'var(--color-text-primary)' }}>
+        <h2 className="text-lg font-medium mb-4 text-[var(--color-text-primary)]">
           修改密码
         </h2>
         <form className="space-y-4 max-w-xl" onSubmit={submitPasswordChange}>
           <div>
-            <label className="block text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-1 text-[var(--color-text-secondary)]">
               旧密码
             </label>
             <input
@@ -144,7 +144,7 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="block text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-1 text-[var(--color-text-secondary)]">
               新密码（至少 6 位）
             </label>
             <input
@@ -156,7 +156,7 @@ export default function Settings() {
             />
           </div>
           <div>
-            <label className="block text-sm mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-1 text-[var(--color-text-secondary)]">
               确认新密码
             </label>
             <input
@@ -174,11 +174,11 @@ export default function Settings() {
       </section>
 
       <section className="card p-5">
-        <h2 className="text-lg font-medium mb-4" style={{ color: 'var(--color-text-primary)' }}>
+        <h2 className="text-lg font-medium mb-4 text-[var(--color-text-primary)]">
           会话管理
         </h2>
         {sessionsLoading ? (
-          <div className="py-8 text-center" style={{ color: 'var(--color-text-muted)' }}>
+          <div className="py-8 text-center text-[var(--color-text-muted)]">
             正在加载会话...
           </div>
         ) : (
@@ -216,7 +216,7 @@ export default function Settings() {
                 ))}
                 {sessions.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                    <td colSpan={5} className="py-10 text-center text-[var(--color-text-muted)]">
                       暂无会话
                     </td>
                   </tr>
@@ -228,13 +228,13 @@ export default function Settings() {
       </section>
 
       <section className="card p-5">
-        <h2 className="text-lg font-medium mb-4" style={{ color: 'var(--color-text-primary)' }}>
+        <h2 className="text-lg font-medium mb-4 text-[var(--color-text-primary)]">
           偏好设置
         </h2>
 
         <div className="space-y-5 max-w-xl">
           <div>
-            <label className="block text-sm mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-2 text-[var(--color-text-secondary)]">
               主题
             </label>
             <div className="flex items-center gap-3">
@@ -262,7 +262,7 @@ export default function Settings() {
           </div>
 
           <div>
-            <label className="block text-sm mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <label className="block text-sm mb-2 text-[var(--color-text-secondary)]">
               全局刷新间隔
             </label>
             <select
@@ -274,7 +274,7 @@ export default function Settings() {
               <option value={30}>标准（30 秒）</option>
               <option value={60}>慢速（60 秒）</option>
             </select>
-            <p className="mt-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
               全局刷新会影响主要列表和概览请求；部分强实时接口（例如 5 秒/10 秒级）不受此设置影响。
             </p>
           </div>

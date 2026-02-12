@@ -179,23 +179,23 @@ export default function IngressForm({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-surface-secondary rounded-xl border border-border w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh]">
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-500/10 rounded-lg">
               <GlobeAltIcon className="w-5 h-5 text-green-400" />
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">创建 Ingress</h3>
-              <p className="text-sm text-slate-400 mt-0.5">
+              <p className="text-sm text-text-muted mt-0.5">
                 在命名空间 <span className="text-green-400">{namespace}</span> 中创建新的 Ingress
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="p-1 text-slate-400 hover:text-white transition-colors"
+            className="p-1 text-text-muted hover:text-white transition-colors"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
@@ -210,7 +210,7 @@ export default function IngressForm({
 
               {/* 名称 */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   名称 <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -218,8 +218,8 @@ export default function IngressForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="my-ingress"
-                  className={`w-full px-4 py-2.5 bg-slate-900 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                    errors.name ? 'border-red-500' : 'border-slate-600'
+                  className={`w-full px-4 py-2.5 bg-surface-tertiary border rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                    errors.name ? 'border-red-500' : 'border-border-hover'
                   }`}
                 />
                 {errors.name && <p className="text-sm text-red-400 mt-1">{errors.name}</p>}
@@ -227,7 +227,7 @@ export default function IngressForm({
 
               {/* Ingress Class */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-text-secondary mb-2">
                   Ingress Class
                 </label>
                 <input
@@ -235,9 +235,9 @@ export default function IngressForm({
                   value={ingressClassName}
                   onChange={(e) => setIngressClassName(e.target.value)}
                   placeholder="nginx"
-                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   通常使用 nginx、traefik 等
                 </p>
               </div>
@@ -264,9 +264,9 @@ export default function IngressForm({
 
               <div className="space-y-3">
                 {rules.map((rule, index) => (
-                  <div key={index} className="bg-slate-900/50 rounded-lg p-4 space-y-3">
+                  <div key={index} className="bg-[color-mix(in_srgb,var(--color-bg-tertiary)_50%,transparent)] rounded-lg p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-400">规则 {index + 1}</span>
+                      <span className="text-sm text-text-muted">规则 {index + 1}</span>
                       {rules.length > 1 && (
                         <button
                           type="button"
@@ -282,7 +282,7 @@ export default function IngressForm({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {/* Host */}
                       <div className="md:col-span-2">
-                        <label className="block text-xs text-slate-500 mb-1">
+                        <label className="block text-xs text-text-muted mb-1">
                           Host (域名) <span className="text-red-400">*</span>
                         </label>
                         <input
@@ -290,29 +290,29 @@ export default function IngressForm({
                           value={rule.host}
                           onChange={(e) => updateRule(index, 'host', e.target.value)}
                           placeholder="example.com"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                         />
                       </div>
 
                       {/* Path */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">路径</label>
+                        <label className="block text-xs text-text-muted mb-1">路径</label>
                         <input
                           type="text"
                           value={rule.path}
                           onChange={(e) => updateRule(index, 'path', e.target.value)}
                           placeholder="/"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                         />
                       </div>
 
                       {/* Path Type */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">路径类型</label>
+                        <label className="block text-xs text-text-muted mb-1">路径类型</label>
                         <select
                           value={rule.pathType}
                           onChange={(e) => updateRule(index, 'pathType', e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                         >
                           <option value="Prefix">Prefix (前缀匹配)</option>
                           <option value="Exact">Exact (精确匹配)</option>
@@ -322,7 +322,7 @@ export default function IngressForm({
 
                       {/* Service Name */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">
+                        <label className="block text-xs text-text-muted mb-1">
                           Service 名称 <span className="text-red-400">*</span>
                         </label>
                         <input
@@ -330,13 +330,13 @@ export default function IngressForm({
                           value={rule.serviceName}
                           onChange={(e) => updateRule(index, 'serviceName', e.target.value)}
                           placeholder="my-service"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                         />
                       </div>
 
                       {/* Service Port */}
                       <div>
-                        <label className="block text-xs text-slate-500 mb-1">Service 端口</label>
+                        <label className="block text-xs text-text-muted mb-1">Service 端口</label>
                         <input
                           type="number"
                           value={rule.servicePort || ''}
@@ -344,7 +344,7 @@ export default function IngressForm({
                           placeholder="80"
                           min="1"
                           max="65535"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                          className="w-full px-3 py-2 bg-surface-tertiary border border-border-hover rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
                         />
                       </div>
                     </div>
@@ -371,14 +371,14 @@ export default function IngressForm({
                   type="checkbox"
                   checked={enableTLS}
                   onChange={(e) => setEnableTLS(e.target.checked)}
-                  className="w-4 h-4 text-green-600 bg-slate-900 border-slate-600 rounded focus:ring-green-500"
+                  className="w-4 h-4 text-green-600 bg-surface-tertiary border-border-hover rounded focus:ring-green-500"
                 />
-                <span className="text-sm text-slate-300">启用 HTTPS (TLS)</span>
+                <span className="text-sm text-text-secondary">启用 HTTPS (TLS)</span>
               </label>
 
               {enableTLS && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
                     TLS Secret 名称 <span className="text-red-400">*</span>
                   </label>
                   <input
@@ -386,12 +386,12 @@ export default function IngressForm({
                     value={tlsSecretName}
                     onChange={(e) => setTlsSecretName(e.target.value)}
                     placeholder="my-tls-secret"
-                    className={`w-full px-4 py-2.5 bg-slate-900 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
-                      errors.tls ? 'border-red-500' : 'border-slate-600'
+                    className={`w-full px-4 py-2.5 bg-surface-tertiary border rounded-lg text-white placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent ${
+                      errors.tls ? 'border-red-500' : 'border-border-hover'
                     }`}
                   />
                   {errors.tls && <p className="text-sm text-red-400 mt-1">{errors.tls}</p>}
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-text-muted mt-1">
                     Secret 必须包含 tls.crt 和 tls.key
                   </p>
                 </div>
@@ -400,11 +400,11 @@ export default function IngressForm({
           </div>
 
           {/* 底部按钮 */}
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-border bg-[color-mix(in_srgb,var(--color-bg-secondary)_50%,transparent)]">
             <button
               type="button"
               onClick={handleClose}
-              className="px-5 py-2.5 text-slate-300 hover:text-white transition-colors font-medium"
+              className="px-5 py-2.5 text-text-secondary hover:text-white transition-colors font-medium"
               disabled={isPending}
             >
               取消

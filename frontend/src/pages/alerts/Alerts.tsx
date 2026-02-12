@@ -67,8 +67,8 @@ export default function Alerts() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>告警管理</h1>
-          <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">告警管理</h1>
+          <p className="mt-1 text-[var(--color-text-secondary)]">
             监控和管理集群告警、静默规则和告警规则
           </p>
         </div>
@@ -139,9 +139,9 @@ export default function Alerts() {
               border: '1px solid var(--color-border)',
             }}
           >
-            <ClockIcon className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-muted)' }} />
-            <p style={{ color: 'var(--color-text-muted)' }}>历史记录功能开发中...</p>
-            <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
+            <ClockIcon className="w-12 h-12 mx-auto mb-4 text-[var(--color-text-muted)]" />
+            <p className="text-[var(--color-text-muted)]">历史记录功能开发中...</p>
+            <p className="text-sm mt-2 text-[var(--color-text-muted)]">
               将支持查看已解决的告警历史和趋势分析
             </p>
           </div>
@@ -155,9 +155,9 @@ export default function Alerts() {
               border: '1px solid var(--color-border)',
             }}
           >
-            <Cog6ToothIcon className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-muted)' }} />
-            <p style={{ color: 'var(--color-text-muted)' }}>告警规则功能开发中...</p>
-            <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
+            <Cog6ToothIcon className="w-12 h-12 mx-auto mb-4 text-[var(--color-text-muted)]" />
+            <p className="text-[var(--color-text-muted)]">告警规则功能开发中...</p>
+            <p className="text-sm mt-2 text-[var(--color-text-muted)]">
               将支持创建自定义告警规则并同步到 VictoriaMetrics
             </p>
           </div>

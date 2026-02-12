@@ -43,7 +43,7 @@ export default function AlertsSilences() {
       <div className="card p-8 text-center">
         <ExclamationCircleIcon className="w-12 h-12 mx-auto text-red-400 mb-4" />
         <p className="text-red-400">加载静默规则失败</p>
-        <p className="text-slate-500 text-sm mt-2">{(error as Error).message}</p>
+        <p className="text-text-muted text-sm mt-2">{(error as Error).message}</p>
         <button
           onClick={() => refetch()}
           className="btn btn-primary mt-4"
@@ -60,7 +60,7 @@ export default function AlertsSilences() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">静默规则</h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-text-muted mt-1">
             创建规则以临时静默特定告警
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function AlertsSilences() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="btn btn-ghost btn-sm text-slate-400 hover:text-white"
+            className="btn btn-ghost btn-sm text-text-muted hover:text-white"
           >
             <ArrowPathIcon className={clsx('w-4 h-4', isFetching && 'animate-spin')} />
           </button>
@@ -85,14 +85,14 @@ export default function AlertsSilences() {
       {/* 静默规则列表 */}
       {isLoading ? (
         <div className="card p-8 text-center">
-          <ArrowPathIcon className="w-8 h-8 mx-auto text-slate-400 animate-spin mb-4" />
-          <p className="text-slate-400">加载静默规则中...</p>
+          <ArrowPathIcon className="w-8 h-8 mx-auto text-text-muted animate-spin mb-4" />
+          <p className="text-text-muted">加载静默规则中...</p>
         </div>
       ) : silences.length === 0 ? (
         <div className="card p-12 text-center">
-          <BellSlashIcon className="w-12 h-12 mx-auto text-slate-500 mb-4" />
-          <p className="text-slate-300">暂无静默规则</p>
-          <p className="text-slate-500 text-sm mt-2">
+          <BellSlashIcon className="w-12 h-12 mx-auto text-text-muted mb-4" />
+          <p className="text-text-secondary">暂无静默规则</p>
+          <p className="text-text-muted text-sm mt-2">
             创建静默规则以临时屏蔽特定告警
           </p>
           <button
@@ -162,17 +162,17 @@ function SilenceCard({
       case 'expired':
         return {
           label: '已过期',
-          color: 'text-slate-400',
-          bgColor: 'bg-slate-500/10',
-          borderColor: 'border-slate-500/30',
+          color: 'text-text-muted',
+          bgColor: 'bg-[color-mix(in_srgb,var(--color-border-hover)_10%,transparent)]',
+          borderColor: 'border-[color-mix(in_srgb,var(--color-border-hover)_30%,transparent)]',
           icon: ExclamationCircleIcon,
         };
       default:
         return {
           label: state,
-          color: 'text-slate-400',
-          bgColor: 'bg-slate-500/10',
-          borderColor: 'border-slate-500/30',
+          color: 'text-text-muted',
+          bgColor: 'bg-[color-mix(in_srgb,var(--color-border-hover)_10%,transparent)]',
+          borderColor: 'border-[color-mix(in_srgb,var(--color-border-hover)_30%,transparent)]',
           icon: BellSlashIcon,
         };
     }
@@ -200,7 +200,7 @@ function SilenceCard({
               <span className={clsx('badge', stateConfig.color)}>
                 {stateConfig.label}
               </span>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-text-muted">
                 ID: {silence.silenceId.slice(0, 8)}
               </span>
             </div>
@@ -211,7 +211,7 @@ function SilenceCard({
                 {silence.matchers.map((matcher, index) => (
                   <span
                     key={index}
-                    className="px-2 py-1 text-xs bg-slate-800 border border-slate-700 rounded"
+                    className="px-2 py-1 text-xs bg-surface-secondary border border-border rounded"
                   >
                     {matcher.name}
                     {matcher.isEqual ? ' = ' : ' != '}
@@ -223,11 +223,11 @@ function SilenceCard({
 
             {/* 备注 */}
             {silence.comment && (
-              <p className="text-sm text-slate-400 mb-2">{silence.comment}</p>
+              <p className="text-sm text-text-muted mb-2">{silence.comment}</p>
             )}
 
             {/* 时间和创建者 */}
-            <div className="flex items-center gap-4 text-xs text-slate-500">
+            <div className="flex items-center gap-4 text-xs text-text-muted">
               <span>
                 {startsAt.toLocaleString('zh-CN')} - {endsAt.toLocaleString('zh-CN')}
               </span>
@@ -256,7 +256,7 @@ function SilenceCard({
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="card max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-white mb-4">删除静默规则</h3>
-            <p className="text-slate-400 mb-4">
+            <p className="text-text-muted mb-4">
               确定要删除这条静默规则吗？删除后将立即恢复告警通知。
             </p>
             <div className="flex gap-2">
@@ -352,7 +352,7 @@ function CreateSilenceModal({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSubmit}>
           {/* 匹配器 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-400 mb-2">
+            <label className="block text-sm font-medium text-text-muted mb-2">
               匹配器（至少一个）
             </label>
             {matchers.map((matcher, index) => (
@@ -388,7 +388,7 @@ function CreateSilenceModal({ onClose }: { onClose: () => void }) {
                     onChange={(e) => updateMatcher(index, 'isRegex', e.target.checked)}
                     className="checkbox"
                   />
-                  <span className="text-xs text-slate-400">正则</span>
+                  <span className="text-xs text-text-muted">正则</span>
                 </label>
                 {matchers.length > 1 && (
                   <button
@@ -413,7 +413,7 @@ function CreateSilenceModal({ onClose }: { onClose: () => void }) {
 
           {/* 持续时间 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-400 mb-2">
+            <label className="block text-sm font-medium text-text-muted mb-2">
               持续时间
             </label>
             <select
@@ -433,7 +433,7 @@ function CreateSilenceModal({ onClose }: { onClose: () => void }) {
 
           {/* 备注 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-400 mb-2">
+            <label className="block text-sm font-medium text-text-muted mb-2">
               备注（必填）
             </label>
             <textarea

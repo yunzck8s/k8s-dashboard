@@ -56,7 +56,7 @@ export default function ServiceAccounts() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">ServiceAccounts</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {serviceAccounts.length} 个 ServiceAccount
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -93,18 +93,18 @@ export default function ServiceAccounts() {
                       <span className="badge badge-default">{sa.metadata.namespace}</span>
                     </td>
                   )}
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {getSecretsCount(sa)} 个
                     {sa.secrets && sa.secrets.length > 0 && (
-                      <span className="text-slate-500 text-sm ml-1">
+                      <span className="text-text-muted text-sm ml-1">
                         ({sa.secrets.map((s) => s.name).join(', ')})
                       </span>
                     )}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {getImagePullSecretsCount(sa)} 个
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {formatDistanceToNow(new Date(sa.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -116,7 +116,7 @@ export default function ServiceAccounts() {
           </table>
         </div>
         {serviceAccounts.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 ServiceAccount</div>
+          <div className="text-center py-12 text-text-muted">没有找到 ServiceAccount</div>
         )}
       </div>
     </div>

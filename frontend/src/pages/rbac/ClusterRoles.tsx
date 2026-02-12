@@ -60,7 +60,7 @@ export default function ClusterRoles() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">ClusterRoles</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {clusterRoles.length} 个 ClusterRole
           </p>
         </div>
@@ -92,11 +92,11 @@ export default function ClusterRoles() {
                       <span className="ml-2 badge badge-info text-xs">系统</span>
                     )}
                   </td>
-                  <td className="text-slate-400">{getRulesCount(role)} 条</td>
-                  <td className="text-slate-400 max-w-xs truncate">
+                  <td className="text-text-muted">{getRulesCount(role)} 条</td>
+                  <td className="text-text-muted max-w-xs truncate">
                     {getRulesSummary(role)}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {formatDistanceToNow(new Date(role.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -108,7 +108,7 @@ export default function ClusterRoles() {
           </table>
         </div>
         {clusterRoles.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 ClusterRole</div>
+          <div className="text-center py-12 text-text-muted">没有找到 ClusterRole</div>
         )}
       </div>
     </div>

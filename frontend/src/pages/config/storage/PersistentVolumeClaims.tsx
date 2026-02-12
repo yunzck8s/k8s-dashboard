@@ -79,7 +79,7 @@ export default function PersistentVolumeClaims() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">PersistentVolumeClaims</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-text-muted mt-1">
             共 {pvcs.length} 个 PVC
             {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
           </p>
@@ -121,19 +121,19 @@ export default function PersistentVolumeClaims() {
                       {pvc.status?.phase || 'Unknown'}
                     </span>
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {pvc.spec.volumeName || '-'}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {pvc.status?.capacity?.storage || pvc.spec.resources?.requests?.storage || '-'}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {formatAccessModes(pvc.spec.accessModes)}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {pvc.spec.storageClassName || '-'}
                   </td>
-                  <td className="text-slate-400">
+                  <td className="text-text-muted">
                     {formatDistanceToNow(new Date(pvc.metadata.creationTimestamp), {
                       addSuffix: true,
                       locale: zhCN,
@@ -145,7 +145,7 @@ export default function PersistentVolumeClaims() {
           </table>
         </div>
         {pvcs.length === 0 && (
-          <div className="text-center py-12 text-slate-400">没有找到 PVC</div>
+          <div className="text-center py-12 text-text-muted">没有找到 PVC</div>
         )}
       </div>
     </div>

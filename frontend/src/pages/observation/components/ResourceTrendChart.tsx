@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import type { ResourceTrend } from '../../../api';
 import ComparisonBadge from './ComparisonBadge';
+import { chartPalette } from '../../../types/theme';
 
 interface ResourceTrendChartProps {
   title: string;
@@ -35,9 +36,15 @@ function ResourceTooltip({ active, payload, label, unit }: ResourceTooltipProps)
   }
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-slate-400 text-xs mb-1">{label}</p>
-      <p className="text-white font-semibold">
+    <div
+      className="rounded-lg px-3 py-2 shadow-xl"
+      style={{
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      <p className="text-xs mb-1 text-[var(--color-text-muted)]">{label}</p>
+      <p className="font-semibold text-[var(--color-text-primary)]">
         {payload[0].value.toFixed(2)}
         {unit}
       </p>
@@ -52,6 +59,7 @@ export default function ResourceTrendChart({
   color,
   gradientId,
 }: ResourceTrendChartProps) {
+  const strokeColor = color || chartPalette.qualitative[0];
   const chartData =
     data?.current?.map((point) => ({
       timestamp: point.timestamp,
@@ -65,7 +73,7 @@ export default function ResourceTrendChart({
   return (
     <div className="card p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{title}</h3>
         {data?.comparison && (
           <div className="flex items-center gap-4">
             <ComparisonBadge
@@ -74,8 +82,8 @@ export default function ResourceTrendChart({
               trend={data.comparison.trend}
             />
             <div className="text-right">
-              <p className="text-xs text-slate-400">当前平均</p>
-              <p className="text-sm font-semibold text-white">
+              <p className="text-xs text-[var(--color-text-muted)]">当前平均</p>
+              <p className="text-sm font-semibold text-[var(--color-text-primary)]">
                 {data.comparison.currentAvg.toFixed(2)}
                 {unit}
               </p>
@@ -90,21 +98,21 @@ export default function ResourceTrendChart({
             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  <stop offset="5%" stopColor={strokeColor} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={strokeColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="time"
-                stroke="#64748b"
-                tick={{ fill: '#64748b', fontSize: 12 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
               />
               <YAxis
-                stroke="#64748b"
-                tick={{ fill: '#64748b', fontSize: 12 }}
+                stroke="var(--color-text-muted)"
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value: number) => `${value}${unit}`}
@@ -122,7 +130,7 @@ export default function ResourceTrendChart({
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke={color}
+                stroke={strokeColor}
                 strokeWidth={2}
                 fill={`url(#${gradientId})`}
               />
@@ -130,7 +138,7 @@ export default function ResourceTrendChart({
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="h-64 flex items-center justify-center text-slate-400">
+        <div className="h-64 flex items-center justify-center text-[var(--color-text-muted)]">
           <p>暂无数据</p>
         </div>
       )}
