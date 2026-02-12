@@ -16,10 +16,7 @@ import {
   PlusIcon,
   MinusIcon,
   ArrowPathIcon,
-  PencilSquareIcon,
   PencilIcon,
-  CheckIcon,
-  XMarkIcon,
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
 
@@ -294,7 +291,9 @@ export default function StatefulSetDetail() {
       <YamlEditorModal
         isOpen={showYamlEditor}
         onClose={() => setShowYamlEditor(false)}
-        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        onSave={async (yaml) => {
+          await updateYamlMutation.mutateAsync(yaml);
+        }}
         initialYaml={yamlData || ''}
         resourceType="StatefulSet"
         title={`编辑 StatefulSet - ${name}`}

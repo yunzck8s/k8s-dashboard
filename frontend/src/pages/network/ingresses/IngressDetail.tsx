@@ -166,13 +166,15 @@ export default function IngressDetail() {
       <div>
         {activeTab === 'overview' && <OverviewTab ingress={ingress} />}
         {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-        {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
+        {activeTab === 'events' && <EventsTab />}
       </div>
 
       <YamlEditorModal
         isOpen={showYamlEditor}
         onClose={() => setShowYamlEditor(false)}
-        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        onSave={async (yaml) => {
+          await updateYamlMutation.mutateAsync(yaml);
+        }}
         initialYaml={yamlData || ''}
         resourceType="Ingress"
         title={`编辑 Ingress - ${name}`}
@@ -344,7 +346,7 @@ function YamlTab({ yaml }: { yaml: string }) {
   );
 }
 
-function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+function EventsTab() {
   return (
     <div className="card p-6 text-center">
       <p className="text-slate-400">暂无事件</p>

@@ -444,6 +444,8 @@ export interface ReplicaSetStatus {
 
 // Service 相关类型
 export interface Service {
+  apiVersion?: string;
+  kind?: string;
   metadata: ObjectMeta;
   spec: ServiceSpec;
   status?: ServiceStatus;
@@ -485,6 +487,8 @@ export interface LoadBalancerIngress {
 
 // Ingress 相关类型
 export interface Ingress {
+  apiVersion?: string;
+  kind?: string;
   metadata: ObjectMeta;
   spec: IngressSpec;
   status?: IngressStatus;
@@ -562,6 +566,23 @@ export interface Secret {
   stringData?: Record<string, string>;
   immutable?: boolean;
 }
+
+// 创建资源时可提交的 metadata（不包含服务端只读字段）
+export interface CreateObjectMeta {
+  name: string;
+  namespace?: string;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
+}
+
+type ResourceInput<T extends { metadata: ObjectMeta }> = Omit<T, 'metadata'> & {
+  metadata: CreateObjectMeta;
+};
+
+export type ServiceInput = ResourceInput<Service>;
+export type IngressInput = ResourceInput<Ingress>;
+export type ConfigMapInput = ResourceInput<ConfigMap>;
+export type SecretInput = ResourceInput<Secret>;
 
 // PersistentVolume 相关类型
 export interface PersistentVolume {

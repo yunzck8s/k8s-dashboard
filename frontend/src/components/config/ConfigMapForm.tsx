@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { XMarkIcon, PlusIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import KeyValuePairInput from '../common/KeyValuePairInput';
-import type { ConfigMap } from '../../types';
+import type { ConfigMapInput } from '../../types';
 
 interface ConfigMapFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (configMap: ConfigMap) => Promise<void>;
+  onSubmit: (configMap: ConfigMapInput) => Promise<void>;
   namespace: string;
   isPending?: boolean;
 }
@@ -106,7 +106,7 @@ export default function ConfigMapForm({
         data[item.key] = item.value;
       });
 
-    const configMap: ConfigMap = {
+    const configMap: ConfigMapInput = {
       apiVersion: 'v1',
       kind: 'ConfigMap',
       metadata: {

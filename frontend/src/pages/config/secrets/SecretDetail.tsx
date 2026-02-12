@@ -45,7 +45,7 @@ export default function SecretDetail() {
   });
 
   // 获取 Secret YAML（移除 activeTab 限制，以便在任何标签页都能编辑）
-  const { data: yamlData, refetch: refetchYaml } = useQuery({
+  const { data: yamlData } = useQuery({
     queryKey: ['secret-yaml', namespace, name],
     queryFn: () => secretApi.getYaml(namespace!, name!),
     enabled: !!namespace && !!name,
@@ -196,14 +196,16 @@ export default function SecretDetail() {
           />
         )}
         {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-        {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
+        {activeTab === 'events' && <EventsTab />}
       </div>
 
       {/* YAML 编辑器模态框 */}
       <YamlEditorModal
         isOpen={showYamlEditor}
         onClose={() => setShowYamlEditor(false)}
-        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        onSave={async (yaml) => {
+          await updateYamlMutation.mutateAsync(yaml);
+        }}
         initialYaml={yamlData || ''}
         resourceType="Secret"
         title={`编辑 Secret - ${name}`}
@@ -407,7 +409,7 @@ function YamlTab({ yaml }: { yaml: string }) {
 }
 
 // 事件标签页
-function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+function EventsTab() {
   return (
     <div className="card p-6 text-center">
       <p className="text-slate-400">暂无事件</p>

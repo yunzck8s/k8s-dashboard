@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { alertApi } from '../../api';
 import AlertsActive from './AlertsActive';
 import AlertsSilences from './AlertsSilences';
-import clsx from 'clsx';
 import {
   BellAlertIcon,
   ClockIcon,

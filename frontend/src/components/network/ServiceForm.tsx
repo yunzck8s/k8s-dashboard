@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { XMarkIcon, PlusIcon, GlobeAltIcon, TrashIcon } from '@heroicons/react/24/outline';
 import KeyValuePairInput from '../common/KeyValuePairInput';
-import type { Service } from '../../types';
+import type { ServiceInput, ServiceType } from '../../types';
 
 interface ServiceFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (service: Service) => Promise<void>;
+  onSubmit: (service: ServiceInput) => Promise<void>;
   namespace: string;
   isPending?: boolean;
 }
@@ -20,7 +20,7 @@ interface PortMapping {
 }
 
 // Service 类型选项
-const SERVICE_TYPES = [
+const SERVICE_TYPES: Array<{ value: ServiceType; label: string; description: string }> = [
   { value: 'ClusterIP', label: 'ClusterIP', description: '集群内部访问' },
   { value: 'NodePort', label: 'NodePort', description: '通过节点端口访问' },
   { value: 'LoadBalancer', label: 'LoadBalancer', description: '通过负载均衡器访问' },
@@ -34,7 +34,7 @@ export default function ServiceForm({
   isPending = false,
 }: ServiceFormProps) {
   const [name, setName] = useState('');
-  const [serviceType, setServiceType] = useState('ClusterIP');
+  const [serviceType, setServiceType] = useState<ServiceType>('ClusterIP');
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [selector, setSelector] = useState<Record<string, string>>({});
   const [ports, setPorts] = useState<PortMapping[]>([
@@ -108,7 +108,7 @@ export default function ServiceForm({
   };
 
   // 更新端口映射
-  const updatePort = (index: number, field: keyof PortMapping, value: string | number) => {
+  const updatePort = (index: number, field: keyof PortMapping, value: string | number | undefined) => {
     const newPorts = [...ports];
     (newPorts[index] as any)[field] = value;
     setPorts(newPorts);
@@ -123,7 +123,7 @@ export default function ServiceForm({
     }
 
     // 构建 Service 对象
-    const service: Service = {
+    const service: ServiceInput = {
       apiVersion: 'v1',
       kind: 'Service',
       metadata: {
@@ -140,7 +140,7 @@ export default function ServiceForm({
             name: p.name || undefined,
             protocol: p.protocol,
             port: p.port,
-            targetPort: typeof p.targetPort === 'string' ? p.targetPort : p.targetPort,
+            targetPort: p.targetPort,
             nodePort: serviceType === 'NodePort' || serviceType === 'LoadBalancer' ? p.nodePort : undefined,
           })),
       },
@@ -365,9 +365,10 @@ export default function ServiceForm({
                           <input
                             type="number"
                             value={port.nodePort || ''}
-                            onChange={(e) =>
-                              updatePort(index, 'nodePort', parseInt(e.target.value) || undefined)
-                            }
+                            onChange={(e) => {
+                              const value = e.target.value.trim();
+                              updatePort(index, 'nodePort', value === '' ? undefined : parseInt(value, 10));
+                            }}
                             placeholder="自动分配"
                             min="30000"
                             max="32767"

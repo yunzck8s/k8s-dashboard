@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { eventApi } from '../../api';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import clsx from 'clsx';
 import {
   CheckCircleIcon,
   ExclamationTriangleIcon,

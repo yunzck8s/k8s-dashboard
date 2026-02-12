@@ -1,10 +1,11 @@
 import clsx from 'clsx';
+import type { ComponentType, CSSProperties } from 'react';
 
 interface StatsCardProps {
   title: string;
   value: number | string;
   subtitle?: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>;
   color: 'blue' | 'green' | 'purple' | 'orange' | 'red';
   trend?: 'up' | 'down';
   onClick?: () => void;

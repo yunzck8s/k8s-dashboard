@@ -215,7 +215,9 @@ export default function Secrets() {
       <SecretForm
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSubmit={(secret) => createMutation.mutateAsync(secret)}
+        onSubmit={async (secret) => {
+          await createMutation.mutateAsync(secret);
+        }}
         namespace={currentNamespace}
         isPending={createMutation.isPending}
       />

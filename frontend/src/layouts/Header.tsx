@@ -4,7 +4,6 @@ import { Menu, Transition } from '@headlessui/react';
 import { useAppStore } from '../store';
 import { useAuthStore, useRoleDisplay } from '../store/auth';
 import { authApi } from '../api/auth';
-import clsx from 'clsx';
 import {
   BellIcon,
   MagnifyingGlassIcon,

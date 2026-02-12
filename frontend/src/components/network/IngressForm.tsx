@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { XMarkIcon, PlusIcon, GlobeAltIcon, TrashIcon } from '@heroicons/react/24/outline';
 import KeyValuePairInput from '../common/KeyValuePairInput';
-import type { Ingress } from '../../types';
+import type { IngressInput } from '../../types';
 
 interface IngressFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (ingress: Ingress) => Promise<void>;
+  onSubmit: (ingress: IngressInput) => Promise<void>;
   namespace: string;
   isPending?: boolean;
 }
@@ -113,7 +113,7 @@ export default function IngressForm({
       return acc;
     }, {} as Record<string, IngressRule[]>);
 
-    const ingress: Ingress = {
+    const ingress: IngressInput = {
       apiVersion: 'networking.k8s.io/v1',
       kind: 'Ingress',
       metadata: {

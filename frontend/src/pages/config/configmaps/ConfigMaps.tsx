@@ -186,7 +186,9 @@ export default function ConfigMaps() {
       <ConfigMapForm
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSubmit={(configMap) => createMutation.mutateAsync(configMap)}
+        onSubmit={async (configMap) => {
+          await createMutation.mutateAsync(configMap);
+        }}
         namespace={currentNamespace}
         isPending={createMutation.isPending}
       />

@@ -138,7 +138,6 @@ function SilenceCard({
 
   const startsAt = new Date(silence.startsAt);
   const endsAt = new Date(silence.endsAt);
-  const now = new Date();
 
   const getStateConfig = (state: string) => {
     switch (state) {

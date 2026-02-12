@@ -8,9 +8,13 @@ import type {
   CronJob,
   ReplicaSet,
   Service,
+  ServiceInput,
   Ingress,
+  IngressInput,
   ConfigMap,
+  ConfigMapInput,
   Secret,
+  SecretInput,
   PersistentVolume,
   PersistentVolumeClaim,
   StorageClass,
@@ -256,7 +260,7 @@ export const serviceApi = {
     get<ListResponse<Service>>('/services', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<Service>(`/namespaces/${namespace}/services/${name}`),
-  create: (namespace: string, data: Service) =>
+  create: (namespace: string, data: ServiceInput) =>
     post<Service>(`/namespaces/${namespace}/services`, data),
   update: (namespace: string, name: string, data: Service) =>
     put<Service>(`/namespaces/${namespace}/services/${name}`, data),
@@ -278,7 +282,7 @@ export const ingressApi = {
     get<ListResponse<Ingress>>('/ingresses', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<Ingress>(`/namespaces/${namespace}/ingresses/${name}`),
-  create: (namespace: string, data: Ingress) =>
+  create: (namespace: string, data: IngressInput) =>
     post<Ingress>(`/namespaces/${namespace}/ingresses`, data),
   update: (namespace: string, name: string, data: Ingress) =>
     put<Ingress>(`/namespaces/${namespace}/ingresses/${name}`, data),
@@ -298,7 +302,7 @@ export const configMapApi = {
     get<ListResponse<ConfigMap>>('/configmaps', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<ConfigMap>(`/namespaces/${namespace}/configmaps/${name}`),
-  create: (namespace: string, data: ConfigMap) =>
+  create: (namespace: string, data: ConfigMapInput) =>
     post<ConfigMap>(`/namespaces/${namespace}/configmaps`, data),
   update: (namespace: string, name: string, data: ConfigMap) =>
     put<ConfigMap>(`/namespaces/${namespace}/configmaps/${name}`, data),
@@ -318,7 +322,7 @@ export const secretApi = {
     get<ListResponse<Secret>>('/secrets', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<Secret>(`/namespaces/${namespace}/secrets/${name}`),
-  create: (namespace: string, data: Secret) =>
+  create: (namespace: string, data: SecretInput) =>
     post<Secret>(`/namespaces/${namespace}/secrets`, data),
   update: (namespace: string, name: string, data: Secret) =>
     put<Secret>(`/namespaces/${namespace}/secrets/${name}`, data),

@@ -233,7 +233,9 @@ export default function Services() {
       <ServiceForm
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSubmit={(service) => createMutation.mutateAsync(service)}
+        onSubmit={async (service) => {
+          await createMutation.mutateAsync(service);
+        }}
         namespace={currentNamespace}
         isPending={createMutation.isPending}
       />

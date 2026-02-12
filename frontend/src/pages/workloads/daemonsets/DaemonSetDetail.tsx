@@ -13,10 +13,7 @@ import {
   TrashIcon,
   ClipboardDocumentIcon,
   ArrowPathIcon,
-  PencilSquareIcon,
   PencilIcon,
-  CheckIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 type TabType = 'overview' | 'pods' | 'yaml' | 'events';
@@ -222,7 +219,9 @@ export default function DaemonSetDetail() {
       <YamlEditorModal
         isOpen={showYamlEditor}
         onClose={() => setShowYamlEditor(false)}
-        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        onSave={async (yaml) => {
+          await updateYamlMutation.mutateAsync(yaml);
+        }}
         initialYaml={yamlData || ''}
         resourceType="DaemonSet"
         title={`编辑 DaemonSet - ${name}`}

@@ -13,7 +13,6 @@ import {
   ArrowPathIcon,
   PencilIcon,
   ClipboardDocumentIcon,
-  CheckCircleIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -43,7 +42,7 @@ export default function ConfigMapDetail() {
   });
 
   // 获取 ConfigMap YAML（移除 activeTab 限制，以便在任何标签页都能编辑）
-  const { data: yamlData, refetch: refetchYaml } = useQuery({
+  const { data: yamlData } = useQuery({
     queryKey: ['configmap-yaml', namespace, name],
     queryFn: () => configMapApi.getYaml(namespace!, name!),
     enabled: !!namespace && !!name,
@@ -165,14 +164,16 @@ export default function ConfigMapDetail() {
       <div>
         {activeTab === 'overview' && <OverviewTab configMap={configMap} />}
         {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-        {activeTab === 'events' && <EventsTab namespace={namespace!} name={name!} />}
+        {activeTab === 'events' && <EventsTab />}
       </div>
 
       {/* YAML 编辑器模态框 */}
       <YamlEditorModal
         isOpen={showYamlEditor}
         onClose={() => setShowYamlEditor(false)}
-        onSave={(yaml) => updateYamlMutation.mutate(yaml)}
+        onSave={async (yaml) => {
+          await updateYamlMutation.mutateAsync(yaml);
+        }}
         initialYaml={yamlData || ''}
         resourceType="ConfigMap"
         title={`编辑 ConfigMap - ${name}`}
@@ -339,7 +340,7 @@ function YamlTab({ yaml }: { yaml: string }) {
 }
 
 // 事件标签页
-function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+function EventsTab() {
   // 这里可以添加获取事件的逻辑
   // const { data: eventsData, isLoading } = useQuery({
   //   queryKey: ['configmap-events', namespace, name],

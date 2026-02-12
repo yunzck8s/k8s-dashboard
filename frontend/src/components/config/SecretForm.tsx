@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { XMarkIcon, PlusIcon, KeyIcon } from '@heroicons/react/24/outline';
 import KeyValuePairInput from '../common/KeyValuePairInput';
-import type { Secret } from '../../types';
+import type { SecretInput } from '../../types';
 
 interface SecretFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (secret: Secret) => Promise<void>;
+  onSubmit: (secret: SecretInput) => Promise<void>;
   namespace: string;
   isPending?: boolean;
 }
@@ -168,7 +168,7 @@ export default function SecretForm({
         stringData[item.key] = item.value;
       });
 
-    const secret: Secret = {
+    const secret: SecretInput = {
       apiVersion: 'v1',
       kind: 'Secret',
       type: secretType,

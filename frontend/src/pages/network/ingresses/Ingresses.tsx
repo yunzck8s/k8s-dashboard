@@ -243,7 +243,9 @@ export default function Ingresses() {
       <IngressForm
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSubmit={(ingress) => createMutation.mutateAsync(ingress)}
+        onSubmit={async (ingress) => {
+          await createMutation.mutateAsync(ingress);
+        }}
         namespace={currentNamespace}
         isPending={createMutation.isPending}
       />
