@@ -10,8 +10,10 @@ resources:
   - rbac.yaml
   - configmap.yaml
   - secret.yaml
+  - sqlite-pvc.yaml
   - deployment.yaml
   - service.yaml
+  - ingress.yaml
 
 # 通用标签
 labels:

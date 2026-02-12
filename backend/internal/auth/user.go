@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	dbutil "github.com/k8s-dashboard/backend/internal/db"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -79,15 +80,32 @@ func (c *Client) CreateUser(req *CreateUserRequest) (*User, error) {
 
 	// 创建用户
 	var userID int64
-	err = tx.QueryRow(`
-		INSERT INTO users (username, password, display_name, email, role,
-		                   service_account, sa_namespace, sa_token, all_namespaces, enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
-		RETURNING id
-	`, req.Username, string(hashedPassword), req.DisplayName, req.Email, req.Role,
-		req.ServiceAccount, req.SANamespace, req.SAToken, req.AllNamespaces).Scan(&userID)
-	if err != nil {
-		return nil, fmt.Errorf("创建用户失败: %w", err)
+	if c.dialect == dbutil.DialectSQLite {
+		result, execErr := tx.Exec(`
+			INSERT INTO users (username, password, display_name, email, role,
+			                   service_account, sa_namespace, sa_token, all_namespaces, enabled)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+		`, req.Username, string(hashedPassword), req.DisplayName, req.Email, req.Role,
+			req.ServiceAccount, req.SANamespace, req.SAToken, req.AllNamespaces)
+		if execErr != nil {
+			return nil, fmt.Errorf("创建用户失败: %w", execErr)
+		}
+		lastID, idErr := result.LastInsertId()
+		if idErr != nil {
+			return nil, fmt.Errorf("读取用户 ID 失败: %w", idErr)
+		}
+		userID = lastID
+	} else {
+		err = tx.QueryRow(`
+			INSERT INTO users (username, password, display_name, email, role,
+			                   service_account, sa_namespace, sa_token, all_namespaces, enabled)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+			RETURNING id
+		`, req.Username, string(hashedPassword), req.DisplayName, req.Email, req.Role,
+			req.ServiceAccount, req.SANamespace, req.SAToken, req.AllNamespaces).Scan(&userID)
+		if err != nil {
+			return nil, fmt.Errorf("创建用户失败: %w", err)
+		}
 	}
 
 	// 添加命名空间权限
@@ -229,7 +247,11 @@ func (c *Client) ListUsers(params ListUsersParams) (*ListUsersResponse, error) {
 	argIndex := 1
 
 	if params.Search != "" {
-		where += fmt.Sprintf(" AND (username ILIKE $%d OR display_name ILIKE $%d OR email ILIKE $%d)", argIndex, argIndex, argIndex)
+		if c.dialect == dbutil.DialectSQLite {
+			where += fmt.Sprintf(" AND (LOWER(username) LIKE LOWER($%d) OR LOWER(display_name) LIKE LOWER($%d) OR LOWER(email) LIKE LOWER($%d))", argIndex, argIndex, argIndex)
+		} else {
+			where += fmt.Sprintf(" AND (username ILIKE $%d OR display_name ILIKE $%d OR email ILIKE $%d)", argIndex, argIndex, argIndex)
+		}
 		args = append(args, "%"+params.Search+"%")
 		argIndex++
 	}

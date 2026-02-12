@@ -80,6 +80,7 @@ clean:
 # 部署到 Kubernetes
 deploy:
 	kubectl apply -f deploy/kubernetes/rbac.yaml
+	kubectl apply -f deploy/kubernetes/sqlite-pvc.yaml
 	kubectl apply -f deploy/kubernetes/deployment.yaml
 	kubectl apply -f deploy/kubernetes/service.yaml
 	@echo ">> 部署完成"
@@ -90,6 +91,7 @@ undeploy:
 	kubectl delete -f deploy/kubernetes/ingress.yaml --ignore-not-found
 	kubectl delete -f deploy/kubernetes/service.yaml --ignore-not-found
 	kubectl delete -f deploy/kubernetes/deployment.yaml --ignore-not-found
+	kubectl delete -f deploy/kubernetes/sqlite-pvc.yaml --ignore-not-found
 	kubectl delete -f deploy/kubernetes/rbac.yaml --ignore-not-found
 	@echo ">> 卸载完成"
 

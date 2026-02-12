@@ -12,6 +12,7 @@ data:
   POSTGRES_HOST: "postgresql.k8s-dashboard.svc.cluster.local"
   POSTGRES_DB: "k8s_dashboard"
   POSTGRES_SSLMODE: "require"  # 生产环境启用 SSL
+  ALLOW_SQLITE_FALLBACK: "false"
 
   # 生产环境 VictoriaMetrics
   VICTORIA_METRICS_URL: "http://victoria-metrics.monitoring.svc.cluster.local:8428"

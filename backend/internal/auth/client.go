@@ -10,36 +10,37 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	dbutil "github.com/k8s-dashboard/backend/internal/db"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	ErrUserNotFound      = errors.New("用户不存在")
-	ErrInvalidPassword   = errors.New("密码错误")
-	ErrUserDisabled      = errors.New("用户已禁用")
-	ErrTokenExpired      = errors.New("Token 已过期")
-	ErrInvalidToken      = errors.New("无效的 Token")
-	ErrPermissionDenied  = errors.New("权限不足")
+	ErrUserNotFound        = errors.New("用户不存在")
+	ErrInvalidPassword     = errors.New("密码错误")
+	ErrUserDisabled        = errors.New("用户已禁用")
+	ErrTokenExpired        = errors.New("Token 已过期")
+	ErrInvalidToken        = errors.New("无效的 Token")
+	ErrPermissionDenied    = errors.New("权限不足")
 	ErrNamespaceNotAllowed = errors.New("无权访问该命名空间")
 )
 
 // User 用户信息
 type User struct {
-	ID              int64     `json:"id"`
-	Username        string    `json:"username"`
-	Password        string    `json:"-"` // 不返回密码
-	DisplayName     string    `json:"displayName"`
-	Email           string    `json:"email"`
-	Role            string    `json:"role"`       // admin, operator, viewer
-	ServiceAccount  string    `json:"serviceAccount,omitempty"` // K8s ServiceAccount 名称
-	SANamespace     string    `json:"saNamespace,omitempty"`    // ServiceAccount 所在命名空间
-	SAToken         string    `json:"-"`                        // ServiceAccount Token (不返回)
-	AllNamespaces   bool      `json:"allNamespaces"`            // 是否有所有命名空间权限
-	Enabled         bool      `json:"enabled"`
-	LastLoginAt     *time.Time `json:"lastLoginAt,omitempty"`
-	LastLoginIP     string    `json:"lastLoginIP,omitempty"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	ID             int64      `json:"id"`
+	Username       string     `json:"username"`
+	Password       string     `json:"-"` // 不返回密码
+	DisplayName    string     `json:"displayName"`
+	Email          string     `json:"email"`
+	Role           string     `json:"role"`                     // admin, operator, viewer
+	ServiceAccount string     `json:"serviceAccount,omitempty"` // K8s ServiceAccount 名称
+	SANamespace    string     `json:"saNamespace,omitempty"`    // ServiceAccount 所在命名空间
+	SAToken        string     `json:"-"`                        // ServiceAccount Token (不返回)
+	AllNamespaces  bool       `json:"allNamespaces"`            // 是否有所有命名空间权限
+	Enabled        bool       `json:"enabled"`
+	LastLoginAt    *time.Time `json:"lastLoginAt,omitempty"`
+	LastLoginIP    string     `json:"lastLoginIP,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
 }
 
 // UserNamespace 用户可访问的命名空间
@@ -66,12 +67,12 @@ type ApprovalRequest struct {
 	ID           int64      `json:"id"`
 	UserID       int64      `json:"userId"`
 	Username     string     `json:"username"`
-	Action       string     `json:"action"`       // delete, scale, restart
-	Resource     string     `json:"resource"`     // pods, deployments, etc.
+	Action       string     `json:"action"`   // delete, scale, restart
+	Resource     string     `json:"resource"` // pods, deployments, etc.
 	ResourceName string     `json:"resourceName"`
 	Namespace    string     `json:"namespace"`
 	Reason       string     `json:"reason"`
-	Status       string     `json:"status"`       // pending, approved, rejected
+	Status       string     `json:"status"` // pending, approved, rejected
 	ApproverID   *int64     `json:"approverId,omitempty"`
 	ApproverName string     `json:"approverName,omitempty"`
 	ApprovedAt   *time.Time `json:"approvedAt,omitempty"`
@@ -83,33 +84,35 @@ type ApprovalRequest struct {
 
 // ApprovalRule 审批规则
 type ApprovalRule struct {
-	ID         int64  `json:"id"`
-	Action     string `json:"action"`     // delete, scale, restart, *
-	Resource   string `json:"resource"`   // pods, deployments, *, etc.
-	Namespace  string `json:"namespace"`  // 空表示所有命名空间
-	MinRole    string `json:"minRole"`    // 需要的最低角色: admin, operator
-	Enabled    bool   `json:"enabled"`
+	ID        int64  `json:"id"`
+	Action    string `json:"action"`    // delete, scale, restart, *
+	Resource  string `json:"resource"`  // pods, deployments, *, etc.
+	Namespace string `json:"namespace"` // 空表示所有命名空间
+	MinRole   string `json:"minRole"`   // 需要的最低角色: admin, operator
+	Enabled   bool   `json:"enabled"`
 }
 
 // JWTClaims JWT 声明
 type JWTClaims struct {
-	UserID      int64  `json:"userId"`
-	Username    string `json:"username"`
-	Role        string `json:"role"`
-	SessionID   string `json:"sessionId"`
+	UserID    int64  `json:"userId"`
+	Username  string `json:"username"`
+	Role      string `json:"role"`
+	SessionID string `json:"sessionId"`
 	jwt.RegisteredClaims
 }
 
 // Client 认证客户端
 type Client struct {
 	db        *sql.DB
+	dialect   dbutil.Dialect
 	jwtSecret []byte
 }
 
 // NewClient 创建认证客户端
-func NewClient(db *sql.DB, jwtSecret string) (*Client, error) {
+func NewClient(db *sql.DB, dialect dbutil.Dialect, jwtSecret string) (*Client, error) {
 	client := &Client{
 		db:        db,
+		dialect:   dialect,
 		jwtSecret: []byte(jwtSecret),
 	}
 
@@ -129,84 +132,166 @@ func NewClient(db *sql.DB, jwtSecret string) (*Client, error) {
 
 // initSchema 初始化表结构
 func (c *Client) initSchema() error {
-	schema := `
-	-- 用户表
-	CREATE TABLE IF NOT EXISTS users (
-		id BIGSERIAL PRIMARY KEY,
-		username VARCHAR(100) UNIQUE NOT NULL,
-		password VARCHAR(255) NOT NULL,
-		display_name VARCHAR(200),
-		email VARCHAR(200),
-		role VARCHAR(50) NOT NULL DEFAULT 'viewer',
-		service_account VARCHAR(200),
-		sa_namespace VARCHAR(200),
-		sa_token TEXT,
-		all_namespaces BOOLEAN DEFAULT FALSE,
-		enabled BOOLEAN DEFAULT TRUE,
-		last_login_at TIMESTAMP WITH TIME ZONE,
-		last_login_ip VARCHAR(50),
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-	);
+	var schema string
+	if c.dialect == dbutil.DialectSQLite {
+		schema = `
+		-- 用户表
+		CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT UNIQUE NOT NULL,
+			password TEXT NOT NULL,
+			display_name TEXT,
+			email TEXT,
+			role TEXT NOT NULL DEFAULT 'viewer',
+			service_account TEXT,
+			sa_namespace TEXT,
+			sa_token TEXT,
+			all_namespaces INTEGER DEFAULT 0,
+			enabled INTEGER DEFAULT 1,
+			last_login_at DATETIME,
+			last_login_ip TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 
-	-- 用户命名空间访问权限表
-	CREATE TABLE IF NOT EXISTS user_namespaces (
-		id BIGSERIAL PRIMARY KEY,
-		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		namespace VARCHAR(200) NOT NULL,
-		permissions VARCHAR(50) DEFAULT 'read',
-		UNIQUE(user_id, namespace)
-	);
+		-- 用户命名空间访问权限表
+		CREATE TABLE IF NOT EXISTS user_namespaces (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			namespace TEXT NOT NULL,
+			permissions TEXT DEFAULT 'read',
+			UNIQUE(user_id, namespace)
+		);
 
-	-- 用户会话表
-	CREATE TABLE IF NOT EXISTS sessions (
-		id VARCHAR(64) PRIMARY KEY,
-		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		token TEXT NOT NULL,
-		ip VARCHAR(50),
-		user_agent TEXT,
-		expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-	);
+		-- 用户会话表
+		CREATE TABLE IF NOT EXISTS sessions (
+			id TEXT PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token TEXT NOT NULL,
+			ip TEXT,
+			user_agent TEXT,
+			expires_at DATETIME NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 
-	-- 审批请求表
-	CREATE TABLE IF NOT EXISTS approval_requests (
-		id BIGSERIAL PRIMARY KEY,
-		user_id BIGINT NOT NULL REFERENCES users(id),
-		action VARCHAR(50) NOT NULL,
-		resource VARCHAR(100) NOT NULL,
-		resource_name VARCHAR(255) NOT NULL,
-		namespace VARCHAR(200),
-		reason TEXT,
-		status VARCHAR(20) DEFAULT 'pending',
-		approver_id BIGINT REFERENCES users(id),
-		approved_at TIMESTAMP WITH TIME ZONE,
-		comment TEXT,
-		request_data TEXT,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-	);
+		-- 审批请求表
+		CREATE TABLE IF NOT EXISTS approval_requests (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			action TEXT NOT NULL,
+			resource TEXT NOT NULL,
+			resource_name TEXT NOT NULL,
+			namespace TEXT,
+			reason TEXT,
+			status TEXT DEFAULT 'pending',
+			approver_id INTEGER REFERENCES users(id),
+			approved_at DATETIME,
+			comment TEXT,
+			request_data TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 
-	-- 审批规则表
-	CREATE TABLE IF NOT EXISTS approval_rules (
-		id BIGSERIAL PRIMARY KEY,
-		action VARCHAR(50) NOT NULL,
-		resource VARCHAR(100) NOT NULL,
-		namespace VARCHAR(200),
-		min_role VARCHAR(50) NOT NULL DEFAULT 'admin',
-		enabled BOOLEAN DEFAULT TRUE,
-		UNIQUE(action, resource, namespace)
-	);
+		-- 审批规则表
+		CREATE TABLE IF NOT EXISTS approval_rules (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			action TEXT NOT NULL,
+			resource TEXT NOT NULL,
+			namespace TEXT,
+			min_role TEXT NOT NULL DEFAULT 'admin',
+			enabled INTEGER DEFAULT 1,
+			UNIQUE(action, resource, namespace)
+		);
 
-	-- 索引
-	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-	CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-	CREATE INDEX IF NOT EXISTS idx_user_namespaces_user_id ON user_namespaces(user_id);
-	CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-	CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-	CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);
-	CREATE INDEX IF NOT EXISTS idx_approval_requests_user_id ON approval_requests(user_id);
-	`
+		-- 索引
+		CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+		CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+		CREATE INDEX IF NOT EXISTS idx_user_namespaces_user_id ON user_namespaces(user_id);
+		CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+		CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+		CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);
+		CREATE INDEX IF NOT EXISTS idx_approval_requests_user_id ON approval_requests(user_id);
+		`
+	} else {
+		schema = `
+		-- 用户表
+		CREATE TABLE IF NOT EXISTS users (
+			id BIGSERIAL PRIMARY KEY,
+			username VARCHAR(100) UNIQUE NOT NULL,
+			password VARCHAR(255) NOT NULL,
+			display_name VARCHAR(200),
+			email VARCHAR(200),
+			role VARCHAR(50) NOT NULL DEFAULT 'viewer',
+			service_account VARCHAR(200),
+			sa_namespace VARCHAR(200),
+			sa_token TEXT,
+			all_namespaces BOOLEAN DEFAULT FALSE,
+			enabled BOOLEAN DEFAULT TRUE,
+			last_login_at TIMESTAMP WITH TIME ZONE,
+			last_login_ip VARCHAR(50),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- 用户命名空间访问权限表
+		CREATE TABLE IF NOT EXISTS user_namespaces (
+			id BIGSERIAL PRIMARY KEY,
+			user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			namespace VARCHAR(200) NOT NULL,
+			permissions VARCHAR(50) DEFAULT 'read',
+			UNIQUE(user_id, namespace)
+		);
+
+		-- 用户会话表
+		CREATE TABLE IF NOT EXISTS sessions (
+			id VARCHAR(64) PRIMARY KEY,
+			user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token TEXT NOT NULL,
+			ip VARCHAR(50),
+			user_agent TEXT,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- 审批请求表
+		CREATE TABLE IF NOT EXISTS approval_requests (
+			id BIGSERIAL PRIMARY KEY,
+			user_id BIGINT NOT NULL REFERENCES users(id),
+			action VARCHAR(50) NOT NULL,
+			resource VARCHAR(100) NOT NULL,
+			resource_name VARCHAR(255) NOT NULL,
+			namespace VARCHAR(200),
+			reason TEXT,
+			status VARCHAR(20) DEFAULT 'pending',
+			approver_id BIGINT REFERENCES users(id),
+			approved_at TIMESTAMP WITH TIME ZONE,
+			comment TEXT,
+			request_data TEXT,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+
+		-- 审批规则表
+		CREATE TABLE IF NOT EXISTS approval_rules (
+			id BIGSERIAL PRIMARY KEY,
+			action VARCHAR(50) NOT NULL,
+			resource VARCHAR(100) NOT NULL,
+			namespace VARCHAR(200),
+			min_role VARCHAR(50) NOT NULL DEFAULT 'admin',
+			enabled BOOLEAN DEFAULT TRUE,
+			UNIQUE(action, resource, namespace)
+		);
+
+		-- 索引
+		CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+		CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+		CREATE INDEX IF NOT EXISTS idx_user_namespaces_user_id ON user_namespaces(user_id);
+		CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+		CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+		CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);
+		CREATE INDEX IF NOT EXISTS idx_approval_requests_user_id ON approval_requests(user_id);
+		`
+	}
 
 	_, err := c.db.Exec(schema)
 	return err

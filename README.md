@@ -164,12 +164,32 @@ DELETE /api/v1/namespaces/:ns/pods/:name     # 删除 Pod
 
 ## 配置
 
+### 数据库选择规则
+- 优先使用 `POSTGRES_DSN`
+- 若未设置 `POSTGRES_DSN`，但设置了 `POSTGRES_HOST`，则使用 PostgreSQL 参数连接
+- 若未提供 PostgreSQL 配置，则自动使用 SQLite
+- 若提供了 PostgreSQL 配置但连接失败：
+  - `ALLOW_SQLITE_FALLBACK=true`：自动回落 SQLite
+  - `ALLOW_SQLITE_FALLBACK=false`：启动失败
+
+> 注意：SQLite 模式建议单副本运行；多副本场景请使用 PostgreSQL。
+
 ### 环境变量
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | PORT | 服务端口 | 8080 |
 | KUBECONFIG | kubeconfig 路径 | ~/.kube/config |
 | TZ | 时区 | Asia/Shanghai |
+| POSTGRES_DSN | PostgreSQL DSN（优先） | 空 |
+| POSTGRES_HOST | PostgreSQL 地址 | 空 |
+| POSTGRES_PORT | PostgreSQL 端口 | 5432 |
+| POSTGRES_DB | PostgreSQL 数据库名 | 空 |
+| POSTGRES_USER | PostgreSQL 用户名 | 空 |
+| POSTGRES_PASSWORD | PostgreSQL 密码 | 空 |
+| POSTGRES_SSLMODE | PostgreSQL SSL 模式 | disable |
+| SQLITE_PATH | SQLite 数据文件路径 | ./data/k8s-dashboard.db |
+| ALLOW_SQLITE_FALLBACK | PostgreSQL 失败时是否回落 SQLite | true |
+| JWT_SECRET | JWT 密钥 | k8s-dashboard-secret-key-change-in-production |
 
 ### Kubernetes RBAC
 Dashboard 需要足够的权限来管理集群资源，部署时会自动创建 ServiceAccount 和 ClusterRole。

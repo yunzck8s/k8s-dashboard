@@ -12,10 +12,10 @@
 
 ### 1. 部署依赖服务
 
-#### 部署 PostgreSQL
+#### 部署 PostgreSQL（可选，推荐生产环境）
 
 ```bash
-# 修改密码
+# 修改密码（使用 PostgreSQL 时）
 vim deploy/kustomize/dependencies/postgresql.yaml
 # 找到 POSTGRES_PASSWORD: changeme 并修改为安全密码
 
@@ -25,6 +25,8 @@ kubectl apply -f deploy/kustomize/dependencies/postgresql.yaml
 # 等待 PostgreSQL 就绪
 kubectl wait --for=condition=ready pod -l app=postgresql -n k8s-dashboard --timeout=300s
 ```
+
+> 如果你不打算部署 PostgreSQL，可以跳过本节。应用会自动使用 SQLite。
 
 #### 部署 VictoriaMetrics
 
@@ -38,15 +40,16 @@ kubectl wait --for=condition=ready pod -l app=victoria-metrics -n monitoring --t
 
 ### 2. 配置应用
 
-#### 修改 Secret（必须）
+#### 修改 Secret（按需）
 
 ```bash
-# 编辑 Secret，设置数据库密码
+# 编辑 Secret
 vim deploy/kustomize/base/secret.yaml
 
-# 修改以下内容（与 PostgreSQL 密码保持一致）:
+# 使用 PostgreSQL 时，POSTGRES_PASSWORD 需与 PostgreSQL 密码保持一致
+# 始终建议设置 JWT_SECRET:
 stringData:
-  POSTGRES_PASSWORD: "your-secure-password"
+  POSTGRES_PASSWORD: "your-secure-password"  # 可选（仅 PostgreSQL）
   JWT_SECRET: "your-jwt-secret-key"
 ```
 
@@ -59,9 +62,14 @@ vim deploy/kustomize/base/configmap.yaml
 
 # 修改以下配置:
 data:
+  POSTGRES_DSN: ""  # 可选，优先于 HOST/PORT 方式
   POSTGRES_HOST: "postgresql.k8s-dashboard.svc.cluster.local"
   VICTORIA_METRICS_URL: "http://victoria-metrics.monitoring.svc.cluster.local:8428"
+  SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
+  ALLOW_SQLITE_FALLBACK: "true"
 ```
+
+> 生产环境多副本建议配置 PostgreSQL，并将 `ALLOW_SQLITE_FALLBACK` 设为 `false`。
 
 ### 3. 部署应用
 
@@ -133,7 +141,7 @@ http://localhost:8080
 ### 检查所有组件状态
 
 ```bash
-# 检查 PostgreSQL
+# 检查 PostgreSQL（若已部署）
 kubectl get pods -n k8s-dashboard -l app=postgresql
 kubectl logs -n k8s-dashboard -l app=postgresql --tail=20
 
@@ -146,13 +154,13 @@ kubectl get pods -n k8s-dashboard -l app.kubernetes.io/name=k8s-dashboard
 kubectl logs -n k8s-dashboard -l app.kubernetes.io/name=k8s-dashboard --tail=50
 ```
 
-### 测试数据库连接
+### 测试数据库连接（可选）
 
 ```bash
 # 进入 Dashboard Pod
 kubectl exec -it -n k8s-dashboard deployment/k8s-dashboard -- sh
 
-# 测试 PostgreSQL 连接（如果安装了 psql 客户端）
+# 测试 PostgreSQL 连接（如果你启用了 PostgreSQL 且安装了 psql 客户端）
 # psql -h postgresql -U k8s_dashboard -d k8s_dashboard
 
 # 测试 VictoriaMetrics 连接
@@ -194,6 +202,9 @@ kubectl get secret k8s-dashboard-secret -n k8s-dashboard -o yaml
 # 检查密码是否匹配
 kubectl get secret postgresql-secret -n k8s-dashboard -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d
 kubectl get secret k8s-dashboard-secret -n k8s-dashboard -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d
+
+# 单副本场景可临时开启 SQLite 回落
+kubectl get configmap k8s-dashboard-config -n k8s-dashboard -o jsonpath='{.data.ALLOW_SQLITE_FALLBACK}'
 ```
 
 ### Ingress 无法访问

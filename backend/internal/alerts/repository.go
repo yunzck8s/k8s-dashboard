@@ -4,19 +4,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
-	_ "github.com/lib/pq"
+	dbutil "github.com/k8s-dashboard/backend/internal/db"
 )
 
 // Acknowledgement 告警确认记录
 type Acknowledgement struct {
-	ID               int64     `json:"id"`
-	AlertFingerprint string    `json:"alertFingerprint"`
-	AcknowledgedBy   string    `json:"acknowledgedBy"`
-	AcknowledgedAt   time.Time `json:"acknowledgedAt"`
-	Comment          string    `json:"comment"`
+	ID               int64      `json:"id"`
+	AlertFingerprint string     `json:"alertFingerprint"`
+	AcknowledgedBy   string     `json:"acknowledgedBy"`
+	AcknowledgedAt   time.Time  `json:"acknowledgedAt"`
+	Comment          string     `json:"comment"`
 	ExpiresAt        *time.Time `json:"expiresAt,omitempty"`
 }
 
@@ -35,99 +34,91 @@ type Silence struct {
 
 // Repository 告警数据仓库
 type Repository struct {
-	db *sql.DB
+	db      *sql.DB
+	dialect dbutil.Dialect
 }
 
 // NewRepository 创建告警数据仓库
-func NewRepository(host string, port int, user, password, dbname string) (*Repository, error) {
-	// 首先连接到 postgres 数据库，检查目标数据库是否存在
-	adminConnStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=postgres sslmode=disable",
-		host, port, user, password)
-
-	adminDB, err := sql.Open("postgres", adminConnStr)
-	if err != nil {
-		return nil, fmt.Errorf("连接 postgres 数据库失败: %w", err)
+func NewRepository(db *sql.DB, dialect dbutil.Dialect) (*Repository, error) {
+	repo := &Repository{
+		db:      db,
+		dialect: dialect,
 	}
-	defer adminDB.Close()
-
-	// 检查目标数据库是否存在
-	var exists bool
-	err = adminDB.QueryRow("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)", dbname).Scan(&exists)
-	if err != nil {
-		return nil, fmt.Errorf("检查数据库存在性失败: %w", err)
-	}
-
-	// 如果数据库不存在，创建它
-	if !exists {
-		_, err = adminDB.Exec(fmt.Sprintf("CREATE DATABASE %s", dbname))
-		if err != nil {
-			return nil, fmt.Errorf("创建数据库失败: %w", err)
-		}
-		log.Printf("数据库 %s 创建成功", dbname)
-	}
-
-	// 连接到目标数据库
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("连接数据库失败: %w", err)
-	}
-
-	// 测试连接
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("数据库连接测试失败: %w", err)
-	}
-
-	// 设置连接池
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	repo := &Repository{db: db}
 
 	// 初始化表结构
 	if err := repo.initSchema(); err != nil {
 		return nil, fmt.Errorf("初始化表结构失败: %w", err)
 	}
 
-	log.Printf("告警数据库初始化成功")
 	return repo, nil
 }
 
 // initSchema 初始化表结构
 func (r *Repository) initSchema() error {
-	schema := `
-	-- 告警确认表
-	CREATE TABLE IF NOT EXISTS alert_acknowledgements (
-		id BIGSERIAL PRIMARY KEY,
-		alert_fingerprint VARCHAR(64) NOT NULL,
-		acknowledged_by VARCHAR(255) NOT NULL,
-		acknowledged_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		comment TEXT,
-		expires_at TIMESTAMP WITH TIME ZONE
-	);
+	var schema string
+	if r.dialect == dbutil.DialectSQLite {
+		schema = `
+		-- 告警确认表
+		CREATE TABLE IF NOT EXISTS alert_acknowledgements (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			alert_fingerprint TEXT NOT NULL,
+			acknowledged_by TEXT NOT NULL,
+			acknowledged_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			comment TEXT,
+			expires_at DATETIME
+		);
 
-	CREATE INDEX IF NOT EXISTS idx_alert_ack_fingerprint ON alert_acknowledgements(alert_fingerprint);
-	CREATE INDEX IF NOT EXISTS idx_alert_ack_expires ON alert_acknowledgements(expires_at);
+		CREATE INDEX IF NOT EXISTS idx_alert_ack_fingerprint ON alert_acknowledgements(alert_fingerprint);
+		CREATE INDEX IF NOT EXISTS idx_alert_ack_expires ON alert_acknowledgements(expires_at);
 
-	-- 静默规则表
-	CREATE TABLE IF NOT EXISTS alert_silences (
-		id BIGSERIAL PRIMARY KEY,
-		silence_id VARCHAR(64) UNIQUE,
-		matchers JSONB NOT NULL,
-		starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
-		ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
-		created_by VARCHAR(255) NOT NULL,
-		comment TEXT NOT NULL,
-		state VARCHAR(20) DEFAULT 'active',
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-	);
+		-- 静默规则表
+		CREATE TABLE IF NOT EXISTS alert_silences (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			silence_id TEXT UNIQUE,
+			matchers TEXT NOT NULL,
+			starts_at DATETIME NOT NULL,
+			ends_at DATETIME NOT NULL,
+			created_by TEXT NOT NULL,
+			comment TEXT NOT NULL,
+			state TEXT DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
 
-	CREATE INDEX IF NOT EXISTS idx_alert_silence_state ON alert_silences(state);
-	CREATE INDEX IF NOT EXISTS idx_alert_silence_ends ON alert_silences(ends_at);
-	`
+		CREATE INDEX IF NOT EXISTS idx_alert_silence_state ON alert_silences(state);
+		CREATE INDEX IF NOT EXISTS idx_alert_silence_ends ON alert_silences(ends_at);
+		`
+	} else {
+		schema = `
+		-- 告警确认表
+		CREATE TABLE IF NOT EXISTS alert_acknowledgements (
+			id BIGSERIAL PRIMARY KEY,
+			alert_fingerprint VARCHAR(64) NOT NULL,
+			acknowledged_by VARCHAR(255) NOT NULL,
+			acknowledged_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			comment TEXT,
+			expires_at TIMESTAMP WITH TIME ZONE
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_alert_ack_fingerprint ON alert_acknowledgements(alert_fingerprint);
+		CREATE INDEX IF NOT EXISTS idx_alert_ack_expires ON alert_acknowledgements(expires_at);
+
+		-- 静默规则表
+		CREATE TABLE IF NOT EXISTS alert_silences (
+			id BIGSERIAL PRIMARY KEY,
+			silence_id VARCHAR(64) UNIQUE,
+			matchers JSONB NOT NULL,
+			starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			created_by VARCHAR(255) NOT NULL,
+			comment TEXT NOT NULL,
+			state VARCHAR(20) DEFAULT 'active',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_alert_silence_state ON alert_silences(state);
+		CREATE INDEX IF NOT EXISTS idx_alert_silence_ends ON alert_silences(ends_at);
+		`
+	}
 
 	_, err := r.db.Exec(schema)
 	return err
@@ -163,14 +154,18 @@ func (r *Repository) UnacknowledgeAlert(fingerprint string) error {
 
 // GetAcknowledgement 获取告警确认记录
 func (r *Repository) GetAcknowledgement(fingerprint string) (*Acknowledgement, error) {
-	query := `
+	nowExpr := "NOW()"
+	if r.dialect == dbutil.DialectSQLite {
+		nowExpr = "CURRENT_TIMESTAMP"
+	}
+	query := fmt.Sprintf(`
 		SELECT id, alert_fingerprint, acknowledged_by, acknowledged_at, comment, expires_at
 		FROM alert_acknowledgements
 		WHERE alert_fingerprint = $1
-		AND (expires_at IS NULL OR expires_at > NOW())
+		AND (expires_at IS NULL OR expires_at > %s)
 		ORDER BY acknowledged_at DESC
 		LIMIT 1
-	`
+	`, nowExpr)
 
 	ack := &Acknowledgement{}
 	err := r.db.QueryRow(query, fingerprint).Scan(
@@ -199,6 +194,36 @@ func (r *Repository) CreateSilence(silence *Silence) error {
 	matchersJSON, err := json.Marshal(silence.Matchers)
 	if err != nil {
 		return fmt.Errorf("序列化 matchers 失败: %w", err)
+	}
+
+	if r.dialect == dbutil.DialectSQLite {
+		query := `
+			INSERT INTO alert_silences (
+				silence_id, matchers, starts_at, ends_at, created_by, comment, state
+			) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`
+		result, err := r.db.Exec(query,
+			silence.SilenceID,
+			matchersJSON,
+			silence.StartsAt,
+			silence.EndsAt,
+			silence.CreatedBy,
+			silence.Comment,
+			silence.State,
+		)
+		if err != nil {
+			return err
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return err
+		}
+		silence.ID = id
+		return r.db.QueryRow(`
+			SELECT created_at
+			FROM alert_silences
+			WHERE id = $1
+		`, silence.ID).Scan(&silence.CreatedAt)
 	}
 
 	query := `
@@ -350,5 +375,6 @@ func (r *Repository) UpdateSilenceState(id int64, state string) error {
 
 // Close 关闭数据库连接
 func (r *Repository) Close() error {
-	return r.db.Close()
+	// 连接由上层统一管理，仓库不主动关闭。
+	return nil
 }

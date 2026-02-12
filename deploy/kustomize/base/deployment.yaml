@@ -55,6 +55,11 @@ spec:
                   key: LOG_FORMAT
 
             # PostgreSQL 配置
+            - name: POSTGRES_DSN
+              valueFrom:
+                configMapKeyRef:
+                  name: k8s-dashboard-config
+                  key: POSTGRES_DSN
             - name: POSTGRES_HOST
               valueFrom:
                 configMapKeyRef:
@@ -80,11 +85,24 @@ spec:
                 secretKeyRef:
                   name: k8s-dashboard-secret
                   key: POSTGRES_PASSWORD
+                  optional: true
             - name: POSTGRES_SSLMODE
               valueFrom:
                 configMapKeyRef:
                   name: k8s-dashboard-config
                   key: POSTGRES_SSLMODE
+
+            # SQLite 配置
+            - name: SQLITE_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: k8s-dashboard-config
+                  key: SQLITE_PATH
+            - name: ALLOW_SQLITE_FALLBACK
+              valueFrom:
+                configMapKeyRef:
+                  name: k8s-dashboard-config
+                  key: ALLOW_SQLITE_FALLBACK
 
             # VictoriaMetrics 配置
             - name: VICTORIA_METRICS_URL
@@ -157,8 +175,15 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /var/lib/k8s-dashboard
 
       securityContext:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: k8s-dashboard-sqlite

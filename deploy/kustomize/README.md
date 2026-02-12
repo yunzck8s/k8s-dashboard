@@ -38,24 +38,27 @@ deploy/kustomize/
 
 ## 依赖服务
 
-应用依赖以下服务，需要先部署：
+应用建议配套以下服务：
 
-### PostgreSQL
+### PostgreSQL（可选）
 
-用于存储审计日志等持久化数据。
+用于生产环境或多副本部署时的持久化数据存储。
 
 ```bash
 # 部署示例 PostgreSQL
 kubectl apply -f dependencies/postgresql.yaml
 ```
 
-配置项（在 ConfigMap 中）：
+配置项（在 ConfigMap 中，可选）：
+- `POSTGRES_DSN`: DSN 连接串（优先）
 - `POSTGRES_HOST`: PostgreSQL 服务地址
 - `POSTGRES_PORT`: 端口（默认 5432）
 - `POSTGRES_DB`: 数据库名
 - `POSTGRES_USER`: 用户名
 - `POSTGRES_PASSWORD`: 密码（在 Secret 中）
 - `POSTGRES_SSLMODE`: SSL 模式（disable/require）
+
+如果不配置 PostgreSQL，服务将自动使用 SQLite（`SQLITE_PATH`）。
 
 ### VictoriaMetrics
 
@@ -80,12 +83,15 @@ kubectl apply -f dependencies/victoria-metrics.yaml
 ```yaml
 # base/configmap.yaml
 data:
-  POSTGRES_HOST: "your-postgres-host"
+  POSTGRES_DSN: ""
+  POSTGRES_HOST: ""    # 可选：配置后优先使用 PostgreSQL
+  SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
+  ALLOW_SQLITE_FALLBACK: "true"
   VICTORIA_METRICS_URL: "your-vm-url"
 
 # base/secret.yaml
 stringData:
-  POSTGRES_PASSWORD: "your-secure-password"
+  POSTGRES_PASSWORD: "your-secure-password"  # 使用 PostgreSQL 时需要
   JWT_SECRET: "your-jwt-secret"
 ```
 
@@ -127,11 +133,14 @@ kubectl apply -k overlays/prod
 | `TZ` | 时区 | Asia/Shanghai | 否 |
 | `LOG_LEVEL` | 日志级别 (debug/info/warn/error) | info | 否 |
 | `LOG_FORMAT` | 日志格式 (json/text) | json | 否 |
-| `POSTGRES_HOST` | PostgreSQL 地址 | - | 是 |
-| `POSTGRES_PORT` | PostgreSQL 端口 | 5432 | 是 |
-| `POSTGRES_DB` | 数据库名 | - | 是 |
-| `POSTGRES_USER` | 数据库用户 | - | 是 |
+| `POSTGRES_DSN` | PostgreSQL DSN（优先） | 空 | 否 |
+| `POSTGRES_HOST` | PostgreSQL 地址 | 空 | 否 |
+| `POSTGRES_PORT` | PostgreSQL 端口 | 5432 | 否 |
+| `POSTGRES_DB` | 数据库名 | k8s_dashboard | 否 |
+| `POSTGRES_USER` | 数据库用户 | postgres | 否 |
 | `POSTGRES_SSLMODE` | SSL 模式 | disable | 否 |
+| `SQLITE_PATH` | SQLite 数据文件路径 | /var/lib/k8s-dashboard/dashboard.db | 否 |
+| `ALLOW_SQLITE_FALLBACK` | PostgreSQL 失败时是否回落 SQLite | true | 否 |
 | `VICTORIA_METRICS_URL` | VictoriaMetrics URL | - | 是 |
 | `AUDIT_LOG_ENABLED` | 启用审计日志 | true | 否 |
 | `AUDIT_LOG_MAX_SIZE` | 日志文件最大大小(MB) | 100 | 否 |
@@ -142,7 +151,7 @@ kubectl apply -k overlays/prod
 
 | 配置项 | 说明 | 必填 |
 |--------|------|------|
-| `POSTGRES_PASSWORD` | PostgreSQL 密码 | 是 |
+| `POSTGRES_PASSWORD` | PostgreSQL 密码 | 否（仅 PostgreSQL） |
 | `JWT_SECRET` | JWT 密钥 | 否 |
 
 ## 更新部署
@@ -224,6 +233,7 @@ kubectl logs -l app.kubernetes.io/name=k8s-dashboard -n k8s-dashboard --tail=100
 2. 检查 ConfigMap 中的连接配置
 3. 检查网络策略是否允许访问
 4. 检查 Secret 中的密码是否正确
+5. 如为单副本环境，可将 `ALLOW_SQLITE_FALLBACK` 设为 `true` 自动回落 SQLite
 
 ### 无法连接 VictoriaMetrics
 
@@ -249,6 +259,7 @@ kubectl rollout restart deployment/k8s-dashboard -n k8s-dashboard
 5. **监控**：配置 Prometheus 监控和告警
 6. **高可用**：生产环境至少运行 3 个副本
 7. **网络策略**：使用 NetworkPolicy 限制 Pod 间通信
+8. **SQLite 限制**：SQLite 模式建议仅单副本运行，多副本请使用 PostgreSQL
 
 ## 参考资料
 

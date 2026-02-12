@@ -32,6 +32,24 @@ spec:
               value: "8080"
             - name: TZ
               value: "Asia/Shanghai"
+            - name: POSTGRES_DSN
+              value: ""
+            - name: POSTGRES_HOST
+              value: ""
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "k8s_dashboard"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: ""
+            - name: POSTGRES_SSLMODE
+              value: "disable"
+            - name: SQLITE_PATH
+              value: "/var/lib/k8s-dashboard/dashboard.db"
+            - name: ALLOW_SQLITE_FALLBACK
+              value: "true"
           resources:
             requests:
               cpu: 100m
@@ -63,7 +81,14 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /var/lib/k8s-dashboard
       securityContext:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: k8s-dashboard-sqlite

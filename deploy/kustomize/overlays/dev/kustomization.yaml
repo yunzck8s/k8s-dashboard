@@ -5,6 +5,11 @@ kind: Kustomization
 resources:
   - ../../base
 
+# 补丁
+patches:
+  - path: configmap-patch.yaml
+  - path: ingress-patch.yaml
+
 # 环境特定的标签
 labels:
   - pairs:

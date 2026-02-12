@@ -3,10 +3,9 @@ package audit
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
-	_ "github.com/lib/pq"
+	dbutil "github.com/k8s-dashboard/backend/internal/db"
 )
 
 // AuditLog 审计日志结构
@@ -50,93 +49,79 @@ type ListResponse struct {
 
 // Client 审计日志客户端
 type Client struct {
-	db *sql.DB
+	db      *sql.DB
+	dialect dbutil.Dialect
 }
 
 // NewClient 创建审计日志客户端
-func NewClient(host string, port int, user, password, dbname string) (*Client, error) {
-	// 首先连接到 postgres 数据库，检查目标数据库是否存在
-	adminConnStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=postgres sslmode=disable",
-		host, port, user, password)
-
-	adminDB, err := sql.Open("postgres", adminConnStr)
-	if err != nil {
-		return nil, fmt.Errorf("连接 postgres 数据库失败: %w", err)
+func NewClient(db *sql.DB, dialect dbutil.Dialect) (*Client, error) {
+	client := &Client{
+		db:      db,
+		dialect: dialect,
 	}
-	defer adminDB.Close()
-
-	// 检查目标数据库是否存在
-	var exists bool
-	err = adminDB.QueryRow("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)", dbname).Scan(&exists)
-	if err != nil {
-		return nil, fmt.Errorf("检查数据库存在性失败: %w", err)
-	}
-
-	// 如果数据库不存在，创建它
-	if !exists {
-		_, err = adminDB.Exec(fmt.Sprintf("CREATE DATABASE %s", dbname))
-		if err != nil {
-			return nil, fmt.Errorf("创建数据库失败: %w", err)
-		}
-		log.Printf("数据库 %s 创建成功", dbname)
-	}
-
-	// 连接到目标数据库
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("连接数据库失败: %w", err)
-	}
-
-	// 测试连接
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("数据库连接测试失败: %w", err)
-	}
-
-	// 设置连接池
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	client := &Client{db: db}
 
 	// 初始化表结构
 	if err := client.initSchema(); err != nil {
 		return nil, fmt.Errorf("初始化表结构失败: %w", err)
 	}
 
-	log.Printf("PostgreSQL 连接成功: %s:%d/%s", host, port, dbname)
 	return client, nil
 }
 
 // initSchema 初始化表结构
 func (c *Client) initSchema() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS audit_logs (
-		id BIGSERIAL PRIMARY KEY,
-		timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		"user" VARCHAR(255) NOT NULL DEFAULT 'anonymous',
-		action VARCHAR(20) NOT NULL,
-		resource VARCHAR(100) NOT NULL,
-		resource_name VARCHAR(255),
-		namespace VARCHAR(255),
-		cluster VARCHAR(100) DEFAULT 'default',
-		status_code INT,
-		client_ip VARCHAR(50),
-		user_agent TEXT,
-		request_body TEXT,
-		duration BIGINT,
-		message TEXT
-	);
+	var schema string
+	if c.dialect == dbutil.DialectSQLite {
+		schema = `
+		CREATE TABLE IF NOT EXISTS audit_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			"user" TEXT NOT NULL DEFAULT 'anonymous',
+			action TEXT NOT NULL,
+			resource TEXT NOT NULL,
+			resource_name TEXT,
+			namespace TEXT,
+			cluster TEXT DEFAULT 'default',
+			status_code INTEGER,
+			client_ip TEXT,
+			user_agent TEXT,
+			request_body TEXT,
+			duration INTEGER,
+			message TEXT
+		);
 
-	CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
-	CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs("user");
-	CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
-	CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
-	CREATE INDEX IF NOT EXISTS idx_audit_logs_namespace ON audit_logs(namespace);
-	`
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs("user");
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_namespace ON audit_logs(namespace);
+		`
+	} else {
+		schema = `
+		CREATE TABLE IF NOT EXISTS audit_logs (
+			id BIGSERIAL PRIMARY KEY,
+			timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			"user" VARCHAR(255) NOT NULL DEFAULT 'anonymous',
+			action VARCHAR(20) NOT NULL,
+			resource VARCHAR(100) NOT NULL,
+			resource_name VARCHAR(255),
+			namespace VARCHAR(255),
+			cluster VARCHAR(100) DEFAULT 'default',
+			status_code INT,
+			client_ip VARCHAR(50),
+			user_agent TEXT,
+			request_body TEXT,
+			duration BIGINT,
+			message TEXT
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs("user");
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
+		CREATE INDEX IF NOT EXISTS idx_audit_logs_namespace ON audit_logs(namespace);
+		`
+	}
 
 	_, err := c.db.Exec(schema)
 	return err
@@ -357,5 +342,6 @@ func (c *Client) GetStats(duration time.Duration) (map[string]interface{}, error
 
 // Close 关闭数据库连接
 func (c *Client) Close() error {
-	return c.db.Close()
+	// 连接由上层统一管理，审计客户端不主动关闭。
+	return nil
 }

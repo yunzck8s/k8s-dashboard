@@ -10,12 +10,17 @@ data:
   PORT: "8080"
   TZ: "Asia/Shanghai"
 
-  # PostgreSQL 配置
-  POSTGRES_HOST: "pgsql-postgresql.middle.svc.cluster.local"
+  # PostgreSQL 配置（可选；未配置时自动使用 SQLite）
+  POSTGRES_DSN: ""
+  POSTGRES_HOST: ""
   POSTGRES_PORT: "5432"
   POSTGRES_DB: "k8s_dashboard"
   POSTGRES_USER: "postgres"
   POSTGRES_SSLMODE: "disable"
+
+  # SQLite 配置
+  SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
+  ALLOW_SQLITE_FALLBACK: "true"
 
   # VictoriaMetrics 配置
   VICTORIA_METRICS_URL: "http://vmauth-vmks-victoria-metrics-k8s-stack.victoriametrics.svc.cluster.local:8427"

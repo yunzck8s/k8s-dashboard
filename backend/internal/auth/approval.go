@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	dbutil "github.com/k8s-dashboard/backend/internal/db"
 )
 
 // CreateApprovalRequest 创建审批请求
@@ -97,14 +99,28 @@ func (c *Client) CreateApproval(userID int64, req *CreateApprovalRequest) (*Appr
 	}
 
 	var approvalID int64
-	err := c.db.QueryRow(`
-		INSERT INTO approval_requests (user_id, action, resource, resource_name, namespace, reason, request_data, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-		RETURNING id
-	`, userID, req.Action, req.Resource, req.ResourceName, req.Namespace, req.Reason, requestDataJSON).Scan(&approvalID)
-
-	if err != nil {
-		return nil, err
+	if c.dialect == dbutil.DialectSQLite {
+		result, err := c.db.Exec(`
+			INSERT INTO approval_requests (user_id, action, resource, resource_name, namespace, reason, request_data, status)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+		`, userID, req.Action, req.Resource, req.ResourceName, req.Namespace, req.Reason, requestDataJSON)
+		if err != nil {
+			return nil, err
+		}
+		lastID, err := result.LastInsertId()
+		if err != nil {
+			return nil, err
+		}
+		approvalID = lastID
+	} else {
+		err := c.db.QueryRow(`
+			INSERT INTO approval_requests (user_id, action, resource, resource_name, namespace, reason, request_data, status)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+			RETURNING id
+		`, userID, req.Action, req.Resource, req.ResourceName, req.Namespace, req.Reason, requestDataJSON).Scan(&approvalID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return c.GetApprovalByID(approvalID)
