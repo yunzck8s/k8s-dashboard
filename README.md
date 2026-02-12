@@ -38,7 +38,7 @@
 - ServiceAccounts 管理
 
 ### 企业功能
-- 多集群支持
+- 多集群支持（增删测切，请求级 `X-Cluster` 路由）
 - 审计日志
 - 告警中心
 - Web 终端
@@ -148,6 +148,12 @@ k8s-dashboard/
 ### REST API
 ```
 GET    /api/v1/overview                      # 集群概览
+GET    /api/v1/clusters                      # 集群列表
+GET    /api/v1/clusters/:name                # 集群详情
+POST   /api/v1/clusters/:name/switch         # 切换集群（登录用户）
+POST   /api/v1/clusters/test                 # 测试集群（admin）
+POST   /api/v1/clusters                      # 添加集群（admin）
+DELETE /api/v1/clusters/:name                # 删除集群（admin）
 GET    /api/v1/namespaces                    # 命名空间列表
 GET    /api/v1/namespaces/:ns/pods           # Pod 列表
 GET    /api/v1/namespaces/:ns/pods/:name     # Pod 详情
@@ -189,7 +195,20 @@ DELETE /api/v1/namespaces/:ns/pods/:name     # 删除 Pod
 | POSTGRES_SSLMODE | PostgreSQL SSL 模式 | disable |
 | SQLITE_PATH | SQLite 数据文件路径 | ./data/k8s-dashboard.db |
 | ALLOW_SQLITE_FALLBACK | PostgreSQL 失败时是否回落 SQLite | true |
+| MULTI_CLUSTER_ENABLED | 是否启用多集群管理 | true |
 | JWT_SECRET | JWT 密钥 | k8s-dashboard-secret-key-change-in-production |
+| CLUSTER_ENCRYPTION_KEY | kubeconfig 加密密钥（Base64 32 字节） | 空（回退为 SHA-256(JWT_SECRET)） |
+
+### 多集群行为说明
+- 默认集群会在首次启动时自动引导为 `default`
+- 集群管理页（`/clusters`）仅 `admin` 可访问
+- 集群切换对所有登录用户可用，切换后会通过请求头 `X-Cluster` 作用于资源查询
+- 若目标集群不可达，接口会返回 `503` 和 `code=CLUSTER_UNAVAILABLE`
+
+### 设置页说明
+- 设置页（`/settings`）对所有登录用户可用
+- 支持：账户信息查看、修改密码、会话撤销、主题与全局刷新间隔偏好
+- `theme` 和 `refreshInterval` 为本地持久化，不写入后端
 
 ### Kubernetes RBAC
 Dashboard 需要足够的权限来管理集群资源，部署时会自动创建 ServiceAccount 和 ClusterRole。

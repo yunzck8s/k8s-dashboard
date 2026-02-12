@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { alertApi, namespaceApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -55,6 +56,7 @@ function getSeverityConfig(severity: string) {
 export default function AlertsActive() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  const pollingInterval = usePollingInterval('standard');
 
   // 从 URL 读取过滤参数
   const filters = {
@@ -70,7 +72,7 @@ export default function AlertsActive() {
       ...filters,
       state: 'active',
     }),
-    refetchInterval: 30000, // 每30秒刷新
+    refetchInterval: pollingInterval,
   });
 
   // 获取命名空间列表（用于过滤器）

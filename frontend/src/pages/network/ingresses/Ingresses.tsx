@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ingressApi } from '../../../api';
 import { useAppStore } from '../../../store';
+import { usePollingInterval } from '../../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -13,6 +14,7 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 
 export default function Ingresses() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -29,7 +31,7 @@ export default function Ingresses() {
       currentNamespace === 'all'
         ? ingressApi.listAll()
         : ingressApi.list(currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 创建 Ingress

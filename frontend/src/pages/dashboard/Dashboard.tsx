@@ -7,6 +7,7 @@ import ResourceChart from '../../components/charts/ResourceChart';
 import EventsList from '../../components/common/EventsList';
 import AlertsList from '../../components/common/AlertsList';
 import { formatNumber } from '../../utils/format';
+import { usePollingInterval } from '../../utils/polling';
 import {
   CubeIcon,
   ServerIcon,
@@ -27,6 +28,8 @@ type AlertSeverityFilter = 'critical' | 'warning' | 'info' | null;
 type EventTypeFilter = 'Normal' | 'Warning' | null;
 
 export default function Dashboard() {
+  const pollingInterval = usePollingInterval('standard');
+  const fastPollingInterval = usePollingInterval('fast');
   // 过滤状态
   const [alertFilter, setAlertFilter] = useState<AlertSeverityFilter>(null);
   const [eventFilter, setEventFilter] = useState<EventTypeFilter>(null);
@@ -39,14 +42,14 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ['overview'],
     queryFn: overviewApi.getOverview,
-    refetchInterval: 15000,
+    refetchInterval: fastPollingInterval,
   });
 
   // 获取告警摘要
   const { data: alertSummary } = useQuery({
     queryKey: ['alertSummary'],
     queryFn: alertApi.getSummary,
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

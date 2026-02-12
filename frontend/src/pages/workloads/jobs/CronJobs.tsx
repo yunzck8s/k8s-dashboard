@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { cronJobApi } from '../../../api';
 import { useAppStore } from '../../../store';
+import { usePollingInterval } from '../../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -9,6 +10,7 @@ import type { CronJob } from '../../../types';
 
 export default function CronJobs() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -17,7 +19,7 @@ export default function CronJobs() {
       currentNamespace === 'all'
         ? cronJobApi.listAll()
         : cronJobApi.list(currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 暂停/恢复 CronJob

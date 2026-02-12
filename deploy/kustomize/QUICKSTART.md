@@ -51,6 +51,7 @@ vim deploy/kustomize/base/secret.yaml
 stringData:
   POSTGRES_PASSWORD: "your-secure-password"  # 可选（仅 PostgreSQL）
   JWT_SECRET: "your-jwt-secret-key"
+  CLUSTER_ENCRYPTION_KEY: "base64-encoded-32-byte-key"  # 可选，建议用于多集群 kubeconfig 加密
 ```
 
 #### 修改 ConfigMap（可选）
@@ -67,6 +68,7 @@ data:
   VICTORIA_METRICS_URL: "http://victoria-metrics.monitoring.svc.cluster.local:8428"
   SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
   ALLOW_SQLITE_FALLBACK: "true"
+  MULTI_CLUSTER_ENABLED: "true"
 ```
 
 > 生产环境多副本建议配置 PostgreSQL，并将 `ALLOW_SQLITE_FALLBACK` 设为 `false`。

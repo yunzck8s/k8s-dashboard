@@ -12,6 +12,7 @@ import ActionDropdown from '../../../components/common/ActionDropdown';
 import EditImageModal from '../../../components/workloads/EditImageModal';
 import SchedulingEditor from '../../../components/workloads/SchedulingEditor';
 import YamlEditorModal from '../../../components/common/YamlEditorModal';
+import { usePollingInterval } from '../../../utils/polling';
 import {
   ArrowLeftIcon,
   TrashIcon,
@@ -827,10 +828,11 @@ function YamlTab({ yaml, onEditYaml }: { yaml: string; onEditYaml: () => void })
 
 // 事件标签页
 function EventsTab({ namespace, name }: { namespace: string; name: string }) {
+  const pollingInterval = usePollingInterval('standard');
   const { data: eventsData, isLoading } = useQuery({
     queryKey: ['deployment-events', namespace, name],
     queryFn: () => deploymentApi.getEvents(namespace, name),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

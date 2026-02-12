@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { eventApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import {
@@ -16,13 +17,14 @@ interface EventsListProps {
 }
 
 export default function EventsList({ namespace, limit = 10, typeFilter = null }: EventsListProps) {
+  const pollingInterval = usePollingInterval('standard');
   const { data, isLoading } = useQuery({
     queryKey: ['events', namespace],
     queryFn: () =>
       namespace
         ? eventApi.list(namespace, { pageSize: 100 })
         : eventApi.listAll({ pageSize: 100 }),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

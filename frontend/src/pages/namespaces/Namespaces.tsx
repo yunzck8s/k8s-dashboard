@@ -1,18 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { namespaceApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Namespace } from '../../types';
 
 export default function Namespaces() {
+  const pollingInterval = usePollingInterval('standard');
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['namespaces'],
     queryFn: () => namespaceApi.list(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 删除命名空间

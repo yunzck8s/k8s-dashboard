@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { silenceApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -18,12 +19,13 @@ import {
 export default function AlertsSilences() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const queryClient = useQueryClient();
+  const pollingInterval = usePollingInterval('standard');
 
   // 获取静默规则
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['silences'],
     queryFn: () => silenceApi.list(),
-    refetchInterval: 30000, // 每30秒刷新
+    refetchInterval: pollingInterval,
   });
 
   // 删除静默规则

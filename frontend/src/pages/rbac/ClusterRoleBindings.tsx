@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { clusterRoleBindingApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { ClusterRoleBinding } from '../../types';
 
 export default function ClusterRoleBindings() {
+  const pollingInterval = usePollingInterval('standard');
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['clusterrolebindings'],
     queryFn: () => clusterRoleBindingApi.list(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

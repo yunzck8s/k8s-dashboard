@@ -30,6 +30,11 @@ func NewClient() (*Client, error) {
 		return nil, err
 	}
 
+	return NewClientWithConfig(config)
+}
+
+// NewClientWithConfig 使用指定的 REST 配置创建客户端。
+func NewClientWithConfig(config *rest.Config) (*Client, error) {
 	// 创建标准客户端
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -89,23 +94,35 @@ func NewClientWithKubeconfig(kubeconfig string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewClientWithConfig(config)
+}
 
-	clientset, err := kubernetes.NewForConfig(config)
+// NewClientWithKubeconfigBytes 使用 kubeconfig 内容创建客户端。
+func NewClientWithKubeconfigBytes(kubeconfig []byte) (*Client, error) {
+	if len(kubeconfig) == 0 {
+		return nil, os.ErrInvalid
+	}
+	config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return nil, err
+	// 兼容某些 kubeconfig 缺失 CurrentContext 的情况。
+	if config.Host == "" {
+		cfg, err := clientcmd.Load(kubeconfig)
+		if err != nil {
+			return nil, err
+		}
+		if cfg.CurrentContext == "" && len(cfg.Contexts) > 0 {
+			for name := range cfg.Contexts {
+				cfg.CurrentContext = name
+				break
+			}
+		}
+		restCfg, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+		config = restCfg
 	}
-
-	metricsClient, _ := versioned.NewForConfig(config)
-
-	return &Client{
-		Clientset:     clientset,
-		DynamicClient: dynamicClient,
-		MetricsClient: metricsClient,
-		Config:        config,
-	}, nil
+	return NewClientWithConfig(config)
 }

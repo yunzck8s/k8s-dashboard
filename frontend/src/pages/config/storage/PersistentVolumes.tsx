@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { pvApi } from '../../../api';
+import { usePollingInterval } from '../../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { PersistentVolume } from '../../../types';
 
 export default function PersistentVolumes() {
+  const pollingInterval = usePollingInterval('standard');
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['pvs'],
     queryFn: () => pvApi.list(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

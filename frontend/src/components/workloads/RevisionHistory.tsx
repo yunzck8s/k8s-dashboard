@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { deploymentApi, statefulSetApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -35,6 +36,7 @@ export default function RevisionHistory({
   resourceType,
   onRollbackSuccess,
 }: RevisionHistoryProps) {
+  const pollingInterval = usePollingInterval('standard');
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const [showRollbackConfirm, setShowRollbackConfirm] = useState(false);
   const queryClient = useQueryClient();
@@ -59,7 +61,7 @@ export default function RevisionHistory({
         return result.items as RevisionItem[];
       }
     },
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // Deployment 回滚

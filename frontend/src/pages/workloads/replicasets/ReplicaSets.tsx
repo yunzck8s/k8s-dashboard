@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { replicaSetApi } from '../../../api';
 import { useAppStore } from '../../../store';
+import { usePollingInterval } from '../../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -8,6 +9,7 @@ import type { ReplicaSet } from '../../../types';
 
 export default function ReplicaSets() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['replicasets', currentNamespace],
@@ -15,7 +17,7 @@ export default function ReplicaSets() {
       currentNamespace === 'all'
         ? replicaSetApi.listAll()
         : replicaSetApi.list(currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

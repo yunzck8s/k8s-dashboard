@@ -251,6 +251,10 @@ export interface ClusterInfo {
   lastChecked: string;
   nodeCount: number;
   podCount: number;
+  isDefault: boolean;
+  enabled: boolean;
+  lastError?: string;
+  source: 'kubeconfig' | 'incluster' | string;
 }
 
 // 错误响应

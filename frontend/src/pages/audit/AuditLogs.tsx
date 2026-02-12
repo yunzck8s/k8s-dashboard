@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { auditApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { format, formatDistanceToNow, subDays, subHours } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -69,6 +70,8 @@ const timeRanges = [
 ];
 
 export default function AuditLogs() {
+  const pollingInterval = usePollingInterval('standard');
+  const slowPollingInterval = usePollingInterval('slow');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [timeRange, setTimeRange] = useState('24h');
@@ -105,14 +108,14 @@ export default function AuditLogs() {
         ...(actionFilter && { action: actionFilter }),
         ...(resourceFilter && { resource: resourceFilter }),
       }),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 获取统计数据
   const { data: stats } = useQuery({
     queryKey: ['audit-stats', timeRange],
     queryFn: () => auditApi.getStats(timeRange === 'all' ? '720h' : timeRange),
-    refetchInterval: 60000,
+    refetchInterval: slowPollingInterval,
   });
 
   if (isLoading) {

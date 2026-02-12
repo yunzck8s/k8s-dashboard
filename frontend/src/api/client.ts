@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiError } from '../types';
+import { useAppStore } from '../store';
 
 // 创建 axios 实例
 const api: AxiosInstance = axios.create({
@@ -34,10 +35,27 @@ api.interceptors.request.use(
 
 // 响应拦截器
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (!response.config.url?.startsWith('/clusters')) {
+      useAppStore.getState().clearClusterError();
+    }
+    return response;
+  },
   (error: AxiosError<ApiError>) => {
     if (error.response) {
       const { status, data } = error.response;
+      const clusterError = data as unknown as {
+        code?: string;
+        cluster?: string;
+        error?: string;
+      };
+
+      if (status === 503 && clusterError?.code === 'CLUSTER_UNAVAILABLE') {
+        useAppStore.getState().setClusterError({
+          cluster: clusterError.cluster || localStorage.getItem('currentCluster') || 'default',
+          error: clusterError.error || '当前集群不可达',
+        });
+      }
 
       switch (status) {
         case 401:

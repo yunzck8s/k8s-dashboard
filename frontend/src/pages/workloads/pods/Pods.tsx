@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { podApi } from '../../../api';
 import { useAppStore } from '../../../store';
+import { usePollingInterval } from '../../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -176,6 +177,7 @@ function formatMemory(bytes: number): string {
 
 export default function Pods() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
 
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
@@ -192,14 +194,14 @@ export default function Pods() {
       currentNamespace === 'all'
         ? podApi.listAll()
         : podApi.list(currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 获取所有 Pod 的实际资源使用量
   const { data: metricsData } = useQuery({
     queryKey: ['pods-metrics'],
     queryFn: () => podApi.listAllMetrics(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 创建 metrics 查找 map

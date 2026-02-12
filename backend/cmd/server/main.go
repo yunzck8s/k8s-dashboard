@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/k8s-dashboard/backend/internal/api"
 	"github.com/k8s-dashboard/backend/internal/audit"
 	"github.com/k8s-dashboard/backend/internal/auth"
+	"github.com/k8s-dashboard/backend/internal/clusters"
 	"github.com/k8s-dashboard/backend/internal/db"
 	"github.com/k8s-dashboard/backend/internal/k8s"
 	"github.com/k8s-dashboard/backend/internal/metrics"
@@ -61,6 +63,7 @@ func main() {
 	var auditClient *audit.Client
 	var authClient *auth.Client
 	var alertService *alerts.Service
+	var clusterManager *clusters.Manager
 
 	// 初始化审计日志客户端
 	auditClient, err = audit.NewClient(database, dialect)
@@ -83,8 +86,19 @@ func main() {
 		log.Printf("告警服务初始化成功")
 	}
 
+	// 初始化多集群管理（可选）
+	if parseBoolEnv("MULTI_CLUSTER_ENABLED", true) {
+		clusterManager, err = clusters.NewManager(database, dialect, jwtSecret, k8sClient)
+		if err != nil {
+			log.Fatalf("Failed to initialize cluster manager: %v", err)
+		}
+		log.Printf("多集群管理初始化成功")
+	} else {
+		log.Printf("多集群管理已禁用 (MULTI_CLUSTER_ENABLED=false)")
+	}
+
 	// 创建路由
-	router := api.NewRouter(k8sClient, metricsClient, alertClient, alertService, auditClient, authClient)
+	router := api.NewRouter(k8sClient, clusterManager, metricsClient, alertClient, alertService, auditClient, authClient)
 
 	// 配置 HTTP 服务器
 	port := os.Getenv("PORT")
@@ -123,4 +137,20 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+func parseBoolEnv(key string, def bool) bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if v == "" {
+		return def
+	}
+
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return def
+	}
 }

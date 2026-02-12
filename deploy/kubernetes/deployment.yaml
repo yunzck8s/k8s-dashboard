@@ -50,6 +50,10 @@ spec:
               value: "/var/lib/k8s-dashboard/dashboard.db"
             - name: ALLOW_SQLITE_FALLBACK
               value: "true"
+            - name: MULTI_CLUSTER_ENABLED
+              value: "true"
+            - name: CLUSTER_ENCRYPTION_KEY
+              value: ""
           resources:
             requests:
               cpu: 100m

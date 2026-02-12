@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { observationApi } from '../../../api';
+import { usePollingInterval } from '../../../utils/polling';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 
@@ -14,26 +15,27 @@ const tabs: { key: TabType; label: string }[] = [
 
 export default function AnomalyPanel() {
   const [activeTab, setActiveTab] = useState<TabType>('pods');
+  const pollingInterval = usePollingInterval('standard');
 
   // 获取 Pod 异常
   const { data: podAnomalies, isLoading: podsLoading } = useQuery({
     queryKey: ['observation-pod-anomalies'],
     queryFn: () => observationApi.getPodAnomalies(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 获取节点异常
   const { data: nodeAnomalies, isLoading: nodesLoading } = useQuery({
     queryKey: ['observation-node-anomalies'],
     queryFn: () => observationApi.getNodeAnomalies(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 获取资源超限
   const { data: resourceExcess, isLoading: resourcesLoading } = useQuery({
     queryKey: ['observation-resource-excess'],
     queryFn: () => observationApi.getResourceExcess(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   const getReasonBadgeColor = (reason: string) => {

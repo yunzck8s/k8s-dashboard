@@ -12,13 +12,14 @@ import (
 	"github.com/k8s-dashboard/backend/internal/api/middleware"
 	"github.com/k8s-dashboard/backend/internal/audit"
 	"github.com/k8s-dashboard/backend/internal/auth"
+	"github.com/k8s-dashboard/backend/internal/clusters"
 	"github.com/k8s-dashboard/backend/internal/k8s"
 	"github.com/k8s-dashboard/backend/internal/metrics"
 	"github.com/k8s-dashboard/backend/internal/observation"
 )
 
 // NewRouter 创建 HTTP 路由
-func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *gin.Engine {
+func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.New()
@@ -44,7 +45,7 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 	})
 
 	// 创建处理器
-	h := handlers.NewHandler(k8sClient, metricsClient, alertClient, alertService, auditClient)
+	h := handlers.NewHandler(k8sClient, clusterManager, metricsClient, alertClient, alertService, auditClient)
 	authHandler := handlers.NewAuthHandler(authClient)
 
 	// 创建观测服务和处理器
@@ -67,6 +68,7 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.Use(middleware.AuthMiddleware(authClient))
 		v1.Use(middleware.NamespaceAccessMiddleware(authClient))
 	}
+	v1.Use(middleware.ClusterSelector(clusterManager))
 
 	{
 		// 当前用户
@@ -74,6 +76,11 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.POST("/auth/password", authHandler.ChangePassword)
 		v1.GET("/auth/sessions", authHandler.GetUserSessions)
 		v1.DELETE("/auth/sessions/:id", authHandler.RevokeSession)
+
+		// 多集群（切换和查询对登录用户开放）
+		v1.GET("/clusters", h.ListClusters)
+		v1.GET("/clusters/:name", h.GetCluster)
+		v1.POST("/clusters/:name/switch", h.SwitchCluster)
 
 		// 集群概览
 		v1.GET("/overview", h.GetOverview)
@@ -275,6 +282,16 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 		v1.POST("/approvals/:id/reject", authHandler.RejectRequest)
 	}
 
+	clusterAdmin := v1.Group("/clusters")
+	if authClient != nil {
+		clusterAdmin.Use(middleware.RequireRole("admin"))
+	}
+	{
+		clusterAdmin.POST("", h.AddCluster)
+		clusterAdmin.POST("/test", h.TestCluster)
+		clusterAdmin.DELETE("/:name", h.DeleteCluster)
+	}
+
 	// ========== 管理员 API（需要 admin 角色）==========
 	adminAPI := r.Group("/api/v1/admin")
 	if authClient != nil {
@@ -297,6 +314,7 @@ func NewRouter(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient
 
 	// WebSocket 路由
 	ws := r.Group("/ws")
+	ws.Use(middleware.ClusterSelector(clusterManager))
 	{
 		ws.GET("/logs", h.StreamPodLogs)
 		ws.GET("/exec", h.ExecPod)

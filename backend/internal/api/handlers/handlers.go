@@ -12,7 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/k8s-dashboard/backend/internal/alertmanager"
 	"github.com/k8s-dashboard/backend/internal/alerts"
+	"github.com/k8s-dashboard/backend/internal/api/middleware"
 	"github.com/k8s-dashboard/backend/internal/audit"
+	"github.com/k8s-dashboard/backend/internal/clusters"
 	"github.com/k8s-dashboard/backend/internal/k8s"
 	"github.com/k8s-dashboard/backend/internal/metrics"
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +34,7 @@ import (
 // Handler API 处理器
 type Handler struct {
 	k8s          *k8s.Client
+	clusters     *clusters.Manager
 	metrics      *metrics.Client
 	alerts       *alertmanager.Client
 	alertService *alerts.Service
@@ -39,14 +42,22 @@ type Handler struct {
 }
 
 // NewHandler 创建处理器
-func NewHandler(k8sClient *k8s.Client, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client) *Handler {
+func NewHandler(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client) *Handler {
 	return &Handler{
 		k8s:          k8sClient,
+		clusters:     clusterManager,
 		metrics:      metricsClient,
 		alerts:       alertClient,
 		alertService: alertService,
 		audit:        auditClient,
 	}
+}
+
+func (h *Handler) getK8s(c *gin.Context) *k8s.Client {
+	if client := middleware.GetClusterClient(c); client != nil {
+		return client
+	}
+	return h.k8s
 }
 
 // ListResponse 列表响应
@@ -80,8 +91,8 @@ type EventSummary struct {
 
 type ResourceUsage struct {
 	CPU        UsageMetric `json:"cpu"`
-	Memory     UsageMetric `json:"memory"`      // 容器内存（K8s 视角）
-	NodeMemory UsageMetric `json:"nodeMemory"`  // 节点内存（OS 视角）
+	Memory     UsageMetric `json:"memory"`     // 容器内存（K8s 视角）
+	NodeMemory UsageMetric `json:"nodeMemory"` // 节点内存（OS 视角）
 	Pods       UsageMetric `json:"pods"`
 }
 
@@ -97,7 +108,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	ctx := context.Background()
 
 	// 获取节点信息
-	nodes, err := h.k8s.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := h.getK8s(c).Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -133,7 +144,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	}
 
 	// 获取所有 Pod
-	pods, err := h.k8s.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -150,7 +161,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	usedPods = float64(len(pods.Items))
 
 	// 获取 Deployments
-	deployments, err := h.k8s.Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
+	deployments, err := h.getK8s(c).Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -166,7 +177,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	}
 
 	// 获取 Services
-	services, err := h.k8s.Clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
+	services, err := h.getK8s(c).Clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -175,14 +186,14 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	serviceCount := ResourceCount{Total: len(services.Items), Ready: len(services.Items)}
 
 	// 获取 Namespaces
-	namespaces, err := h.k8s.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	namespaces, err := h.getK8s(c).Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// 获取事件
-	events, err := h.k8s.Clientset.CoreV1().Events("").List(ctx, metav1.ListOptions{})
+	events, err := h.getK8s(c).Clientset.CoreV1().Events("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -226,8 +237,8 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	}
 
 	// 如果 VM 不可用，回退到 Kubernetes Metrics Server
-	if !vmDataUsed && h.k8s.MetricsClient != nil {
-		nodeMetrics, err := h.k8s.MetricsClient.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
+	if !vmDataUsed && h.getK8s(c).MetricsClient != nil {
+		nodeMetrics, err := h.getK8s(c).MetricsClient.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
 		if err == nil {
 			usedCPU = 0
 			usedMemory = 0
@@ -262,7 +273,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 
 func (h *Handler) ListNamespaces(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -273,7 +284,7 @@ func (h *Handler) ListNamespaces(c *gin.Context) {
 func (h *Handler) GetNamespace(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	ns, err := h.k8s.Clientset.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+	ns, err := h.getK8s(c).Clientset.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -288,7 +299,7 @@ func (h *Handler) CreateNamespace(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.CoreV1().Namespaces().Create(ctx, &ns, metav1.CreateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().Namespaces().Create(ctx, &ns, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -299,7 +310,7 @@ func (h *Handler) CreateNamespace(c *gin.Context) {
 func (h *Handler) DeleteNamespace(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().Namespaces().Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -311,7 +322,7 @@ func (h *Handler) DeleteNamespace(c *gin.Context) {
 
 func (h *Handler) ListAllPods(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -322,7 +333,7 @@ func (h *Handler) ListAllPods(c *gin.Context) {
 func (h *Handler) ListPods(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -334,7 +345,7 @@ func (h *Handler) GetPod(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	pod, err := h.k8s.Clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+	pod, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -346,7 +357,7 @@ func (h *Handler) DeletePod(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -358,7 +369,7 @@ func (h *Handler) GetPodYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	pod, err := h.k8s.Clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+	pod, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -388,7 +399,7 @@ func (h *Handler) GetPodLogs(c *gin.Context) {
 		opts.TailLines = &lines
 	}
 
-	req := h.k8s.Clientset.CoreV1().Pods(namespace).GetLogs(name, opts)
+	req := h.getK8s(c).Clientset.CoreV1().Pods(namespace).GetLogs(name, opts)
 	logs, err := req.Stream(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -410,7 +421,7 @@ func (h *Handler) GetPodEvents(c *gin.Context) {
 	name := c.Param("name")
 
 	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=Pod", name, namespace)
-	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+	events, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -424,7 +435,7 @@ func (h *Handler) GetPodEvents(c *gin.Context) {
 
 func (h *Handler) ListAllDeployments(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -435,7 +446,7 @@ func (h *Handler) ListAllDeployments(c *gin.Context) {
 func (h *Handler) ListDeployments(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -447,7 +458,7 @@ func (h *Handler) GetDeployment(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -463,7 +474,7 @@ func (h *Handler) CreateDeployment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Create(ctx, &dep, metav1.CreateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Create(ctx, &dep, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -479,7 +490,7 @@ func (h *Handler) UpdateDeployment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, &dep, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, &dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -491,7 +502,7 @@ func (h *Handler) DeleteDeployment(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.AppsV1().Deployments(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -503,7 +514,7 @@ func (h *Handler) GetDeploymentYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -535,7 +546,7 @@ func (h *Handler) UpdateDeploymentYAML(c *gin.Context) {
 		return
 	}
 
-	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, &dep, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, &dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -556,14 +567,14 @@ func (h *Handler) ScaleDeployment(c *gin.Context) {
 		return
 	}
 
-	scale, err := h.k8s.Clientset.AppsV1().Deployments(namespace).GetScale(ctx, name, metav1.GetOptions{})
+	scale, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).GetScale(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	scale.Spec.Replicas = req.Replicas
-	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().Deployments(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -576,7 +587,7 @@ func (h *Handler) RestartDeployment(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -588,7 +599,7 @@ func (h *Handler) RestartDeployment(c *gin.Context) {
 	}
 	dep.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
-	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -607,7 +618,7 @@ func (h *Handler) RollbackDeployment(c *gin.Context) {
 	c.ShouldBindJSON(&req)
 
 	// 获取 ReplicaSets
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -619,7 +630,7 @@ func (h *Handler) RollbackDeployment(c *gin.Context) {
 		return
 	}
 
-	rsList, err := h.k8s.Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{
+	rsList, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -654,7 +665,7 @@ func (h *Handler) RollbackDeployment(c *gin.Context) {
 
 	// 更新 Deployment 的 Pod 模板
 	dep.Spec.Template = targetRS.Spec.Template
-	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -667,14 +678,14 @@ func (h *Handler) GetDeploymentPods(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	selector := labels.Set(dep.Spec.Selector.MatchLabels).AsSelector()
-	pods, err := h.k8s.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -688,7 +699,7 @@ func (h *Handler) GetDeploymentPods(c *gin.Context) {
 
 func (h *Handler) ListAllStatefulSets(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -699,7 +710,7 @@ func (h *Handler) ListAllStatefulSets(c *gin.Context) {
 func (h *Handler) ListStatefulSets(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -711,7 +722,7 @@ func (h *Handler) GetStatefulSet(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -723,7 +734,7 @@ func (h *Handler) DeleteStatefulSet(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -735,7 +746,7 @@ func (h *Handler) GetStatefulSetYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -762,14 +773,14 @@ func (h *Handler) ScaleStatefulSet(c *gin.Context) {
 		return
 	}
 
-	scale, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, name, metav1.GetOptions{})
+	scale, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	scale.Spec.Replicas = req.Replicas
-	_, err = h.k8s.Clientset.AppsV1().StatefulSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -781,7 +792,7 @@ func (h *Handler) ScaleStatefulSet(c *gin.Context) {
 
 func (h *Handler) ListAllDaemonSets(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -792,7 +803,7 @@ func (h *Handler) ListAllDaemonSets(c *gin.Context) {
 func (h *Handler) ListDaemonSets(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -804,7 +815,7 @@ func (h *Handler) GetDaemonSet(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	ds, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -816,7 +827,7 @@ func (h *Handler) DeleteDaemonSet(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -828,7 +839,7 @@ func (h *Handler) GetDaemonSetYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	ds, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -846,7 +857,7 @@ func (h *Handler) GetDaemonSetYAML(c *gin.Context) {
 
 func (h *Handler) ListAllJobs(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.BatchV1().Jobs("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.BatchV1().Jobs("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -857,7 +868,7 @@ func (h *Handler) ListAllJobs(c *gin.Context) {
 func (h *Handler) ListJobs(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -869,7 +880,7 @@ func (h *Handler) GetJob(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	job, err := h.k8s.Clientset.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	job, err := h.getK8s(c).Clientset.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -882,7 +893,7 @@ func (h *Handler) DeleteJob(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 	propagation := metav1.DeletePropagationBackground
-	err := h.k8s.Clientset.BatchV1().Jobs(namespace).Delete(ctx, name, metav1.DeleteOptions{
+	err := h.getK8s(c).Clientset.BatchV1().Jobs(namespace).Delete(ctx, name, metav1.DeleteOptions{
 		PropagationPolicy: &propagation,
 	})
 	if err != nil {
@@ -896,7 +907,7 @@ func (h *Handler) DeleteJob(c *gin.Context) {
 
 func (h *Handler) ListAllCronJobs(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.BatchV1().CronJobs("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.BatchV1().CronJobs("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -907,7 +918,7 @@ func (h *Handler) ListAllCronJobs(c *gin.Context) {
 func (h *Handler) ListCronJobs(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -919,7 +930,7 @@ func (h *Handler) GetCronJob(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	cj, err := h.k8s.Clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	cj, err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -931,7 +942,7 @@ func (h *Handler) DeleteCronJob(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.BatchV1().CronJobs(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -944,7 +955,7 @@ func (h *Handler) TriggerCronJob(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	cj, err := h.k8s.Clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	cj, err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -968,7 +979,7 @@ func (h *Handler) TriggerCronJob(c *gin.Context) {
 		Spec: cj.Spec.JobTemplate.Spec,
 	}
 
-	result, err := h.k8s.Clientset.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{})
+	result, err := h.getK8s(c).Clientset.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -980,7 +991,7 @@ func (h *Handler) TriggerCronJob(c *gin.Context) {
 
 func (h *Handler) ListAllServices(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Services("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -991,7 +1002,7 @@ func (h *Handler) ListAllServices(c *gin.Context) {
 func (h *Handler) ListServices(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1003,7 +1014,7 @@ func (h *Handler) GetService(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	svc, err := h.k8s.Clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+	svc, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1015,7 +1026,7 @@ func (h *Handler) DeleteService(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1027,7 +1038,7 @@ func (h *Handler) GetServiceYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	svc, err := h.k8s.Clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+	svc, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1050,7 +1061,7 @@ func (h *Handler) CreateService(c *gin.Context) {
 		return
 	}
 	svc.Namespace = namespace
-	created, err := h.k8s.Clientset.CoreV1().Services(namespace).Create(ctx, &svc, metav1.CreateOptions{})
+	created, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).Create(ctx, &svc, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1069,7 +1080,7 @@ func (h *Handler) UpdateService(c *gin.Context) {
 	}
 	svc.Namespace = namespace
 	svc.Name = name
-	updated, err := h.k8s.Clientset.CoreV1().Services(namespace).Update(ctx, &svc, metav1.UpdateOptions{})
+	updated, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).Update(ctx, &svc, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1097,7 +1108,7 @@ func (h *Handler) UpdateServiceYAML(c *gin.Context) {
 	svc.Namespace = namespace
 	svc.Name = name
 
-	updated, err := h.k8s.Clientset.CoreV1().Services(namespace).Update(ctx, &svc, metav1.UpdateOptions{})
+	updated, err := h.getK8s(c).Clientset.CoreV1().Services(namespace).Update(ctx, &svc, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1109,7 +1120,7 @@ func (h *Handler) UpdateServiceYAML(c *gin.Context) {
 
 func (h *Handler) ListAllIngresses(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1120,7 +1131,7 @@ func (h *Handler) ListAllIngresses(c *gin.Context) {
 func (h *Handler) ListIngresses(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1132,7 +1143,7 @@ func (h *Handler) GetIngress(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	ing, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
+	ing, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1144,7 +1155,7 @@ func (h *Handler) DeleteIngress(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1161,7 +1172,7 @@ func (h *Handler) CreateIngress(c *gin.Context) {
 		return
 	}
 	ing.Namespace = namespace
-	created, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Create(ctx, &ing, metav1.CreateOptions{})
+	created, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).Create(ctx, &ing, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1180,7 +1191,7 @@ func (h *Handler) UpdateIngress(c *gin.Context) {
 	}
 	ing.Namespace = namespace
 	ing.Name = name
-	updated, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Update(ctx, &ing, metav1.UpdateOptions{})
+	updated, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).Update(ctx, &ing, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1192,7 +1203,7 @@ func (h *Handler) GetIngressYAML(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	ing, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
+	ing, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1226,7 +1237,7 @@ func (h *Handler) UpdateIngressYAML(c *gin.Context) {
 	ing.Namespace = namespace
 	ing.Name = name
 
-	updated, err := h.k8s.Clientset.NetworkingV1().Ingresses(namespace).Update(ctx, &ing, metav1.UpdateOptions{})
+	updated, err := h.getK8s(c).Clientset.NetworkingV1().Ingresses(namespace).Update(ctx, &ing, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1238,7 +1249,7 @@ func (h *Handler) UpdateIngressYAML(c *gin.Context) {
 
 func (h *Handler) ListAllConfigMaps(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1249,7 +1260,7 @@ func (h *Handler) ListAllConfigMaps(c *gin.Context) {
 func (h *Handler) ListConfigMaps(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1261,7 +1272,7 @@ func (h *Handler) GetConfigMap(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	cm, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+	cm, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1277,7 +1288,7 @@ func (h *Handler) CreateConfigMap(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Create(ctx, &cm, metav1.CreateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).Create(ctx, &cm, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1293,7 +1304,7 @@ func (h *Handler) UpdateConfigMap(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Update(ctx, &cm, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).Update(ctx, &cm, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1305,7 +1316,7 @@ func (h *Handler) DeleteConfigMap(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1319,7 +1330,7 @@ func (h *Handler) GetConfigMapYAML(c *gin.Context) {
 	name := c.Param("name")
 
 	// 获取 ConfigMap
-	cm, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
+	cm, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1354,7 +1365,7 @@ func (h *Handler) UpdateConfigMapYAML(c *gin.Context) {
 	}
 
 	// 更新 ConfigMap
-	result, err := h.k8s.Clientset.CoreV1().ConfigMaps(namespace).Update(ctx, &cm, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().ConfigMaps(namespace).Update(ctx, &cm, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1367,7 +1378,7 @@ func (h *Handler) UpdateConfigMapYAML(c *gin.Context) {
 
 func (h *Handler) ListAllSecrets(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Secrets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1378,7 +1389,7 @@ func (h *Handler) ListAllSecrets(c *gin.Context) {
 func (h *Handler) ListSecrets(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1390,7 +1401,7 @@ func (h *Handler) GetSecret(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	secret, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	secret, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1406,7 +1417,7 @@ func (h *Handler) CreateSecret(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Create(ctx, &secret, metav1.CreateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Create(ctx, &secret, metav1.CreateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1422,7 +1433,7 @@ func (h *Handler) UpdateSecret(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Update(ctx, &secret, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Update(ctx, &secret, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1434,7 +1445,7 @@ func (h *Handler) DeleteSecret(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().Secrets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1448,7 +1459,7 @@ func (h *Handler) GetSecretYAML(c *gin.Context) {
 	name := c.Param("name")
 
 	// 获取 Secret
-	secret, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
+	secret, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1483,7 +1494,7 @@ func (h *Handler) UpdateSecretYAML(c *gin.Context) {
 	}
 
 	// 更新 Secret
-	result, err := h.k8s.Clientset.CoreV1().Secrets(namespace).Update(ctx, &secret, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.CoreV1().Secrets(namespace).Update(ctx, &secret, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1496,7 +1507,7 @@ func (h *Handler) UpdateSecretYAML(c *gin.Context) {
 
 func (h *Handler) ListPersistentVolumes(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1507,7 +1518,7 @@ func (h *Handler) ListPersistentVolumes(c *gin.Context) {
 func (h *Handler) GetPersistentVolume(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	pv, err := h.k8s.Clientset.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
+	pv, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1518,7 +1529,7 @@ func (h *Handler) GetPersistentVolume(c *gin.Context) {
 func (h *Handler) DeletePersistentVolume(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().PersistentVolumes().Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().PersistentVolumes().Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1530,7 +1541,7 @@ func (h *Handler) DeletePersistentVolume(c *gin.Context) {
 
 func (h *Handler) ListAllPersistentVolumeClaims(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1541,7 +1552,7 @@ func (h *Handler) ListAllPersistentVolumeClaims(c *gin.Context) {
 func (h *Handler) ListPersistentVolumeClaims(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().PersistentVolumeClaims(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1553,7 +1564,7 @@ func (h *Handler) GetPersistentVolumeClaim(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	pvc, err := h.k8s.Clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
+	pvc, err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1565,7 +1576,7 @@ func (h *Handler) DeletePersistentVolumeClaim(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
 	name := c.Param("name")
-	err := h.k8s.Clientset.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	err := h.getK8s(c).Clientset.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1577,7 +1588,7 @@ func (h *Handler) DeletePersistentVolumeClaim(c *gin.Context) {
 
 func (h *Handler) ListStorageClasses(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.StorageV1().StorageClasses().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1588,7 +1599,7 @@ func (h *Handler) ListStorageClasses(c *gin.Context) {
 func (h *Handler) GetStorageClass(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	sc, err := h.k8s.Clientset.StorageV1().StorageClasses().Get(ctx, name, metav1.GetOptions{})
+	sc, err := h.getK8s(c).Clientset.StorageV1().StorageClasses().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1600,7 +1611,7 @@ func (h *Handler) GetStorageClass(c *gin.Context) {
 
 func (h *Handler) ListNodes(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1611,7 +1622,7 @@ func (h *Handler) ListNodes(c *gin.Context) {
 func (h *Handler) GetNode(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	node, err := h.k8s.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1622,7 +1633,7 @@ func (h *Handler) GetNode(c *gin.Context) {
 func (h *Handler) GetNodeYAML(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
-	node, err := h.k8s.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1640,7 +1651,7 @@ func (h *Handler) GetNodeMetrics(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
 
-	node, err := h.k8s.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -1661,8 +1672,8 @@ func (h *Handler) GetNodeMetrics(c *gin.Context) {
 	}
 
 	// 尝试获取 Metrics
-	if h.k8s.MetricsClient != nil {
-		metrics, err := h.k8s.MetricsClient.MetricsV1beta1().NodeMetricses().Get(ctx, name, metav1.GetOptions{})
+	if h.getK8s(c).MetricsClient != nil {
+		metrics, err := h.getK8s(c).MetricsClient.MetricsV1beta1().NodeMetricses().Get(ctx, name, metav1.GetOptions{})
 		if err == nil {
 			cpuUsage := metrics.Usage.Cpu().MilliValue()
 			memUsage := metrics.Usage.Memory().Value()
@@ -1689,7 +1700,7 @@ func (h *Handler) GetNodePods(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
 
-	pods, err := h.k8s.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("spec.nodeName=%s", name),
 	})
 	if err != nil {
@@ -1703,14 +1714,14 @@ func (h *Handler) CordonNode(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
 
-	node, err := h.k8s.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	node.Spec.Unschedulable = true
-	_, err = h.k8s.Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1722,14 +1733,14 @@ func (h *Handler) UncordonNode(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
 
-	node, err := h.k8s.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	node.Spec.Unschedulable = false
-	_, err = h.k8s.Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1742,20 +1753,20 @@ func (h *Handler) DrainNode(c *gin.Context) {
 	name := c.Param("name")
 
 	// 先 cordon
-	node, err := h.k8s.Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	node, err := h.getK8s(c).Clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 	node.Spec.Unschedulable = true
-	_, err = h.k8s.Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// 驱逐 Pods
-	pods, err := h.k8s.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("spec.nodeName=%s", name),
 	})
 	if err != nil {
@@ -1777,7 +1788,7 @@ func (h *Handler) DrainNode(c *gin.Context) {
 		}
 
 		// 删除 Pod（会被控制器重建到其他节点）
-		h.k8s.Clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+		h.getK8s(c).Clientset.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "drained"})
@@ -1787,7 +1798,7 @@ func (h *Handler) DrainNode(c *gin.Context) {
 
 func (h *Handler) ListAllEvents(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().Events("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Events("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1798,7 +1809,7 @@ func (h *Handler) ListAllEvents(c *gin.Context) {
 func (h *Handler) ListEvents(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1811,7 +1822,7 @@ func (h *Handler) ListEvents(c *gin.Context) {
 func (h *Handler) ListRoles(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.RbacV1().Roles(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.RbacV1().Roles(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1821,7 +1832,7 @@ func (h *Handler) ListRoles(c *gin.Context) {
 
 func (h *Handler) ListClusterRoles(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.RbacV1().ClusterRoles().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1832,7 +1843,7 @@ func (h *Handler) ListClusterRoles(c *gin.Context) {
 func (h *Handler) ListRoleBindings(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.RbacV1().RoleBindings(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.RbacV1().RoleBindings(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1842,7 +1853,7 @@ func (h *Handler) ListRoleBindings(c *gin.Context) {
 
 func (h *Handler) ListClusterRoleBindings(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.RbacV1().ClusterRoleBindings().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1852,7 +1863,7 @@ func (h *Handler) ListClusterRoleBindings(c *gin.Context) {
 
 func (h *Handler) ListAllServiceAccounts(c *gin.Context) {
 	ctx := context.Background()
-	list, err := h.k8s.Clientset.CoreV1().ServiceAccounts("").List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1863,7 +1874,7 @@ func (h *Handler) ListAllServiceAccounts(c *gin.Context) {
 func (h *Handler) ListServiceAccounts(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
-	list, err := h.k8s.Clientset.CoreV1().ServiceAccounts(namespace).List(ctx, metav1.ListOptions{})
+	list, err := h.getK8s(c).Clientset.CoreV1().ServiceAccounts(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1908,7 +1919,7 @@ func (h *Handler) ExecPod(c *gin.Context) {
 	defer ws.Close()
 
 	// 创建 exec 请求
-	req := h.k8s.Clientset.CoreV1().RESTClient().Post().
+	req := h.getK8s(c).Clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Namespace(namespace).
 		Name(name).
@@ -1923,7 +1934,7 @@ func (h *Handler) ExecPod(c *gin.Context) {
 		}, scheme.ParameterCodec)
 
 	// 创建 SPDY executor
-	config := h.k8s.Config
+	config := h.getK8s(c).Config
 	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
 		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("Error creating executor: %v\r\n", err)))
@@ -2318,10 +2329,10 @@ func (h *Handler) CreateSilence(c *gin.Context) {
 	}
 
 	var req struct {
-		Matchers  []map[string]interface{} `json:"matchers"`
-		StartsAt  time.Time                `json:"startsAt"`
-		EndsAt    time.Time                `json:"endsAt"`
-		Comment   string                   `json:"comment"`
+		Matchers []map[string]interface{} `json:"matchers"`
+		StartsAt time.Time                `json:"startsAt"`
+		EndsAt   time.Time                `json:"endsAt"`
+		Comment  string                   `json:"comment"`
 	}
 
 	if err := c.BindJSON(&req); err != nil {
@@ -2462,7 +2473,7 @@ func (h *Handler) RestartStatefulSet(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2474,7 +2485,7 @@ func (h *Handler) RestartStatefulSet(c *gin.Context) {
 	}
 	sts.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
-	_, err = h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2501,7 +2512,7 @@ func (h *Handler) UpdateStatefulSetYAML(c *gin.Context) {
 		return
 	}
 
-	result, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, &sts, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Update(ctx, &sts, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2515,14 +2526,14 @@ func (h *Handler) GetStatefulSetPods(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	selector := labels.Set(sts.Spec.Selector.MatchLabels).AsSelector()
-	pods, err := h.k8s.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -2539,7 +2550,7 @@ func (h *Handler) GetStatefulSetEvents(c *gin.Context) {
 	name := c.Param("name")
 
 	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=StatefulSet", name, namespace)
-	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+	events, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -2557,7 +2568,7 @@ func (h *Handler) RestartDaemonSet(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	ds, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2569,7 +2580,7 @@ func (h *Handler) RestartDaemonSet(c *gin.Context) {
 	}
 	ds.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().Format(time.RFC3339)
 
-	_, err = h.k8s.Clientset.AppsV1().DaemonSets(namespace).Update(ctx, ds, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Update(ctx, ds, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2596,7 +2607,7 @@ func (h *Handler) UpdateDaemonSetYAML(c *gin.Context) {
 		return
 	}
 
-	result, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Update(ctx, &ds, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Update(ctx, &ds, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2610,14 +2621,14 @@ func (h *Handler) GetDaemonSetPods(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	ds, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
 	selector := labels.Set(ds.Spec.Selector.MatchLabels).AsSelector()
-	pods, err := h.k8s.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -2634,7 +2645,7 @@ func (h *Handler) GetDaemonSetEvents(c *gin.Context) {
 	name := c.Param("name")
 
 	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=DaemonSet", name, namespace)
-	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+	events, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -2653,7 +2664,7 @@ func (h *Handler) GetDeploymentEvents(c *gin.Context) {
 	name := c.Param("name")
 
 	fieldSelector := fmt.Sprintf("involvedObject.name=%s,involvedObject.namespace=%s,involvedObject.kind=Deployment", name, namespace)
-	events, err := h.k8s.Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
+	events, err := h.getK8s(c).Clientset.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{
 		FieldSelector: fieldSelector,
 	})
 	if err != nil {
@@ -2681,7 +2692,7 @@ func (h *Handler) UpdateDeploymentStrategy(c *gin.Context) {
 		return
 	}
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2707,7 +2718,7 @@ func (h *Handler) UpdateDeploymentStrategy(c *gin.Context) {
 		}
 	}
 
-	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2730,7 +2741,7 @@ func (h *Handler) UpdateStatefulSetStrategy(c *gin.Context) {
 		return
 	}
 
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2749,7 +2760,7 @@ func (h *Handler) UpdateStatefulSetStrategy(c *gin.Context) {
 		sts.Spec.UpdateStrategy.RollingUpdate.Partition = &req.Partition
 	}
 
-	result, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2773,7 +2784,7 @@ func (h *Handler) UpdateDaemonSetStrategy(c *gin.Context) {
 		return
 	}
 
-	ds, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	ds, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2799,7 +2810,7 @@ func (h *Handler) UpdateDaemonSetStrategy(c *gin.Context) {
 		}
 	}
 
-	result, err := h.k8s.Clientset.AppsV1().DaemonSets(namespace).Update(ctx, ds, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().DaemonSets(namespace).Update(ctx, ds, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2813,7 +2824,7 @@ func (h *Handler) GetStatefulSetRevisions(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2821,7 +2832,7 @@ func (h *Handler) GetStatefulSetRevisions(c *gin.Context) {
 
 	// 获取 ControllerRevisions
 	selector := labels.Set(sts.Spec.Selector.MatchLabels).AsSelector()
-	revisions, err := h.k8s.Clientset.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{
+	revisions, err := h.getK8s(c).Clientset.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -2835,11 +2846,11 @@ func (h *Handler) GetStatefulSetRevisions(c *gin.Context) {
 		for _, ref := range rev.OwnerReferences {
 			if ref.Kind == "StatefulSet" && ref.Name == name {
 				stsRevisions = append(stsRevisions, map[string]interface{}{
-					"name":       rev.Name,
-					"revision":   rev.Revision,
-					"created":    rev.CreationTimestamp,
-					"isCurrent":  rev.Name == sts.Status.CurrentRevision,
-					"isUpdate":   rev.Name == sts.Status.UpdateRevision,
+					"name":      rev.Name,
+					"revision":  rev.Revision,
+					"created":   rev.CreationTimestamp,
+					"isCurrent": rev.Name == sts.Status.CurrentRevision,
+					"isUpdate":  rev.Name == sts.Status.UpdateRevision,
 				})
 				break
 			}
@@ -2868,7 +2879,7 @@ func (h *Handler) RollbackStatefulSet(c *gin.Context) {
 		return
 	}
 
-	sts, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	sts, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2876,7 +2887,7 @@ func (h *Handler) RollbackStatefulSet(c *gin.Context) {
 
 	// 获取目标版本的 ControllerRevision
 	selector := labels.Set(sts.Spec.Selector.MatchLabels).AsSelector()
-	revisions, err := h.k8s.Clientset.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{
+	revisions, err := h.getK8s(c).Clientset.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -2911,7 +2922,7 @@ func (h *Handler) RollbackStatefulSet(c *gin.Context) {
 
 	// 更新 StatefulSet 的 Pod 模板
 	sts.Spec.Template = patchedSts.Spec.Template
-	result, err := h.k8s.Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().StatefulSets(namespace).Update(ctx, sts, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2925,7 +2936,7 @@ func (h *Handler) PauseDeployment(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2937,7 +2948,7 @@ func (h *Handler) PauseDeployment(c *gin.Context) {
 	}
 
 	dep.Spec.Paused = true
-	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2951,7 +2962,7 @@ func (h *Handler) ResumeDeployment(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2963,7 +2974,7 @@ func (h *Handler) ResumeDeployment(c *gin.Context) {
 	}
 
 	dep.Spec.Paused = false
-	result, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	result, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -2977,7 +2988,7 @@ func (h *Handler) GetDeploymentRevisions(c *gin.Context) {
 	namespace := c.Param("ns")
 	name := c.Param("name")
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -2989,7 +3000,7 @@ func (h *Handler) GetDeploymentRevisions(c *gin.Context) {
 		return
 	}
 
-	rsList, err := h.k8s.Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{
+	rsList, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
@@ -3013,12 +3024,12 @@ func (h *Handler) GetDeploymentRevisions(c *gin.Context) {
 
 		revision := rs.Annotations["deployment.kubernetes.io/revision"]
 		revisions = append(revisions, map[string]interface{}{
-			"name":       rs.Name,
-			"revision":   revision,
-			"replicas":   rs.Status.Replicas,
-			"ready":      rs.Status.ReadyReplicas,
-			"created":    rs.CreationTimestamp,
-			"image":      rs.Spec.Template.Spec.Containers[0].Image,
+			"name":     rs.Name,
+			"revision": revision,
+			"replicas": rs.Status.Replicas,
+			"ready":    rs.Status.ReadyReplicas,
+			"created":  rs.CreationTimestamp,
+			"image":    rs.Spec.Template.Spec.Containers[0].Image,
 		})
 	}
 
@@ -3045,7 +3056,7 @@ func (h *Handler) UpdateDeploymentImage(c *gin.Context) {
 		return
 	}
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -3061,7 +3072,7 @@ func (h *Handler) UpdateDeploymentImage(c *gin.Context) {
 		}
 	}
 
-	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -3077,7 +3088,7 @@ func (h *Handler) UpdateDeploymentScheduling(c *gin.Context) {
 	name := c.Param("name")
 
 	var req struct {
-		NodeSelector map[string]string `json:"nodeSelector"`
+		NodeSelector map[string]string   `json:"nodeSelector"`
 		Tolerations  []corev1.Toleration `json:"tolerations"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -3085,7 +3096,7 @@ func (h *Handler) UpdateDeploymentScheduling(c *gin.Context) {
 		return
 	}
 
-	dep, err := h.k8s.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -3095,7 +3106,7 @@ func (h *Handler) UpdateDeploymentScheduling(c *gin.Context) {
 	dep.Spec.Template.Spec.NodeSelector = req.NodeSelector
 	dep.Spec.Template.Spec.Tolerations = req.Tolerations
 
-	_, err = h.k8s.Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
+	_, err = h.getK8s(c).Clientset.AppsV1().Deployments(namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

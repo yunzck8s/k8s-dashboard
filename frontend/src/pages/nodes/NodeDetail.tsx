@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { nodeApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -18,6 +19,7 @@ type TabType = 'overview' | 'pods' | 'yaml' | 'metrics';
 
 export default function NodeDetail() {
   const { name } = useParams<{ name: string }>();
+  const pollingInterval = usePollingInterval('standard');
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const queryClient = useQueryClient();
 
@@ -47,7 +49,7 @@ export default function NodeDetail() {
     queryKey: ['node-metrics', name],
     queryFn: () => nodeApi.getMetrics(name!),
     enabled: !!name && activeTab === 'metrics',
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // Cordon 节点

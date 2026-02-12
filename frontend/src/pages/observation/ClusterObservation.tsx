@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { observationApi, type TimeRange } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import AnomalySummary from './components/AnomalySummary';
 import AnomalyPanel from './components/AnomalyPanel';
 import ResourceTrendChart from './components/ResourceTrendChart';
@@ -10,33 +11,35 @@ import { ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export default function ClusterObservation() {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
+  const pollingInterval = usePollingInterval('standard');
+  const slowPollingInterval = usePollingInterval('slow');
 
   // 获取异常状态汇总
   const { data: summary, refetch: refetchSummary, isLoading: summaryLoading } = useQuery({
     queryKey: ['observation-summary'],
     queryFn: () => observationApi.getSummary(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 获取 CPU 趋势
   const { data: cpuTrend } = useQuery({
     queryKey: ['observation-cpu-trend', timeRange],
     queryFn: () => observationApi.getResourceTrend('cpu', timeRange),
-    refetchInterval: 60000,
+    refetchInterval: slowPollingInterval,
   });
 
   // 获取内存趋势
   const { data: memoryTrend } = useQuery({
     queryKey: ['observation-memory-trend', timeRange],
     queryFn: () => observationApi.getResourceTrend('memory', timeRange),
-    refetchInterval: 60000,
+    refetchInterval: slowPollingInterval,
   });
 
   // 获取重启趋势
   const { data: restartTrend } = useQuery({
     queryKey: ['observation-restart-trend', timeRange],
     queryFn: () => observationApi.getRestartTrend(timeRange),
-    refetchInterval: 60000,
+    refetchInterval: slowPollingInterval,
   });
 
   const handleRefresh = () => {

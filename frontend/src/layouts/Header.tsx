@@ -1,9 +1,11 @@
 import { Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Menu, Transition } from '@headlessui/react';
 import { useAppStore } from '../store';
 import { useAuthStore, useRoleDisplay } from '../store/auth';
 import { authApi } from '../api/auth';
+import { clusterApi } from '../api';
 import {
   BellIcon,
   MagnifyingGlassIcon,
@@ -18,6 +20,7 @@ import {
 
 export default function Header() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const {
     currentNamespace,
     setCurrentNamespace,
@@ -25,6 +28,7 @@ export default function Header() {
     currentCluster,
     clusters,
     setCurrentCluster,
+    clearClusterError,
     theme,
     toggleTheme,
   } = useAppStore();
@@ -40,6 +44,21 @@ export default function Header() {
     }
     clearAuth();
     navigate('/login');
+  };
+
+  const handleSwitchCluster = async (name: string) => {
+    if (name === currentCluster) {
+      return;
+    }
+
+    try {
+      await clusterApi.switch(name);
+      setCurrentCluster(name);
+      clearClusterError();
+      await queryClient.invalidateQueries();
+    } catch {
+      // 错误由全局拦截器处理
+    }
   };
 
   return (
@@ -112,7 +131,9 @@ export default function Header() {
                     <Menu.Item key={cluster.name}>
                       {({ active }) => (
                         <button
-                          onClick={() => setCurrentCluster(cluster.name)}
+                          onClick={() => {
+                            void handleSwitchCluster(cluster.name);
+                          }}
                           className="w-full text-left px-4 py-2 text-sm flex items-center justify-between transition-colors duration-150"
                           style={{
                             background: active ? 'var(--color-primary-light)' : 'transparent',

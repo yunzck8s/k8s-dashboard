@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { nodeApi, podApi } from '../../api';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -79,20 +80,21 @@ function ResourceBar({
 }
 
 export default function Nodes() {
+  const pollingInterval = usePollingInterval('standard');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['nodes'],
     queryFn: () => nodeApi.list(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 获取所有 Pod 来统计每个节点上运行的 Pod 数量
   const { data: podsData } = useQuery({
     queryKey: ['pods-all'],
     queryFn: () => podApi.listAll(),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   // 计算每个节点上运行的 Pod 数量

@@ -19,6 +19,9 @@ interface AppState {
   // 集群列表
   clusters: ClusterInfo[];
   setClusters: (clusters: ClusterInfo[]) => void;
+  clusterError: { cluster: string; error: string } | null;
+  setClusterError: (error: { cluster: string; error: string } | null) => void;
+  clearClusterError: () => void;
 
   // 侧边栏状态
   sidebarCollapsed: boolean;
@@ -28,6 +31,7 @@ interface AppState {
   // 主题
   theme: 'dark' | 'light';
   toggleTheme: () => void;
+  setTheme: (theme: 'dark' | 'light') => void;
 
   // 刷新间隔（秒）
   refreshInterval: number;
@@ -59,6 +63,9 @@ export const useAppStore = create<AppState>()(
       },
       clusters: [],
       setClusters: (clusters) => set({ clusters }),
+      clusterError: null,
+      setClusterError: (clusterError) => set({ clusterError }),
+      clearClusterError: () => set({ clusterError: null }),
 
       // 侧边栏
       sidebarCollapsed: false,
@@ -71,6 +78,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           theme: state.theme === 'dark' ? 'light' : 'dark',
         })),
+      setTheme: (theme) => set({ theme }),
 
       // 刷新间隔
       refreshInterval: 30,

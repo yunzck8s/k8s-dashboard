@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { serviceAccountApi } from '../../api';
 import { useAppStore } from '../../store';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { ServiceAccount } from '../../types';
 
 export default function ServiceAccounts() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['serviceaccounts', currentNamespace],
@@ -14,7 +16,7 @@ export default function ServiceAccounts() {
       currentNamespace === 'all'
         ? serviceAccountApi.listAll()
         : serviceAccountApi.list(currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
   });
 
   if (isLoading) {

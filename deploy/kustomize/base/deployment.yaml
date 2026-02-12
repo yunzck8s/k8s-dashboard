@@ -103,6 +103,11 @@ spec:
                 configMapKeyRef:
                   name: k8s-dashboard-config
                   key: ALLOW_SQLITE_FALLBACK
+            - name: MULTI_CLUSTER_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: k8s-dashboard-config
+                  key: MULTI_CLUSTER_ENABLED
 
             # VictoriaMetrics 配置
             - name: VICTORIA_METRICS_URL
@@ -139,6 +144,12 @@ spec:
                 secretKeyRef:
                   name: k8s-dashboard-secret
                   key: JWT_SECRET
+                  optional: true
+            - name: CLUSTER_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: k8s-dashboard-secret
+                  key: CLUSTER_ENCRYPTION_KEY
                   optional: true
 
           resources:

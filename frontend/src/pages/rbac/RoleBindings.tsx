@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { roleBindingApi } from '../../api';
 import { useAppStore } from '../../store';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { RoleBinding } from '../../types';
 
 export default function RoleBindings() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['rolebindings', currentNamespace],
     queryFn: () => roleBindingApi.list(currentNamespace === 'all' ? 'default' : currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
     enabled: currentNamespace !== 'all',
   });
 

@@ -1,20 +1,40 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAppStore } from '../store';
-import { namespaceApi } from '../api';
+import { useAuthStore } from '../store/auth';
+import { clusterApi, namespaceApi } from '../api';
+import { usePollingInterval } from '../utils/polling';
 import clsx from 'clsx';
 
 export default function MainLayout() {
-  const { sidebarCollapsed, setNamespaces } = useAppStore();
+  const queryClient = useQueryClient();
+  const {
+    sidebarCollapsed,
+    setNamespaces,
+    currentCluster,
+    setCurrentCluster,
+    setClusters,
+    clusterError,
+    theme,
+  } = useAppStore();
+  const user = useAuthStore((state) => state.user);
+  const pollingInterval = usePollingInterval('standard');
+  const slowPollingInterval = usePollingInterval('slow');
 
   // 获取命名空间列表
   const { data: namespacesData } = useQuery({
     queryKey: ['namespaces'],
     queryFn: () => namespaceApi.list(),
-    refetchInterval: 60000,
+    refetchInterval: pollingInterval,
+  });
+
+  const { data: clustersData } = useQuery({
+    queryKey: ['clusters'],
+    queryFn: () => clusterApi.list(),
+    refetchInterval: slowPollingInterval,
   });
 
   // 更新 store 中的命名空间列表
@@ -23,6 +43,41 @@ export default function MainLayout() {
       setNamespaces(namespacesData.items);
     }
   }, [namespacesData, setNamespaces]);
+
+  useEffect(() => {
+    if (!clustersData || clustersData.length === 0) {
+      return;
+    }
+
+    setClusters(clustersData);
+
+    const names = new Set(clustersData.map((c) => c.name));
+    if (currentCluster && names.has(currentCluster)) {
+      return;
+    }
+
+    const defaultCluster = clustersData.find((c) => c.isDefault)?.name || 'default';
+    setCurrentCluster(defaultCluster);
+    clusterApi.switch(defaultCluster).catch(() => {
+      // 目标集群不可达时由全局拦截器处理错误提示
+    });
+    queryClient.invalidateQueries();
+  }, [clustersData, currentCluster, setClusters, setCurrentCluster, queryClient]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const switchToDefault = async () => {
+    const target = clustersData?.find((c) => c.isDefault)?.name || 'default';
+    try {
+      await clusterApi.switch(target);
+      setCurrentCluster(target);
+      await queryClient.invalidateQueries();
+    } catch {
+      // 错误由全局拦截器处理
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -38,6 +93,33 @@ export default function MainLayout() {
       >
         {/* 顶部导航 */}
         <Header />
+
+        {clusterError && (
+          <div
+            className="mx-6 mt-4 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3"
+            style={{
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: 'var(--color-text-primary)',
+            }}
+          >
+            <span className="text-sm">
+              当前集群 `{clusterError.cluster}` 不可达：{clusterError.error}
+            </span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={switchToDefault}>
+              切换到默认集群
+            </button>
+            {user?.role === 'admin' ? (
+              <a href="/clusters" className="btn btn-secondary btn-sm">
+                打开集群管理
+              </a>
+            ) : (
+              <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                你也可以使用顶部集群选择器切换
+              </span>
+            )}
+          </div>
+        )}
 
         {/* 页面内容 */}
         <main className="flex-1 p-6 overflow-auto">

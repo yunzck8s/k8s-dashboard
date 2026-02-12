@@ -572,7 +572,7 @@ export const clusterApi = {
   delete: (name: string) =>
     del<void>(`/clusters/${name}`),
   switch: (name: string) =>
-    post<void>(`/clusters/${name}/switch`),
+    post<ClusterInfo>(`/clusters/${name}/switch`),
   test: (kubeconfig: string) =>
-    post<{ success: boolean; message: string }>('/clusters/test', { kubeconfig }),
+    post<{ success: boolean; message: string; cluster?: ClusterInfo }>('/clusters/test', { kubeconfig }),
 };

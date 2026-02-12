@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { alertApi } from '../../api';
 import AlertsActive from './AlertsActive';
 import AlertsSilences from './AlertsSilences';
+import { usePollingInterval } from '../../utils/polling';
 import {
   BellAlertIcon,
   ClockIcon,
@@ -14,6 +15,7 @@ type TabType = 'active' | 'history' | 'silences' | 'rules';
 
 export default function Alerts() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const pollingInterval = usePollingInterval('standard');
 
   // 从 URL 参数读取当前标签，默认为 'active'
   const activeTab = (searchParams.get('tab') as TabType) || 'active';
@@ -22,7 +24,7 @@ export default function Alerts() {
   const { data: summary } = useQuery({
     queryKey: ['alerts-summary'],
     queryFn: () => alertApi.getSummary(),
-    refetchInterval: 30000, // 每30秒刷新
+    refetchInterval: pollingInterval,
   });
 
   // 设置标签并同步到 URL 参数

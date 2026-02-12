@@ -45,6 +45,7 @@ import ClusterObservation from './pages/observation/ClusterObservation';
 import NotFound from './pages/NotFound';
 import Users from './pages/admin/Users';
 import Approvals from './pages/admin/Approvals';
+import Forbidden from './pages/Forbidden';
 
 // 创建 QueryClient
 const queryClient = new QueryClient({
@@ -64,6 +65,7 @@ function App() {
         <Routes>
           {/* 登录页面 - 不需要认证 */}
           <Route path="/login" element={<Login />} />
+          <Route path="/403" element={<Forbidden />} />
 
           {/* 需要认证的路由 */}
           <Route
@@ -133,7 +135,14 @@ function App() {
             </Route>
 
             {/* 集群 */}
-            <Route path="clusters" element={<Clusters />} />
+            <Route
+              path="clusters"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <Clusters />
+                </ProtectedRoute>
+              }
+            />
 
             {/* 事件 */}
             <Route path="events" element={<Events />} />
@@ -149,8 +158,22 @@ function App() {
 
             {/* 管理（需要 admin 角色） */}
             <Route path="admin">
-              <Route path="users" element={<Users />} />
-              <Route path="approvals" element={<Approvals />} />
+              <Route
+                path="users"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="approvals"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Approvals />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* 设置 */}

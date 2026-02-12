@@ -21,6 +21,7 @@ data:
   # SQLite 配置
   SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
   ALLOW_SQLITE_FALLBACK: "true"
+  MULTI_CLUSTER_ENABLED: "true"
 
   # VictoriaMetrics 配置
   VICTORIA_METRICS_URL: "http://vmauth-vmks-victoria-metrics-k8s-stack.victoriametrics.svc.cluster.local:8427"

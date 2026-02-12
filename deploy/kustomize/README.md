@@ -87,12 +87,14 @@ data:
   POSTGRES_HOST: ""    # 可选：配置后优先使用 PostgreSQL
   SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
   ALLOW_SQLITE_FALLBACK: "true"
+  MULTI_CLUSTER_ENABLED: "true"
   VICTORIA_METRICS_URL: "your-vm-url"
 
 # base/secret.yaml
 stringData:
   POSTGRES_PASSWORD: "your-secure-password"  # 使用 PostgreSQL 时需要
   JWT_SECRET: "your-jwt-secret"
+  CLUSTER_ENCRYPTION_KEY: "base64-encoded-32-byte-key"  # 推荐配置
 ```
 
 #### 环境特定配置
@@ -141,6 +143,7 @@ kubectl apply -k overlays/prod
 | `POSTGRES_SSLMODE` | SSL 模式 | disable | 否 |
 | `SQLITE_PATH` | SQLite 数据文件路径 | /var/lib/k8s-dashboard/dashboard.db | 否 |
 | `ALLOW_SQLITE_FALLBACK` | PostgreSQL 失败时是否回落 SQLite | true | 否 |
+| `MULTI_CLUSTER_ENABLED` | 启用多集群管理 | true | 否 |
 | `VICTORIA_METRICS_URL` | VictoriaMetrics URL | - | 是 |
 | `AUDIT_LOG_ENABLED` | 启用审计日志 | true | 否 |
 | `AUDIT_LOG_MAX_SIZE` | 日志文件最大大小(MB) | 100 | 否 |
@@ -153,6 +156,7 @@ kubectl apply -k overlays/prod
 |--------|------|------|
 | `POSTGRES_PASSWORD` | PostgreSQL 密码 | 否（仅 PostgreSQL） |
 | `JWT_SECRET` | JWT 密钥 | 否 |
+| `CLUSTER_ENCRYPTION_KEY` | kubeconfig 加密密钥（Base64 32 字节） | 否（建议） |
 
 ## 更新部署
 

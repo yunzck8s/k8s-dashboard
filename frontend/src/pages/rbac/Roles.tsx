@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { roleApi } from '../../api';
 import { useAppStore } from '../../store';
+import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { Role } from '../../types';
 
 export default function Roles() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('standard');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['roles', currentNamespace],
     queryFn: () => roleApi.list(currentNamespace === 'all' ? 'default' : currentNamespace),
-    refetchInterval: 30000,
+    refetchInterval: pollingInterval,
     enabled: currentNamespace !== 'all',
   });
 
