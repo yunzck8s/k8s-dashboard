@@ -8,6 +8,7 @@ interface ResourceChartProps {
   color?: string;
   title?: string;
   showLegend?: boolean;
+  size?: 'sm' | 'md';
   onClick?: () => void;
   isSelected?: boolean;
 }
@@ -19,13 +20,28 @@ export default function ResourceChart({
   color,
   title,
   showLegend = true,
+  size = 'md',
   onClick,
   isSelected,
 }: ResourceChartProps) {
+  const sizeConfig = size === 'sm'
+    ? {
+        diameter: 152,
+        radius: 56,
+        strokeWidth: 10,
+        valueClassName: 'text-3xl',
+        unitClassName: 'text-sm',
+      }
+    : {
+        diameter: 180,
+        radius: 70,
+        strokeWidth: 12,
+        valueClassName: 'text-4xl',
+        unitClassName: 'text-lg',
+      };
   const percentage = total > 0 ? Math.min((used / total) * 100, 100) : 0;
-  const radius = 70;
-  const strokeWidth = 12;
-  const circumference = 2 * Math.PI * radius;
+  const center = sizeConfig.diameter / 2;
+  const circumference = 2 * Math.PI * sizeConfig.radius;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
   const chartColor = color || getUsageColor(percentage);
@@ -61,36 +77,37 @@ export default function ResourceChart({
   const chartContent = (
     <>
       <div className="relative">
-        <svg width="180" height="180" className="transform -rotate-90">
+        <svg
+          width={sizeConfig.diameter}
+          height={sizeConfig.diameter}
+          className="-rotate-90 transform"
+        >
           {/* 背景圆环 */}
           <circle
-            cx="90"
-            cy="90"
-            r={radius}
+            cx={center}
+            cy={center}
+            r={sizeConfig.radius}
             stroke="var(--color-border)"
-            strokeWidth={strokeWidth}
+            strokeWidth={sizeConfig.strokeWidth}
             fill="none"
           />
           {/* 进度圆环 */}
           <circle
-            cx="90"
-            cy="90"
-            r={radius}
+            cx={center}
+            cy={center}
+            r={sizeConfig.radius}
             stroke={chartColor}
-            strokeWidth={strokeWidth}
+            strokeWidth={sizeConfig.strokeWidth}
             fill="none"
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            className="transition-all duration-500 ease-out"
+            className="transition-all duration-200 ease-out"
           />
         </svg>
         {/* 中心内容 */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-4xl font-semibold"
-            style={{ color: chartColor }}
-          >
+          <span className={`${sizeConfig.valueClassName} font-semibold`} style={{ color: chartColor }}>
             {percentage.toFixed(1)}%
           </span>
           {title && (
@@ -103,7 +120,7 @@ export default function ResourceChart({
 
       {showLegend && (
         <div className="mt-4 text-center">
-          <div className="text-lg font-medium text-[var(--color-text-primary)]">
+          <div className={`${sizeConfig.unitClassName} font-medium text-[var(--color-text-primary)]`}>
             {formatted.usedStr}{' '}
             <span className="text-[var(--color-text-muted)]">/</span>{' '}
             {formatted.totalStr}{' '}
@@ -140,12 +157,16 @@ export default function ResourceChart({
     return (
       <button
         onClick={onClick}
-        className={clsx('flex flex-col items-center p-4 rounded-xl border transition-all duration-200 ring-2 ring-transparent')}
+        className={clsx(
+          'flex flex-col items-center rounded-xl border p-4 ring-2 ring-transparent transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-focus-ring',
+          size === 'sm' ? 'min-h-[220px]' : 'min-h-[240px]'
+        )}
         style={{
           background: isSelected ? currentLevelStyle.background : 'transparent',
           borderColor: isSelected ? currentLevelStyle.border : 'transparent',
           boxShadow: isSelected ? `0 0 0 2px ${currentLevelStyle.ring}` : 'none',
         }}
+        aria-label={`${title || '资源利用率'}详情`}
       >
         {chartContent}
       </button>

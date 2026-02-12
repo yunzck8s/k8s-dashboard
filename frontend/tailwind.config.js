@@ -19,6 +19,9 @@ export default {
           secondary: 'var(--color-bg-secondary)',
           tertiary: 'var(--color-bg-tertiary)',
           elevated: 'var(--color-bg-elevated)',
+          emphasis: 'var(--color-surface-emphasis)',
+          risk: 'var(--color-surface-risk)',
+          neutral: 'var(--color-surface-neutral)',
         },
         text: {
           primary: 'var(--color-text-primary)',
@@ -39,6 +42,12 @@ export default {
         border: {
           DEFAULT: 'var(--color-border)',
           hover: 'var(--color-border-hover)',
+        },
+        divider: {
+          strong: 'var(--color-divider-strong)',
+        },
+        focus: {
+          ring: 'var(--color-focus-ring)',
         },
         chart: {
           1: 'var(--chart-color-1)',

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { eventApi } from '../../api';
 import { usePollingInterval } from '../../utils/polling';
 import { queryKeys } from '../../api/queryKeys';
@@ -16,9 +17,15 @@ interface EventsListProps {
   namespace?: string;
   limit?: number;
   typeFilter?: 'Normal' | 'Warning' | null;
+  density?: 'compact' | 'comfortable';
 }
 
-export default function EventsList({ namespace, limit = 10, typeFilter = null }: EventsListProps) {
+export default function EventsList({
+  namespace,
+  limit = 10,
+  typeFilter = null,
+  density = 'comfortable',
+}: EventsListProps) {
   const pollingInterval = usePollingInterval('standard');
   const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
   const namespaceKey = namespace ?? 'all';
@@ -57,42 +64,46 @@ export default function EventsList({ namespace, limit = 10, typeFilter = null }:
       </div>
     );
   }
+  const isCompact = density === 'compact';
 
   return (
-    <div className="space-y-3">
+    <div className={clsx(isCompact ? 'space-y-2.5' : 'space-y-3')}>
       {events.map((event) => (
         <div
           key={event.metadata.uid}
-          className="flex items-start gap-3 p-3 rounded-lg transition-colors duration-150"
+          className={clsx(
+            'flex items-start gap-3 rounded-lg border transition-colors duration-150 ease-out',
+            isCompact ? 'p-2.5' : 'p-3'
+          )}
           style={{
             background: event.type === 'Warning' ? 'var(--sys-warning-soft-bg)' : 'var(--color-bg-tertiary)',
-            border: `1px solid ${event.type === 'Warning' ? 'var(--sys-warning-soft-border)' : 'var(--color-border)'}`,
+            borderColor: event.type === 'Warning' ? 'var(--sys-warning-soft-border)' : 'var(--color-border)',
           }}
         >
           {event.type === 'Warning' ? (
-            <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--color-warning)]" />
+            <ExclamationTriangleIcon className={clsx('mt-0.5 flex-shrink-0 text-[var(--color-warning)]', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
           ) : event.type === 'Normal' ? (
-            <CheckCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--color-success)]" />
+            <CheckCircleIcon className={clsx('mt-0.5 flex-shrink-0 text-[var(--color-success)]', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
           ) : (
-            <InformationCircleIcon className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--color-info)]" />
+            <InformationCircleIcon className={clsx('mt-0.5 flex-shrink-0 text-[var(--color-info)]', isCompact ? 'h-4 w-4' : 'h-5 w-5')} />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium truncate text-[var(--color-text-primary)]">
+              <p className={clsx('truncate font-medium text-[var(--color-text-primary)]', isCompact ? 'text-xs' : 'text-sm')}>
                 {event.reason}
               </p>
-              <span className="text-xs flex-shrink-0 text-[var(--color-text-muted)]">
+              <span className={clsx('flex-shrink-0 text-[var(--color-text-muted)]', isCompact ? 'text-[11px]' : 'text-xs')}>
                 {event.lastTimestamp &&
                   formatDistanceToNow(new Date(event.lastTimestamp), {
                     addSuffix: true,
                     locale: zhCN,
                   })}
-              </span>
+                </span>
             </div>
-            <p className="text-sm mt-1 line-clamp-2 text-[var(--color-text-secondary)]">
+            <p className={clsx('mt-1 line-clamp-2 text-[var(--color-text-secondary)]', isCompact ? 'text-xs' : 'text-sm')}>
               {event.message}
             </p>
-            <p className="text-xs mt-1 text-[var(--color-text-muted)]">
+            <p className={clsx('mt-1 text-[var(--color-text-muted)]', isCompact ? 'text-[11px]' : 'text-xs')}>
               {event.involvedObject.kind}/{event.involvedObject.name}
               {event.involvedObject.namespace && ` in ${event.involvedObject.namespace}`}
             </p>

@@ -7,6 +7,7 @@ interface StatsCardProps {
   subtitle?: string;
   icon: ComponentType<{ className?: string; style?: CSSProperties }>;
   color: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+  variant?: 'executive' | 'standard';
   trend?: 'up' | 'down';
   onClick?: () => void;
   isSelected?: boolean;
@@ -56,42 +57,53 @@ export default function StatsCard({
   subtitle,
   icon: Icon,
   color,
+  variant = 'standard',
   trend,
   onClick,
   isSelected,
 }: StatsCardProps) {
   const styles = colorStyles[color];
   const isClickable = !!onClick;
+  const isExecutive = variant === 'executive';
 
   const cardContent = (
     <>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p
-            className="text-xs font-medium uppercase tracking-wider mb-2"
-            style={{ color: 'var(--color-text-secondary)' }}
+            className={clsx(
+              'mb-2 text-[var(--color-text-secondary)]',
+              isExecutive
+                ? 'text-sm font-medium'
+                : 'text-xs font-medium uppercase tracking-wider'
+            )}
           >
             {title}
           </p>
           <p
-            className="kpi-number mb-1"
+            className={clsx(
+              'mb-1',
+              isExecutive
+                ? 'font-heading text-3xl font-semibold leading-9 tabular-nums'
+                : 'kpi-number'
+            )}
             style={{ color: styles.text }}
           >
             {value}
           </p>
           {subtitle && (
-            <p className="text-xs text-[var(--color-text-muted)]">
+            <p className={clsx('text-[var(--color-text-muted)]', isExecutive ? 'text-sm' : 'text-xs')}>
               {subtitle}
             </p>
           )}
         </div>
         <div
-          className="p-3 rounded-lg"
+          className={clsx('rounded-lg', isExecutive ? 'p-2.5' : 'p-3')}
           style={{
             background: styles.iconBg,
           }}
         >
-          <Icon className="w-6 h-6" style={{ color: styles.iconColor }} />
+          <Icon className={clsx(isExecutive ? 'h-5 w-5' : 'h-6 w-6')} style={{ color: styles.iconColor }} />
         </div>
       </div>
 
@@ -113,18 +125,23 @@ export default function StatsCard({
   );
 
   const baseClasses = clsx(
-    'relative p-6 rounded-xl transition-all duration-200',
+    'relative rounded-xl transition-all duration-200 ease-out',
+    isExecutive ? 'p-5' : 'p-6'
   );
 
   if (isClickable) {
     return (
       <button
         onClick={onClick}
-        className={clsx(baseClasses, 'w-full text-left cursor-pointer')}
+        className={clsx(
+          baseClasses,
+          'w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring'
+        )}
         style={{
           background: isSelected ? styles.bg : 'var(--color-bg-secondary)',
           border: `1px solid ${isSelected ? styles.border : 'var(--color-border)'}`,
         }}
+        aria-label={`${title} 详情`}
       >
         {cardContent}
       </button>

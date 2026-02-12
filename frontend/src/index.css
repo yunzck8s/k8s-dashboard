@@ -38,6 +38,11 @@
   --sys-bg-secondary: #FFFFFF;
   --sys-bg-tertiary: #EEF2F8;
   --sys-bg-elevated: #FFFFFF;
+  --sys-surface-emphasis: #E8EFFD;
+  --sys-surface-risk: #FFF3F1;
+  --sys-surface-neutral: #F8FAFC;
+  --sys-divider-strong: rgba(148, 163, 184, 0.5);
+  --sys-focus-ring: rgba(37, 99, 235, 0.45);
 
   --sys-text-primary: #0F172A;
   --sys-text-secondary: #334155;
@@ -101,6 +106,11 @@
   --color-bg-secondary: var(--sys-bg-secondary);
   --color-bg-tertiary: var(--sys-bg-tertiary);
   --color-bg-elevated: var(--sys-bg-elevated);
+  --color-surface-emphasis: var(--sys-surface-emphasis);
+  --color-surface-risk: var(--sys-surface-risk);
+  --color-surface-neutral: var(--sys-surface-neutral);
+  --color-divider-strong: var(--sys-divider-strong);
+  --color-focus-ring: var(--sys-focus-ring);
   --color-text-primary: var(--sys-text-primary);
   --color-text-secondary: var(--sys-text-secondary);
   --color-text-muted: var(--sys-text-muted);
@@ -125,6 +135,11 @@
   --sys-bg-secondary: #101A2C;
   --sys-bg-tertiary: #17233A;
   --sys-bg-elevated: #1C2A45;
+  --sys-surface-emphasis: rgba(96, 165, 250, 0.16);
+  --sys-surface-risk: rgba(248, 113, 113, 0.14);
+  --sys-surface-neutral: #142038;
+  --sys-divider-strong: rgba(148, 163, 184, 0.34);
+  --sys-focus-ring: rgba(147, 197, 253, 0.52);
 
   --sys-text-primary: #E6EDF7;
   --sys-text-secondary: #B2C0D6;
@@ -352,6 +367,11 @@ body {
   .sidebar-item:hover {
     color: var(--color-text-primary);
     background: var(--color-primary-light);
+  }
+
+  .sidebar-item:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
   }
 
   .sidebar-item-active {

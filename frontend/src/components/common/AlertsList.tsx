@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 import { alertApi } from '../../api';
 import { usePollingInterval } from '../../utils/polling';
 import { queryKeys } from '../../api/queryKeys';
@@ -16,9 +17,15 @@ interface AlertsListProps {
   limit?: number;
   showTitle?: boolean;
   severityFilter?: 'critical' | 'warning' | 'info' | null;
+  density?: 'compact' | 'comfortable';
 }
 
-export default function AlertsList({ limit = 5, showTitle = true, severityFilter = null }: AlertsListProps) {
+export default function AlertsList({
+  limit = 5,
+  showTitle = true,
+  severityFilter = null,
+  density = 'comfortable',
+}: AlertsListProps) {
   const pollingInterval = usePollingInterval('standard');
   const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
   const { data, isLoading, error } = useQuery({
@@ -26,6 +33,7 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
     queryFn: () => alertApi.list(),
     refetchInterval,
   });
+  const isCompact = density === 'compact';
 
   // 获取严重级别图标和样式
   const getSeverityConfig = (severity: string) => {
@@ -104,7 +112,7 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
   }
 
   return (
-    <div className="space-y-3">
+    <div className={clsx(isCompact ? 'space-y-2.5' : 'space-y-3')}>
       {showTitle && (
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-[var(--color-text-secondary)]">
@@ -127,21 +135,27 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
         return (
           <div
             key={alert.fingerprint}
-            className="p-3 rounded-lg border transition-all duration-150"
+            className={clsx(
+              'rounded-lg border transition-all duration-150 ease-out',
+              isCompact ? 'p-2.5' : 'p-3'
+            )}
             style={{
               background: config.background,
               borderColor: config.border,
             }}
           >
             <div className="flex items-start gap-3">
-              <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: config.iconColor }} />
+              <Icon
+                className={clsx('mt-0.5 flex-shrink-0', isCompact ? 'h-4 w-4' : 'h-5 w-5')}
+                style={{ color: config.iconColor }}
+              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm" style={{ color: config.textColor }}>
+                  <span className={clsx('font-medium', isCompact ? 'text-xs' : 'text-sm')} style={{ color: config.textColor }}>
                     {alertName}
                   </span>
                   <span
-                    className="px-1.5 py-0.5 text-xs rounded"
+                    className={clsx('rounded px-1.5 py-0.5', isCompact ? 'text-[10px]' : 'text-xs')}
                     style={{
                       background: config.background,
                       color: config.textColor,
@@ -158,11 +172,11 @@ export default function AlertsList({ limit = 5, showTitle = true, severityFilter
                   </div>
                 )}
                 {description && (
-                  <p className="text-xs mt-1 line-clamp-2 text-[var(--color-text-secondary)]">
+                  <p className={clsx('mt-1 line-clamp-2 text-[var(--color-text-secondary)]', isCompact ? 'text-[11px]' : 'text-xs')}>
                     {description}
                   </p>
                 )}
-                <div className="text-xs mt-2 text-[var(--color-text-muted)]">
+                <div className={clsx('text-[var(--color-text-muted)]', isCompact ? 'mt-1.5 text-[11px]' : 'mt-2 text-xs')}>
                   开始于{' '}
                   {formatDistanceToNow(new Date(alert.startsAt), {
                     addSuffix: true,
