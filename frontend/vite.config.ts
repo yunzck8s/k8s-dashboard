@@ -33,10 +33,9 @@ export default defineConfig({
             return 'ui-vendor';
           }
           if (
-            normalizedId.includes('/react/') ||
-            normalizedId.includes('/react-dom/') ||
-            normalizedId.includes('/react-router-dom/') ||
-            normalizedId.includes('/scheduler/')
+            normalizedId.includes('/node_modules/react/') ||
+            normalizedId.includes('/node_modules/react-dom/') ||
+            normalizedId.includes('/node_modules/scheduler/')
           ) {
             return 'react-vendor';
           }
