@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { alertApi } from '../../api';
 import { usePollingInterval } from '../../utils/polling';
+import { queryKeys } from '../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -19,10 +21,11 @@ interface AlertsListProps {
 
 export default function AlertsList({ limit = 5, showTitle = true, severityFilter = null }: AlertsListProps) {
   const pollingInterval = usePollingInterval('standard');
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
   const { data, isLoading, error } = useQuery({
-    queryKey: ['alerts'],
+    queryKey: queryKeys.alerts,
     queryFn: () => alertApi.list(),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   // 获取严重级别图标和样式

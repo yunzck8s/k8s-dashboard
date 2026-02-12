@@ -6,7 +6,7 @@ import { usePollingInterval } from '../../utils/polling';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
-import type { Node, Pod } from '../../types';
+import type { Node, NodeMetrics, Pod } from '../../types';
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
@@ -504,7 +504,7 @@ function PodsTab({ pods }: { pods: Pod[] }) {
 }
 
 // 指标标签页
-function MetricsTab({ metrics }: { metrics?: any }) {
+function MetricsTab({ metrics }: { metrics?: NodeMetrics }) {
   if (!metrics) {
     return (
       <div

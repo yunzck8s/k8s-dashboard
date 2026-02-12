@@ -7,6 +7,8 @@ import { useAppStore } from '../store';
 import { useAuthStore } from '../store/auth';
 import { clusterApi, namespaceApi } from '../api';
 import { usePollingInterval } from '../utils/polling';
+import { queryKeys } from '../api/queryKeys';
+import { createVisibilityRefetchInterval, invalidateClusterScopedQueries } from '../api/queryPolicy';
 import clsx from 'clsx';
 
 export default function MainLayout() {
@@ -23,18 +25,20 @@ export default function MainLayout() {
   const user = useAuthStore((state) => state.user);
   const pollingInterval = usePollingInterval('standard');
   const slowPollingInterval = usePollingInterval('slow');
+  const standardRefetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const slowRefetchInterval = createVisibilityRefetchInterval(slowPollingInterval);
 
   // 获取命名空间列表
   const { data: namespacesData } = useQuery({
-    queryKey: ['namespaces'],
+    queryKey: queryKeys.namespaces,
     queryFn: () => namespaceApi.list(),
-    refetchInterval: pollingInterval,
+    refetchInterval: standardRefetchInterval,
   });
 
   const { data: clustersData } = useQuery({
-    queryKey: ['clusters'],
+    queryKey: queryKeys.clusters,
     queryFn: () => clusterApi.list(),
-    refetchInterval: slowPollingInterval,
+    refetchInterval: slowRefetchInterval,
   });
 
   // 更新 store 中的命名空间列表
@@ -61,7 +65,7 @@ export default function MainLayout() {
     clusterApi.switch(defaultCluster).catch(() => {
       // 目标集群不可达时由全局拦截器处理错误提示
     });
-    queryClient.invalidateQueries();
+    void invalidateClusterScopedQueries(queryClient);
   }, [clustersData, currentCluster, setClusters, setCurrentCluster, queryClient]);
 
   useEffect(() => {
@@ -73,7 +77,7 @@ export default function MainLayout() {
     try {
       await clusterApi.switch(target);
       setCurrentCluster(target);
-      await queryClient.invalidateQueries();
+      await invalidateClusterScopedQueries(queryClient);
     } catch {
       // 错误由全局拦截器处理
     }

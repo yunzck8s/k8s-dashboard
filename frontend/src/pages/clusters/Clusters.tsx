@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clusterApi } from '../../api';
 import { useAppStore } from '../../store';
 import { usePollingInterval } from '../../utils/polling';
+import { queryKeys } from '../../api/queryKeys';
+import { createVisibilityRefetchInterval, invalidateClusterScopedQueries } from '../../api/queryPolicy';
 import type { ClusterInfo } from '../../types';
 
 function statusColor(status: ClusterInfo['status']): string {
@@ -21,6 +23,7 @@ function formatDateTime(value?: string): string {
 export default function Clusters() {
   const queryClient = useQueryClient();
   const pollingInterval = usePollingInterval('standard');
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
   const { currentCluster, setCurrentCluster, clearClusterError } = useAppStore();
   const [name, setName] = useState('');
   const [kubeconfig, setKubeconfig] = useState('');
@@ -28,9 +31,9 @@ export default function Clusters() {
   const [testResult, setTestResult] = useState<ClusterInfo | null>(null);
 
   const { data: clusters = [], isLoading } = useQuery({
-    queryKey: ['clusters'],
+    queryKey: queryKeys.clusters,
     queryFn: () => clusterApi.list(),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   const defaultCluster = useMemo(
@@ -57,7 +60,7 @@ export default function Clusters() {
       setName('');
       setKubeconfig('');
       setTestResult(null);
-      await queryClient.invalidateQueries({ queryKey: ['clusters'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clusters });
     },
     onError: (error) => {
       setMessage((error as Error).message || '添加失败');
@@ -70,7 +73,7 @@ export default function Clusters() {
       setCurrentCluster(cluster.name);
       clearClusterError();
       setMessage(`已切换到集群 ${cluster.name}`);
-      await queryClient.invalidateQueries();
+      await invalidateClusterScopedQueries(queryClient);
     },
     onError: (error) => {
       setMessage((error as Error).message || '切换失败');
@@ -84,8 +87,8 @@ export default function Clusters() {
         setCurrentCluster(defaultCluster);
       }
       setMessage(`集群 ${clusterName} 已删除`);
-      await queryClient.invalidateQueries({ queryKey: ['clusters'] });
-      await queryClient.invalidateQueries();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.clusters });
+      await invalidateClusterScopedQueries(queryClient);
     },
     onError: (error) => {
       setMessage((error as Error).message || '删除失败');

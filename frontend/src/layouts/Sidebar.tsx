@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { useAuthStore } from '../store/auth';
+import { preloadRoute } from '../routes/lazyRoutes';
 import clsx from 'clsx';
 import {
   HomeIcon,
@@ -129,6 +130,10 @@ export default function Sidebar() {
     return isActive(item.path);
   };
 
+  const handlePrefetch = (path: string) => {
+    preloadRoute(path);
+  };
+
   return (
     <aside
       className={clsx(
@@ -173,6 +178,8 @@ export default function Sidebar() {
                       'sidebar-item',
                       isParentActive(item) && 'sidebar-item-active'
                     )}
+                    onMouseEnter={() => handlePrefetch(item.children![0].path)}
+                    onFocus={() => handlePrefetch(item.children![0].path)}
                     title={sidebarCollapsed ? item.name : undefined}
                   >
                     <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -191,6 +198,8 @@ export default function Sidebar() {
                                 isActive && 'sidebar-item-active'
                               )
                             }
+                            onMouseEnter={() => handlePrefetch(child.path)}
+                            onFocus={() => handlePrefetch(child.path)}
                           >
                             <child.icon className="w-4 h-4 flex-shrink-0" />
                             <span>{child.name}</span>
@@ -207,6 +216,8 @@ export default function Sidebar() {
                   className={({ isActive }) =>
                     clsx('sidebar-item', isActive && 'sidebar-item-active')
                   }
+                  onMouseEnter={() => handlePrefetch(item.path)}
+                  onFocus={() => handlePrefetch(item.path)}
                   title={sidebarCollapsed ? item.name : undefined}
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
@@ -220,18 +231,18 @@ export default function Sidebar() {
 
       {/* 折叠按钮 */}
       <button
+        type="button"
         onClick={toggleSidebar}
-        className="h-12 flex items-center justify-center transition-colors duration-150"
+        className="h-12 flex items-center justify-center transition-colors duration-150 hover:bg-primary-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
         style={{
           borderTop: '1px solid var(--color-border)',
         }}
-        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-primary-light)'}
-        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
       >
         {sidebarCollapsed ? (
-          <ChevronRightIcon className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
+          <ChevronRightIcon className="w-5 h-5 text-[var(--color-text-secondary)]" />
         ) : (
-          <ChevronLeftIcon className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} />
+          <ChevronLeftIcon className="w-5 h-5 text-[var(--color-text-secondary)]" />
         )}
       </button>
     </aside>

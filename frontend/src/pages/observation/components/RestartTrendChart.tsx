@@ -1,12 +1,11 @@
-import { useMemo } from 'react';
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
 import type { RestartTrend } from '../../../api';
 import ComparisonBadge from './ComparisonBadge';
@@ -16,35 +15,38 @@ interface RestartTrendChartProps {
   data?: RestartTrend;
 }
 
-export default function RestartTrendChart({ title, data }: RestartTrendChartProps) {
-  // 格式化图表数据
-  const chartData = useMemo(() => {
-    if (!data?.current) return [];
+interface TooltipPayloadItem {
+  value?: number;
+}
 
-    return data.current.map((point) => ({
+interface RestartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+}
+
+function RestartTooltip({ active, payload, label }: RestartTooltipProps) {
+  if (!active || !payload || payload.length === 0 || payload[0].value === undefined) {
+    return null;
+  }
+
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-slate-400 text-xs mb-1">{label}</p>
+      <p className="text-white font-semibold">{payload[0].value} 次重启</p>
+    </div>
+  );
+}
+
+export default function RestartTrendChart({ title, data }: RestartTrendChartProps) {
+  const chartData =
+    data?.current?.map((point) => ({
       date: point.date,
       count: point.count,
-    }));
-  }, [data]);
-
-  // 自定义 Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-          <p className="text-slate-400 text-xs mb-1">{label}</p>
-          <p className="text-white font-semibold">
-            {payload[0].value} 次重启
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+    })) ?? [];
 
   return (
     <div className="card p-6">
-      {/* 标题和同比环比 */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white">{title}</h3>
         {data?.comparison && (
@@ -64,7 +66,6 @@ export default function RestartTrendChart({ title, data }: RestartTrendChartProp
         )}
       </div>
 
-      {/* 图表 */}
       {chartData.length > 0 ? (
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -90,12 +91,16 @@ export default function RestartTrendChart({ title, data }: RestartTrendChartProp
                 axisLine={false}
                 allowDecimals={false}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar
-                dataKey="count"
-                fill="url(#restartGradient)"
-                radius={[4, 4, 0, 0]}
+              <Tooltip
+                content={({ active, payload, label }) => (
+                  <RestartTooltip
+                    active={active}
+                    payload={payload as TooltipPayloadItem[] | undefined}
+                    label={label as string | undefined}
+                  />
+                )}
               />
+              <Bar dataKey="count" fill="url(#restartGradient)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -1,11 +1,12 @@
 import { Fragment } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Menu, Transition } from '@headlessui/react';
 import { useAppStore } from '../store';
 import { useAuthStore, useRoleDisplay } from '../store/auth';
 import { authApi } from '../api/auth';
 import { clusterApi } from '../api';
+import { invalidateClusterScopedQueries } from '../api/queryPolicy';
 import {
   BellIcon,
   MagnifyingGlassIcon,
@@ -55,7 +56,7 @@ export default function Header() {
       await clusterApi.switch(name);
       setCurrentCluster(name);
       clearClusterError();
-      await queryClient.invalidateQueries();
+      await invalidateClusterScopedQueries(queryClient);
     } catch {
       // 错误由全局拦截器处理
     }
@@ -223,16 +224,8 @@ export default function Header() {
         {/* 主题切换 */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg transition-colors duration-150"
-          style={{ color: 'var(--color-text-secondary)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--color-primary-light)';
-            e.currentTarget.style.color = 'var(--color-text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'var(--color-text-secondary)';
-          }}
+          className="p-2 rounded-lg transition-colors duration-150 text-[var(--color-text-secondary)] hover:bg-primary-light hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={theme === 'dark' ? '切换到亮色主题' : '切换到暗色主题'}
           title={theme === 'dark' ? '切换到亮色主题' : '切换到暗色主题'}
         >
           {theme === 'dark' ? (
@@ -244,16 +237,8 @@ export default function Header() {
 
         {/* 通知 */}
         <button
-          className="relative p-2 rounded-lg transition-colors duration-150"
-          style={{ color: 'var(--color-text-secondary)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--color-primary-light)';
-            e.currentTarget.style.color = 'var(--color-text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = 'var(--color-text-secondary)';
-          }}
+          className="relative p-2 rounded-lg transition-colors duration-150 text-[var(--color-text-secondary)] hover:bg-primary-light hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="通知"
         >
           <BellIcon className="w-5 h-5" />
           <span
@@ -267,6 +252,7 @@ export default function Header() {
           <Menu.Button
             className="flex items-center gap-2 p-2 rounded-lg transition-colors duration-150"
             style={{ color: 'var(--color-text-secondary)' }}
+            aria-label="打开用户菜单"
           >
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -321,8 +307,8 @@ export default function Header() {
               <div className="py-1">
                 <Menu.Item>
                   {({ active }) => (
-                    <a
-                      href="/settings"
+                    <Link
+                      to="/settings"
                       className="flex items-center gap-2 px-4 py-2 text-sm transition-colors duration-150"
                       style={{
                         background: active ? 'var(--color-primary-light)' : 'transparent',
@@ -331,14 +317,14 @@ export default function Header() {
                     >
                       <Cog6ToothIcon className="w-4 h-4" />
                       设置
-                    </a>
+                    </Link>
                   )}
                 </Menu.Item>
                 {user?.role === 'admin' && (
                   <Menu.Item>
                     {({ active }) => (
-                      <a
-                        href="/admin/users"
+                      <Link
+                        to="/admin/users"
                         className="flex items-center gap-2 px-4 py-2 text-sm transition-colors duration-150"
                         style={{
                           background: active ? 'var(--color-primary-light)' : 'transparent',
@@ -347,7 +333,7 @@ export default function Header() {
                       >
                         <UserIcon className="w-4 h-4" />
                         用户管理
-                      </a>
+                      </Link>
                     )}
                   </Menu.Item>
                 )}

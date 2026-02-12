@@ -14,7 +14,7 @@ interface IngressFormProps {
 interface IngressRule {
   host: string;
   path: string;
-  pathType: string;
+  pathType: 'Prefix' | 'Exact' | 'ImplementationSpecific';
   serviceName: string;
   servicePort: number;
 }
@@ -88,9 +88,11 @@ export default function IngressForm({
 
   // 更新规则
   const updateRule = (index: number, field: keyof IngressRule, value: string | number) => {
-    const newRules = [...rules];
-    (newRules[index] as any)[field] = value;
-    setRules(newRules);
+    setRules((previous) =>
+      previous.map((rule, ruleIndex) =>
+        ruleIndex === index ? ({ ...rule, [field]: value } as IngressRule) : rule
+      )
+    );
   };
 
   // 处理提交
@@ -128,7 +130,7 @@ export default function IngressForm({
           http: {
             paths: hostRules.map((rule) => ({
               path: rule.path,
-              pathType: rule.pathType as any,
+              pathType: rule.pathType,
               backend: {
                 service: {
                   name: rule.serviceName,

@@ -1,12 +1,11 @@
-import { useMemo } from 'react';
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from 'recharts';
 import type { ResourceTrend } from '../../../api';
 import ComparisonBadge from './ComparisonBadge';
@@ -19,6 +18,33 @@ interface ResourceTrendChartProps {
   gradientId: string;
 }
 
+interface TooltipPayloadItem {
+  value?: number;
+}
+
+interface ResourceTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+  unit: string;
+}
+
+function ResourceTooltip({ active, payload, label, unit }: ResourceTooltipProps) {
+  if (!active || !payload || payload.length === 0 || payload[0].value === undefined) {
+    return null;
+  }
+
+  return (
+    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-slate-400 text-xs mb-1">{label}</p>
+      <p className="text-white font-semibold">
+        {payload[0].value.toFixed(2)}
+        {unit}
+      </p>
+    </div>
+  );
+}
+
 export default function ResourceTrendChart({
   title,
   data,
@@ -26,38 +52,18 @@ export default function ResourceTrendChart({
   color,
   gradientId,
 }: ResourceTrendChartProps) {
-  // 格式化图表数据
-  const chartData = useMemo(() => {
-    if (!data?.current) return [];
-
-    return data.current.map((point) => ({
+  const chartData =
+    data?.current?.map((point) => ({
       timestamp: point.timestamp,
       time: new Date(point.timestamp * 1000).toLocaleTimeString('zh-CN', {
         hour: '2-digit',
         minute: '2-digit',
       }),
-      value: parseFloat(point.value.toFixed(2)),
-    }));
-  }, [data]);
-
-  // 自定义 Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-          <p className="text-slate-400 text-xs mb-1">{label}</p>
-          <p className="text-white font-semibold">
-            {payload[0].value.toFixed(2)}{unit}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+      value: Number(point.value.toFixed(2)),
+    })) ?? [];
 
   return (
     <div className="card p-6">
-      {/* 标题和同比环比 */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-white">{title}</h3>
         {data?.comparison && (
@@ -70,14 +76,14 @@ export default function ResourceTrendChart({
             <div className="text-right">
               <p className="text-xs text-slate-400">当前平均</p>
               <p className="text-sm font-semibold text-white">
-                {data.comparison.currentAvg.toFixed(2)}{unit}
+                {data.comparison.currentAvg.toFixed(2)}
+                {unit}
               </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* 图表 */}
       {chartData.length > 0 ? (
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -101,9 +107,18 @@ export default function ResourceTrendChart({
                 tick={{ fill: '#64748b', fontSize: 12 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${value}${unit}`}
+                tickFormatter={(value: number) => `${value}${unit}`}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={({ active, payload, label }) => (
+                  <ResourceTooltip
+                    active={active}
+                    payload={payload as TooltipPayloadItem[] | undefined}
+                    label={label as string | undefined}
+                    unit={unit}
+                  />
+                )}
+              />
               <Area
                 type="monotone"
                 dataKey="value"

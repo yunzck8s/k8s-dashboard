@@ -1,0 +1,39 @@
+name: Frontend Quality Gate
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-quality.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-quality.yml'
+  workflow_dispatch:
+
+jobs:
+  frontend-quality:
+    name: Lint Build and Bundle Budget
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Verify frontend quality
+        working-directory: frontend
+        run: npm run ci:verify

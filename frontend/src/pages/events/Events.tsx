@@ -1,6 +1,10 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { eventApi } from '../../api';
 import { useAppStore } from '../../store';
+import { usePollingInterval } from '../../utils/polling';
+import { queryKeys } from '../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -12,15 +16,36 @@ import type { Event } from '../../types';
 
 export default function Events() {
   const { currentNamespace } = useAppStore();
+  const pollingInterval = usePollingInterval('fast');
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['events', currentNamespace],
+    queryKey: queryKeys.events(currentNamespace),
     queryFn: () =>
       currentNamespace === 'all'
         ? eventApi.listAll()
         : eventApi.list(currentNamespace),
-    refetchInterval: 10000,
+    refetchInterval,
   });
+
+  const events = useMemo(() => data?.items ?? [], [data?.items]);
+
+  // 按时间排序，最新的在前
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((a, b) => {
+      const timeA = a.lastTimestamp || a.metadata.creationTimestamp;
+      const timeB = b.lastTimestamp || b.metadata.creationTimestamp;
+      return new Date(timeB).getTime() - new Date(timeA).getTime();
+    });
+  }, [events]);
+
+  // 统计事件类型
+  const { normalCount, warningCount } = useMemo(() => {
+    return {
+      normalCount: events.filter((event) => event.type === 'Normal').length,
+      warningCount: events.filter((event) => event.type === 'Warning').length,
+    };
+  }, [events]);
 
   if (isLoading) {
     return (
@@ -40,19 +65,6 @@ export default function Events() {
       </div>
     );
   }
-
-  const events = data?.items ?? [];
-
-  // 按时间排序，最新的在前
-  const sortedEvents = [...events].sort((a, b) => {
-    const timeA = a.lastTimestamp || a.metadata.creationTimestamp;
-    const timeB = b.lastTimestamp || b.metadata.creationTimestamp;
-    return new Date(timeB).getTime() - new Date(timeA).getTime();
-  });
-
-  // 统计事件类型
-  const normalCount = events.filter((e) => e.type === 'Normal').length;
-  const warningCount = events.filter((e) => e.type === 'Warning').length;
 
   // 获取事件时间
   const getEventTime = (event: Event) => {

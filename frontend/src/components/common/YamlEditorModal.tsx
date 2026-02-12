@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import * as yaml from 'js-yaml';
 import {
-  XMarkIcon,
-  ExclamationTriangleIcon,
-  DocumentTextIcon,
   CheckCircleIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
+
+const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
 interface YamlEditorModalProps {
   isOpen: boolean;
@@ -18,66 +19,71 @@ interface YamlEditorModalProps {
   isPending?: boolean;
 }
 
-export default function YamlEditorModal({
-  isOpen,
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
+function parseYaml(content: string): { isValid: boolean; error: string | null } {
+  if (!content || content.trim() === '') {
+    return { isValid: false, error: 'YAML 内容不能为空' };
+  }
+
+  try {
+    yaml.load(content);
+    return { isValid: true, error: null };
+  } catch (error: unknown) {
+    return { isValid: false, error: getErrorMessage(error, 'YAML 语法错误') };
+  }
+}
+
+function YamlEditorModalContent({
   onClose,
   onSave,
   initialYaml,
   resourceType = 'Resource',
   title,
   isPending = false,
-}: YamlEditorModalProps) {
+}: Omit<YamlEditorModalProps, 'isOpen'>) {
+  const initialState = parseYaml(initialYaml);
   const [yamlContent, setYamlContent] = useState(initialYaml);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialState.error);
   const [isValidating, setIsValidating] = useState(false);
-  const [isValid, setIsValid] = useState(true);
+  const [isValid, setIsValid] = useState(initialState.isValid);
+  const validateTimerRef = useRef<number | null>(null);
 
-  // 当模态框打开或 initialYaml 变化时，重置编辑器内容
+  const validateYaml = useCallback((content: string): boolean => {
+    const result = parseYaml(content);
+    setError(result.error);
+    setIsValid(result.isValid);
+    return result.isValid;
+  }, []);
+
   useEffect(() => {
-    if (isOpen) {
-      setYamlContent(initialYaml);
-      setError(null);
-      validateYaml(initialYaml);
-    }
-  }, [isOpen, initialYaml]);
+    return () => {
+      if (validateTimerRef.current !== null) {
+        window.clearTimeout(validateTimerRef.current);
+      }
+    };
+  }, []);
 
-  // YAML 语法验证
-  const validateYaml = (content: string) => {
-    if (!content || content.trim() === '') {
-      setError('YAML 内容不能为空');
-      setIsValid(false);
-      return false;
-    }
-
-    try {
-      yaml.load(content);
-      setError(null);
-      setIsValid(true);
-      return true;
-    } catch (e: any) {
-      const errorMessage = e.message || 'YAML 语法错误';
-      setError(errorMessage);
-      setIsValid(false);
-      return false;
-    }
-  };
-
-  // 处理编辑器内容变化
   const handleEditorChange = (value: string | undefined) => {
-    const newContent = value || '';
+    const newContent = value ?? '';
     setYamlContent(newContent);
 
-    // 延迟验证以避免频繁验证
+    if (validateTimerRef.current !== null) {
+      window.clearTimeout(validateTimerRef.current);
+    }
+
     setIsValidating(true);
-    const timeoutId = setTimeout(() => {
+    validateTimerRef.current = window.setTimeout(() => {
       validateYaml(newContent);
       setIsValidating(false);
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
+    }, 300);
   };
 
-  // 处理保存
   const handleSave = async () => {
     if (!validateYaml(yamlContent)) {
       return;
@@ -86,23 +92,20 @@ export default function YamlEditorModal({
     try {
       await onSave(yamlContent);
       onClose();
-    } catch (error: any) {
-      setError(error.message || '保存失败');
+    } catch (saveError: unknown) {
+      setError(getErrorMessage(saveError, '保存失败'));
     }
   };
 
-  // 处理取消
   const handleClose = () => {
     if (yamlContent !== initialYaml) {
-      if (confirm('有未保存的更改，确定要关闭吗？')) {
+      if (window.confirm('有未保存的更改，确定要关闭吗？')) {
         onClose();
       }
-    } else {
-      onClose();
+      return;
     }
+    onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -113,16 +116,12 @@ export default function YamlEditorModal({
           border: '1px solid var(--color-border)',
         }}
       >
-        {/* 标题栏 */}
         <div
           className="flex items-center justify-between px-6 py-4"
           style={{ borderBottom: '1px solid var(--color-border)' }}
         >
           <div className="flex items-center gap-3">
-            <div
-              className="p-2 rounded-lg"
-              style={{ background: 'var(--color-primary-light)' }}
-            >
+            <div className="p-2 rounded-lg" style={{ background: 'var(--color-primary-light)' }}>
               <DocumentTextIcon className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
             </div>
             <div>
@@ -138,35 +137,45 @@ export default function YamlEditorModal({
             onClick={handleClose}
             className="p-1 transition-colors duration-150"
             style={{ color: 'var(--color-text-muted)' }}
+            aria-label="关闭 YAML 编辑器"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
         </div>
 
-        {/* 编辑器区域 */}
         <div className="flex-1 overflow-hidden">
-          <Editor
-            height="500px"
-            language="yaml"
-            theme="vs-dark"
-            value={yamlContent}
-            onChange={handleEditorChange}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 14,
-              wordWrap: 'on',
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              tabSize: 2,
-              insertSpaces: true,
-              formatOnPaste: true,
-              formatOnType: true,
-            }}
-          />
+          <Suspense
+            fallback={
+              <div className="h-[500px] flex items-center justify-center" style={{ color: 'var(--color-text-muted)' }}>
+                <div
+                  className="animate-spin rounded-full h-6 w-6 border-b-2"
+                  style={{ borderColor: 'var(--color-primary)' }}
+                />
+              </div>
+            }
+          >
+            <MonacoEditor
+              height="500px"
+              language="yaml"
+              theme="vs-dark"
+              value={yamlContent}
+              onChange={handleEditorChange}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                insertSpaces: true,
+                formatOnPaste: true,
+                formatOnType: true,
+              }}
+            />
+          </Suspense>
         </div>
 
-        {/* 状态栏 */}
         <div
           className="px-6 py-3"
           style={{
@@ -187,7 +196,9 @@ export default function YamlEditorModal({
               <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">YAML 语法错误</p>
-                <p className="text-xs mt-1" style={{ color: 'rgba(248, 113, 113, 0.8)' }}>{error}</p>
+                <p className="text-xs mt-1" style={{ color: 'rgba(248, 113, 113, 0.8)' }}>
+                  {error}
+                </p>
               </div>
             </div>
           ) : isValid ? (
@@ -198,7 +209,6 @@ export default function YamlEditorModal({
           ) : null}
         </div>
 
-        {/* 底部按钮 */}
         <div
           className="flex justify-end gap-3 px-6 py-4"
           style={{
@@ -237,5 +247,25 @@ export default function YamlEditorModal({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function YamlEditorModal(props: YamlEditorModalProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+
+  const modalKey = `${props.resourceType ?? 'resource'}:${props.initialYaml.length}:${props.initialYaml.slice(0, 64)}`;
+
+  return (
+    <YamlEditorModalContent
+      key={modalKey}
+      onClose={props.onClose}
+      onSave={props.onSave}
+      initialYaml={props.initialYaml}
+      resourceType={props.resourceType}
+      title={props.title}
+      isPending={props.isPending}
+    />
   );
 }

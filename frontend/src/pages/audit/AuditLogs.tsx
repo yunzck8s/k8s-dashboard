@@ -5,6 +5,7 @@ import { usePollingInterval } from '../../utils/polling';
 import { format, formatDistanceToNow, subDays, subHours } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
+import type { AuditLog } from '../../types';
 import {
   FunnelIcon,
   ArrowPathIcon,
@@ -185,7 +186,7 @@ export default function AuditLogs() {
   };
 
   // 生成操作描述
-  const getActionDescription = (log: any) => {
+  const getActionDescription = (log: AuditLog) => {
     // 优先使用后端生成的 message，它包含了更精确的操作描述（如"重启"、"扩缩容"等）
     if (log.message) {
       const user = log.user || '未知用户';

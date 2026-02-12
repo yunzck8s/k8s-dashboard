@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { overviewApi, alertApi } from '../../api';
@@ -8,6 +8,8 @@ import EventsList from '../../components/common/EventsList';
 import AlertsList from '../../components/common/AlertsList';
 import { formatNumber } from '../../utils/format';
 import { usePollingInterval } from '../../utils/polling';
+import { queryKeys } from '../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../api/queryPolicy';
 import {
   CubeIcon,
   ServerIcon,
@@ -27,9 +29,20 @@ import clsx from 'clsx';
 type AlertSeverityFilter = 'critical' | 'warning' | 'info' | null;
 type EventTypeFilter = 'Normal' | 'Warning' | null;
 
+const quickLinks = [
+  { name: 'Pods', path: '/workloads/pods', icon: CubeIcon, color: '#60A5FA' },
+  { name: 'Deployments', path: '/workloads/deployments', icon: RectangleStackIcon, color: '#818CF8' },
+  { name: 'Services', path: '/network/services', icon: GlobeAltIcon, color: '#FBBF24' },
+  { name: 'Nodes', path: '/nodes', icon: ServerIcon, color: '#34D399' },
+  { name: 'ConfigMaps', path: '/config/configmaps', icon: FolderIcon, color: '#60A5FA' },
+  { name: 'Namespaces', path: '/namespaces', icon: FolderIcon, color: '#818CF8' },
+];
+
 export default function Dashboard() {
   const pollingInterval = usePollingInterval('standard');
   const fastPollingInterval = usePollingInterval('fast');
+  const fastRefetchInterval = createVisibilityRefetchInterval(fastPollingInterval);
+  const standardRefetchInterval = createVisibilityRefetchInterval(pollingInterval);
   // 过滤状态
   const [alertFilter, setAlertFilter] = useState<AlertSeverityFilter>(null);
   const [eventFilter, setEventFilter] = useState<EventTypeFilter>(null);
@@ -40,17 +53,26 @@ export default function Dashboard() {
     refetch,
     dataUpdatedAt,
   } = useQuery({
-    queryKey: ['overview'],
+    queryKey: queryKeys.overview,
     queryFn: overviewApi.getOverview,
-    refetchInterval: fastPollingInterval,
+    refetchInterval: fastRefetchInterval,
   });
 
   // 获取告警摘要
   const { data: alertSummary } = useQuery({
-    queryKey: ['alertSummary'],
+    queryKey: queryKeys.alertSummary,
     queryFn: alertApi.getSummary,
-    refetchInterval: pollingInterval,
+    refetchInterval: standardRefetchInterval,
   });
+
+  // 计算集群健康度
+  const healthScore = useMemo(() => {
+    if (!overview) return 0;
+    const nodeHealth = overview.nodes.total > 0 ? (overview.nodes.ready / overview.nodes.total) * 100 : 0;
+    const podHealth = overview.pods.total > 0 ? (overview.pods.ready / overview.pods.total) * 100 : 0;
+    const deployHealth = overview.deployments.total > 0 ? (overview.deployments.ready / overview.deployments.total) * 100 : 0;
+    return Math.round((nodeHealth + podHealth + deployHealth) / 3);
+  }, [overview]);
 
   if (isLoading) {
     return (
@@ -59,15 +81,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  // 计算集群健康度
-  const healthScore = (() => {
-    if (!overview) return 0;
-    const nodeHealth = overview.nodes.total > 0 ? (overview.nodes.ready / overview.nodes.total) * 100 : 0;
-    const podHealth = overview.pods.total > 0 ? (overview.pods.ready / overview.pods.total) * 100 : 0;
-    const deployHealth = overview.deployments.total > 0 ? (overview.deployments.ready / overview.deployments.total) * 100 : 0;
-    return Math.round((nodeHealth + podHealth + deployHealth) / 3);
-  })();
 
   const getHealthColor = (score: number) => {
     if (score >= 90) return 'text-green-400';
@@ -433,14 +446,7 @@ export default function Dashboard() {
           快捷导航
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {[
-            { name: 'Pods', path: '/workloads/pods', icon: CubeIcon, color: '#60A5FA' },
-            { name: 'Deployments', path: '/workloads/deployments', icon: RectangleStackIcon, color: '#818CF8' },
-            { name: 'Services', path: '/network/services', icon: GlobeAltIcon, color: '#FBBF24' },
-            { name: 'Nodes', path: '/nodes', icon: ServerIcon, color: '#34D399' },
-            { name: 'ConfigMaps', path: '/config/configmaps', icon: FolderIcon, color: '#60A5FA' },
-            { name: 'Namespaces', path: '/namespaces', icon: FolderIcon, color: '#818CF8' },
-          ].map((item) => (
+          {quickLinks.map((item) => (
             <Link
               key={item.path}
               to={item.path}

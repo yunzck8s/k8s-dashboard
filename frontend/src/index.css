@@ -31,6 +31,12 @@
   /* 边框色 */
   --color-border: rgba(99, 102, 241, 0.15);
   --color-border-hover: rgba(99, 102, 241, 0.3);
+
+  /* 动效与圆角 */
+  --motion-fast: 160ms;
+  --motion-medium: 220ms;
+  --radius-md: 10px;
+  --radius-lg: 12px;
 }
 
 [data-theme="light"] {
@@ -69,6 +75,11 @@ body {
   min-height: 100vh;
 }
 
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* 滚动条样式 - 简洁风格 */
 ::-webkit-scrollbar {
   width: 8px;
@@ -94,6 +105,7 @@ body {
     @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
     font-family: 'Fira Sans', sans-serif;
     font-weight: 500;
+    min-height: 44px;
   }
 
   .btn:active {
@@ -150,6 +162,7 @@ body {
 
   .btn-sm {
     @apply px-3 py-1.5 text-sm;
+    min-height: 36px;
   }
 
   .btn-lg {
@@ -235,6 +248,7 @@ body {
     color: var(--color-text-secondary);
     font-family: 'Fira Sans', sans-serif;
     font-weight: 500;
+    min-height: 44px;
   }
 
   .sidebar-item:hover {
@@ -319,6 +333,15 @@ tbody tr:last-child td {
 .animate-fade-in-delay-3 {
   animation: fade-in 0.2s ease-out 0.15s forwards;
   opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes slide-in-right {

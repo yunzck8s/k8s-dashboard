@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { podApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { queryKeys } from '../../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../../api/queryPolicy';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -178,43 +181,48 @@ function formatMemory(bytes: number): string {
 export default function Pods() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
-
-  // 分页状态
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-
-  // 当命名空间变化时重置分页
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [currentNamespace]);
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['pods', currentNamespace],
+    queryKey: queryKeys.pods(currentNamespace),
     queryFn: () =>
       currentNamespace === 'all'
         ? podApi.listAll()
         : podApi.list(currentNamespace),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   // 获取所有 Pod 的实际资源使用量
   const { data: metricsData } = useQuery({
-    queryKey: ['pods-metrics'],
+    queryKey: queryKeys.podsMetrics,
     queryFn: () => podApi.listAllMetrics(),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   // 创建 metrics 查找 map
-  const metricsMap = new Map<string, { cpuUsage: number; memoryUsage: number }>();
-  if (metricsData?.items) {
-    for (const m of metricsData.items) {
-      const key = `${m.namespace}/${m.name}`;
-      metricsMap.set(key, {
-        cpuUsage: m.cpuUsage,
-        memoryUsage: m.memoryUsage,
+  const metricsMap = useMemo(() => {
+    const map = new Map<string, { cpuUsage: number; memoryUsage: number }>();
+    if (!metricsData?.items) {
+      return map;
+    }
+    for (const metrics of metricsData.items) {
+      map.set(`${metrics.namespace}/${metrics.name}`, {
+        cpuUsage: metrics.cpuUsage,
+        memoryUsage: metrics.memoryUsage,
       });
     }
-  }
+    return map;
+  }, [metricsData]);
+
+  const pods = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalItems = pods.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const currentPods = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return pods.slice(startIndex, endIndex);
+  }, [currentPage, pageSize, pods]);
 
   if (isLoading) {
     return (
@@ -243,15 +251,6 @@ export default function Pods() {
       </div>
     );
   }
-
-  const pods = data?.items ?? [];
-
-  // 分页计算
-  const totalItems = pods.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentPods = pods.slice(startIndex, endIndex);
 
   // 处理页码变化
   const handlePageChange = (page: number) => {

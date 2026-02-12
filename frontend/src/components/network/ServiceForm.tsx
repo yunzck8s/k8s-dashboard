@@ -109,9 +109,11 @@ export default function ServiceForm({
 
   // 更新端口映射
   const updatePort = (index: number, field: keyof PortMapping, value: string | number | undefined) => {
-    const newPorts = [...ports];
-    (newPorts[index] as any)[field] = value;
-    setPorts(newPorts);
+    setPorts((previous) =>
+      previous.map((port, portIndex) =>
+        portIndex === index ? ({ ...port, [field]: value } as PortMapping) : port
+      )
+    );
   };
 
   // 处理提交

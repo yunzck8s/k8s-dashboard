@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { secretApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
+import { queryKeys } from '../../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
+import type { SecretInput } from '../../../types';
 import Pagination from '../../../components/common/Pagination';
 import SecretForm from '../../../components/config/SecretForm';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -14,28 +18,23 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 export default function Secrets() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const queryClient = useQueryClient();
 
-  // 命名空间变化时重置页码
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [currentNamespace]);
-
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['secrets', currentNamespace],
+    queryKey: queryKeys.secrets(currentNamespace),
     queryFn: () =>
       currentNamespace === 'all'
         ? secretApi.listAll()
         : secretApi.list(currentNamespace),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   // 创建 Secret
   const createMutation = useMutation({
-    mutationFn: (secret: any) => secretApi.create(currentNamespace, secret),
+    mutationFn: (secret: SecretInput) => secretApi.create(currentNamespace, secret),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['secrets'] });
       setShowCreateModal(false);
@@ -44,6 +43,15 @@ export default function Secrets() {
       alert(`创建失败: ${error.message}`);
     },
   });
+
+  const secrets = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalItems = secrets.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const currentSecrets = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return secrets.slice(startIndex, endIndex);
+  }, [currentPage, pageSize, secrets]);
 
   if (isLoading) {
     return (
@@ -63,15 +71,6 @@ export default function Secrets() {
       </div>
     );
   }
-
-  const secrets = data?.items ?? [];
-
-  // 分页逻辑
-  const totalItems = secrets.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentSecrets = secrets.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

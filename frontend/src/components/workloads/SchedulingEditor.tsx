@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { XMarkIcon, PlusIcon, TrashIcon, ServerIcon } from '@heroicons/react/24/outline';
+import { useState } from 'react';
+import { PlusIcon, ServerIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
 interface NodeSelector {
@@ -23,96 +23,98 @@ interface SchedulingEditorProps {
   isPending?: boolean;
 }
 
-export default function SchedulingEditor({
-  isOpen,
+function normalizeNodeSelector(selector: NodeSelector): Array<{ key: string; value: string }> {
+  return Object.entries(selector).map(([key, value]) => ({ key, value }));
+}
+
+function normalizeTolerations(tolerations: Toleration[]): Toleration[] {
+  return tolerations.map((toleration) => ({ ...toleration }));
+}
+
+function SchedulingEditorContent({
   onClose,
   onSave,
   nodeSelector = {},
   tolerations = [],
   isPending = false,
-}: SchedulingEditorProps) {
+}: Omit<SchedulingEditorProps, 'isOpen'>) {
   const [activeTab, setActiveTab] = useState<'nodeSelector' | 'tolerations'>('nodeSelector');
-  const [editedNodeSelector, setEditedNodeSelector] = useState<{ key: string; value: string }[]>([]);
-  const [editedTolerations, setEditedTolerations] = useState<Toleration[]>([]);
+  const [editedNodeSelector, setEditedNodeSelector] = useState<Array<{ key: string; value: string }>>(() =>
+    normalizeNodeSelector(nodeSelector)
+  );
+  const [editedTolerations, setEditedTolerations] = useState<Toleration[]>(() =>
+    normalizeTolerations(tolerations)
+  );
 
-  useEffect(() => {
-    if (isOpen) {
-      // 转换 nodeSelector 对象为数组形式便于编辑
-      setEditedNodeSelector(
-        Object.entries(nodeSelector || {}).map(([key, value]) => ({ key, value }))
-      );
-      setEditedTolerations((tolerations || []).map(t => ({ ...t })));
-    }
-  }, [isOpen]); // 只依赖 isOpen，避免无限循环
-
-  // 节点选择器操作
   const addNodeSelector = () => {
-    setEditedNodeSelector([...editedNodeSelector, { key: '', value: '' }]);
+    setEditedNodeSelector((previous) => [...previous, { key: '', value: '' }]);
   };
 
   const removeNodeSelector = (index: number) => {
-    setEditedNodeSelector(editedNodeSelector.filter((_, i) => i !== index));
+    setEditedNodeSelector((previous) => previous.filter((_, selectorIndex) => selectorIndex !== index));
   };
 
   const updateNodeSelector = (index: number, field: 'key' | 'value', value: string) => {
-    const updated = [...editedNodeSelector];
-    updated[index] = { ...updated[index], [field]: value };
-    setEditedNodeSelector(updated);
+    setEditedNodeSelector((previous) => {
+      const updated = [...previous];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
-  // 容忍度操作
   const addToleration = () => {
-    setEditedTolerations([
-      ...editedTolerations,
+    setEditedTolerations((previous) => [
+      ...previous,
       { key: '', operator: 'Equal', value: '', effect: 'NoSchedule' },
     ]);
   };
 
   const removeToleration = (index: number) => {
-    setEditedTolerations(editedTolerations.filter((_, i) => i !== index));
+    setEditedTolerations((previous) => previous.filter((_, tolerationIndex) => tolerationIndex !== index));
   };
 
   const updateToleration = (index: number, field: keyof Toleration, value: string | number) => {
-    const updated = [...editedTolerations];
-    updated[index] = { ...updated[index], [field]: value };
-    setEditedTolerations(updated);
+    setEditedTolerations((previous) => {
+      const updated = [...previous];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // 转换回对象格式
-    const newNodeSelector: NodeSelector = {};
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    const nextNodeSelector: NodeSelector = {};
     editedNodeSelector.forEach(({ key, value }) => {
-      if (key.trim()) {
-        newNodeSelector[key.trim()] = value.trim();
+      if (!key.trim()) {
+        return;
       }
+      nextNodeSelector[key.trim()] = value.trim();
     });
 
-    // 清理 tolerations，移除空值字段
     const cleanedTolerations = editedTolerations
-      .filter(t => t.key || t.operator === 'Exists')
-      .map(t => {
+      .filter((toleration) => toleration.key || toleration.operator === 'Exists')
+      .map((toleration) => {
         const cleaned: Toleration = {};
-        if (t.key) cleaned.key = t.key;
-        if (t.operator) cleaned.operator = t.operator;
-        if (t.operator !== 'Exists' && t.value) cleaned.value = t.value;
-        if (t.effect) cleaned.effect = t.effect;
-        if (t.tolerationSeconds !== undefined) cleaned.tolerationSeconds = t.tolerationSeconds;
+        if (toleration.key) cleaned.key = toleration.key;
+        if (toleration.operator) cleaned.operator = toleration.operator;
+        if (toleration.operator !== 'Exists' && toleration.value) cleaned.value = toleration.value;
+        if (toleration.effect) cleaned.effect = toleration.effect;
+        if (toleration.tolerationSeconds !== undefined) {
+          cleaned.tolerationSeconds = toleration.tolerationSeconds;
+        }
         return cleaned;
       });
 
     onSave({
-      nodeSelector: Object.keys(newNodeSelector).length > 0 ? newNodeSelector : undefined,
+      nodeSelector: Object.keys(nextNodeSelector).length > 0 ? nextNodeSelector : undefined,
       tolerations: cleanedTolerations.length > 0 ? cleanedTolerations : undefined,
     });
   };
 
-  if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl shadow-2xl">
-        {/* 标题 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-500/10 rounded-lg">
@@ -120,15 +122,11 @@ export default function SchedulingEditor({
             </div>
             <h3 className="text-lg font-semibold text-white">调度配置</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white transition-colors"
-          >
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab 切换 */}
         <div className="border-b border-slate-700 px-6">
           <nav className="flex gap-4">
             {[
@@ -151,21 +149,15 @@ export default function SchedulingEditor({
           </nav>
         </div>
 
-        {/* 内容 */}
         <form onSubmit={handleSubmit}>
           <div className="px-6 py-4 min-h-[300px] max-h-96 overflow-y-auto">
             {activeTab === 'nodeSelector' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-400">
-                    指定 Pod 只能调度到带有特定标签的节点上
-                  </p>
+                  <p className="text-sm text-slate-400">指定 Pod 只能调度到带有特定标签的节点上</p>
                   <button
                     type="button"
-                    onClick={() => {
-                      console.log('Adding node selector');
-                      addNodeSelector();
-                    }}
+                    onClick={addNodeSelector}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
                   >
                     <PlusIcon className="w-4 h-4" />
@@ -174,9 +166,7 @@ export default function SchedulingEditor({
                 </div>
 
                 {editedNodeSelector.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    暂无节点选择器配置
-                  </div>
+                  <div className="text-center py-8 text-slate-500">暂无节点选择器配置</div>
                 ) : (
                   <div className="space-y-3">
                     {editedNodeSelector.map((item, index) => (
@@ -184,7 +174,7 @@ export default function SchedulingEditor({
                         <input
                           type="text"
                           value={item.key}
-                          onChange={(e) => updateNodeSelector(index, 'key', e.target.value)}
+                          onChange={(event) => updateNodeSelector(index, 'key', event.target.value)}
                           placeholder="标签键"
                           className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
@@ -192,7 +182,7 @@ export default function SchedulingEditor({
                         <input
                           type="text"
                           value={item.value}
-                          onChange={(e) => updateNodeSelector(index, 'value', e.target.value)}
+                          onChange={(event) => updateNodeSelector(index, 'value', event.target.value)}
                           placeholder="标签值"
                           className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
@@ -221,15 +211,10 @@ export default function SchedulingEditor({
             {activeTab === 'tolerations' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-slate-400">
-                    允许 Pod 调度到带有特定污点的节点上
-                  </p>
+                  <p className="text-sm text-slate-400">允许 Pod 调度到带有特定污点的节点上</p>
                   <button
                     type="button"
-                    onClick={() => {
-                      console.log('Adding toleration');
-                      addToleration();
-                    }}
+                    onClick={addToleration}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
                   >
                     <PlusIcon className="w-4 h-4" />
@@ -238,9 +223,7 @@ export default function SchedulingEditor({
                 </div>
 
                 {editedTolerations.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    暂无容忍度配置
-                  </div>
+                  <div className="text-center py-8 text-slate-500">暂无容忍度配置</div>
                 ) : (
                   <div className="space-y-3">
                     {editedTolerations.map((toleration, index) => (
@@ -261,7 +244,7 @@ export default function SchedulingEditor({
                             <input
                               type="text"
                               value={toleration.key || ''}
-                              onChange={(e) => updateToleration(index, 'key', e.target.value)}
+                              onChange={(event) => updateToleration(index, 'key', event.target.value)}
                               placeholder="例: node.kubernetes.io/not-ready"
                               className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                             />
@@ -270,7 +253,7 @@ export default function SchedulingEditor({
                             <label className="block text-xs text-slate-500 mb-1">Operator</label>
                             <select
                               value={toleration.operator || 'Equal'}
-                              onChange={(e) => updateToleration(index, 'operator', e.target.value)}
+                              onChange={(event) => updateToleration(index, 'operator', event.target.value)}
                               className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                             >
                               <option value="Equal">Equal</option>
@@ -283,7 +266,7 @@ export default function SchedulingEditor({
                               <input
                                 type="text"
                                 value={toleration.value || ''}
-                                onChange={(e) => updateToleration(index, 'value', e.target.value)}
+                                onChange={(event) => updateToleration(index, 'value', event.target.value)}
                                 className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
                             </div>
@@ -292,7 +275,7 @@ export default function SchedulingEditor({
                             <label className="block text-xs text-slate-500 mb-1">Effect</label>
                             <select
                               value={toleration.effect || ''}
-                              onChange={(e) => updateToleration(index, 'effect', e.target.value)}
+                              onChange={(event) => updateToleration(index, 'effect', event.target.value)}
                               className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                             >
                               <option value="">All</option>
@@ -310,7 +293,6 @@ export default function SchedulingEditor({
             )}
           </div>
 
-          {/* 底部按钮 */}
           <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
             <button
               type="button"
@@ -330,5 +312,24 @@ export default function SchedulingEditor({
         </form>
       </div>
     </div>
+  );
+}
+
+export default function SchedulingEditor(props: SchedulingEditorProps) {
+  if (!props.isOpen) {
+    return null;
+  }
+
+  const modalKey = `${JSON.stringify(props.nodeSelector ?? {})}:${JSON.stringify(props.tolerations ?? [])}`;
+
+  return (
+    <SchedulingEditorContent
+      key={modalKey}
+      onClose={props.onClose}
+      onSave={props.onSave}
+      nodeSelector={props.nodeSelector}
+      tolerations={props.tolerations}
+      isPending={props.isPending}
+    />
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { podApi } from '../../../api';
@@ -6,13 +6,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
 import type { Pod, Event, PodPhase } from '../../../types';
-import PodTerminal from '../../../components/terminal/PodTerminal';
 import {
   ArrowLeftIcon,
   TrashIcon,
   ArrowPathIcon,
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline';
+
+const PodTerminal = lazy(() => import('../../../components/terminal/PodTerminal'));
 
 // Tab 类型
 type TabType = 'overview' | 'containers' | 'logs' | 'terminal' | 'yaml' | 'events';
@@ -77,10 +78,12 @@ export default function PodDetail() {
   });
 
   // 获取 Pod 日志
+  const effectiveSelectedContainer = selectedContainer || pod?.spec.containers[0]?.name || '';
+
   const { data: logsData, refetch: refetchLogs } = useQuery({
-    queryKey: ['pod-logs', namespace, name, selectedContainer],
-    queryFn: () => podApi.getLogs(namespace!, name!, selectedContainer, 500),
-    enabled: !!namespace && !!name && !!selectedContainer && activeTab === 'logs',
+    queryKey: ['pod-logs', namespace, name, effectiveSelectedContainer],
+    queryFn: () => podApi.getLogs(namespace!, name!, effectiveSelectedContainer, 500),
+    enabled: !!namespace && !!name && !!effectiveSelectedContainer && activeTab === 'logs',
   });
 
   // 删除 Pod
@@ -91,11 +94,6 @@ export default function PodDetail() {
       window.history.back();
     },
   });
-
-  // 设置默认容器
-  if (pod && !selectedContainer && pod.spec.containers.length > 0) {
-    setSelectedContainer(pod.spec.containers[0].name);
-  }
 
   if (isLoading) {
     return (
@@ -206,7 +204,7 @@ export default function PodDetail() {
           <LogsTab
             pod={pod}
             logs={logsData || ''}
-            selectedContainer={selectedContainer}
+            selectedContainer={effectiveSelectedContainer}
             onContainerChange={setSelectedContainer}
             onRefresh={() => refetchLogs()}
           />
@@ -224,7 +222,7 @@ export default function PodDetail() {
               <div className="flex items-center gap-4">
                 <label className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>选择容器:</label>
                 <select
-                  value={selectedContainer}
+                  value={effectiveSelectedContainer}
                   onChange={(e) => setSelectedContainer(e.target.value)}
                   className="rounded px-3 py-1.5 text-sm"
                   style={{
@@ -241,12 +239,23 @@ export default function PodDetail() {
                 </select>
               </div>
             </div>
-            {selectedContainer && (
-              <PodTerminal
-                namespace={namespace!}
-                name={name!}
-                container={selectedContainer}
-              />
+            {effectiveSelectedContainer && (
+              <Suspense
+                fallback={
+                  <div className="h-[420px] flex items-center justify-center">
+                    <div
+                      className="animate-spin rounded-full h-6 w-6 border-b-2"
+                      style={{ borderColor: 'var(--color-primary)' }}
+                    />
+                  </div>
+                }
+              >
+                <PodTerminal
+                  namespace={namespace!}
+                  name={name!}
+                  container={effectiveSelectedContainer}
+                />
+              </Suspense>
             )}
           </div>
         )}

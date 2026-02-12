@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { deploymentApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
+import { queryKeys } from '../../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
@@ -12,22 +15,26 @@ import Pagination from '../../../components/common/Pagination';
 export default function Deployments() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-
-  // 命名空间变化时重置页码
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [currentNamespace]);
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['deployments', currentNamespace],
+    queryKey: queryKeys.deployments(currentNamespace),
     queryFn: () =>
       currentNamespace === 'all'
         ? deploymentApi.listAll()
         : deploymentApi.list(currentNamespace),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
+
+  const deployments = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalItems = deployments.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const currentDeployments = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return deployments.slice(startIndex, endIndex);
+  }, [currentPage, deployments, pageSize]);
 
   if (isLoading) {
     return (
@@ -56,15 +63,6 @@ export default function Deployments() {
       </div>
     );
   }
-
-  const deployments = data?.items ?? [];
-
-  // 分页逻辑
-  const totalItems = deployments.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentDeployments = deployments.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

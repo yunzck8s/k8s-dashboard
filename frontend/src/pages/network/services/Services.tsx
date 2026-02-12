@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { serviceApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
+import { queryKeys } from '../../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import clsx from 'clsx';
-import type { Service } from '../../../types';
+import type { Service, ServiceInput } from '../../../types';
 import Pagination from '../../../components/common/Pagination';
 import ServiceForm from '../../../components/network/ServiceForm';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -15,28 +18,23 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 export default function Services() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const queryClient = useQueryClient();
 
-  // 命名空间变化时重置页码
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [currentNamespace]);
-
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['services', currentNamespace],
+    queryKey: queryKeys.services(currentNamespace),
     queryFn: () =>
       currentNamespace === 'all'
         ? serviceApi.listAll()
         : serviceApi.list(currentNamespace),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   // 创建 Service
   const createMutation = useMutation({
-    mutationFn: (service: any) => serviceApi.create(currentNamespace, service),
+    mutationFn: (service: ServiceInput) => serviceApi.create(currentNamespace, service),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
       setShowCreateModal(false);
@@ -45,6 +43,15 @@ export default function Services() {
       alert(`创建失败: ${error.message}`);
     },
   });
+
+  const services = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalItems = services.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const currentServices = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return services.slice(startIndex, endIndex);
+  }, [currentPage, pageSize, services]);
 
   if (isLoading) {
     return (
@@ -73,15 +80,6 @@ export default function Services() {
       </div>
     );
   }
-
-  const services = data?.items ?? [];
-
-  // 分页逻辑
-  const totalItems = services.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentServices = services.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

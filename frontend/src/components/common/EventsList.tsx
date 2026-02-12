@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { eventApi } from '../../api';
 import { usePollingInterval } from '../../utils/polling';
+import { queryKeys } from '../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import {
@@ -18,13 +20,15 @@ interface EventsListProps {
 
 export default function EventsList({ namespace, limit = 10, typeFilter = null }: EventsListProps) {
   const pollingInterval = usePollingInterval('standard');
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const namespaceKey = namespace ?? 'all';
   const { data, isLoading } = useQuery({
-    queryKey: ['events', namespace],
+    queryKey: queryKeys.events(namespaceKey),
     queryFn: () =>
       namespace
         ? eventApi.list(namespace, { pageSize: 100 })
         : eventApi.listAll({ pageSize: 100 }),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   if (isLoading) {

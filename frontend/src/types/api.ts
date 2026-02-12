@@ -115,9 +115,7 @@ export interface RollbackRequest {
 }
 
 // 重启请求
-export interface RestartRequest {
-  // 空对象，仅用于触发重启
-}
+export type RestartRequest = Record<string, never>;
 
 // YAML 更新请求
 export interface UpdateYamlRequest {

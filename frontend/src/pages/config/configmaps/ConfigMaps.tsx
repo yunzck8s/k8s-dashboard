@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { configMapApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
+import { queryKeys } from '../../../api/queryKeys';
+import { createVisibilityRefetchInterval } from '../../../api/queryPolicy';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import type { ConfigMapInput } from '../../../types';
 import Pagination from '../../../components/common/Pagination';
 import ConfigMapForm from '../../../components/config/ConfigMapForm';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -13,28 +17,23 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 export default function ConfigMaps() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const queryClient = useQueryClient();
 
-  // 命名空间变化时重置页码
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [currentNamespace]);
-
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['configmaps', currentNamespace],
+    queryKey: queryKeys.configMaps(currentNamespace),
     queryFn: () =>
       currentNamespace === 'all'
         ? configMapApi.listAll()
         : configMapApi.list(currentNamespace),
-    refetchInterval: pollingInterval,
+    refetchInterval,
   });
 
   // 创建 ConfigMap
   const createMutation = useMutation({
-    mutationFn: (configMap: any) => configMapApi.create(currentNamespace, configMap),
+    mutationFn: (configMap: ConfigMapInput) => configMapApi.create(currentNamespace, configMap),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['configmaps'] });
       setShowCreateModal(false);
@@ -43,6 +42,15 @@ export default function ConfigMaps() {
       alert(`创建失败: ${error.message}`);
     },
   });
+
+  const configMaps = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalItems = configMaps.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const currentConfigMaps = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return configMaps.slice(startIndex, endIndex);
+  }, [configMaps, currentPage, pageSize]);
 
   if (isLoading) {
     return (
@@ -62,15 +70,6 @@ export default function ConfigMaps() {
       </div>
     );
   }
-
-  const configMaps = data?.items ?? [];
-
-  // 分页逻辑
-  const totalItems = configMaps.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentConfigMaps = configMaps.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
