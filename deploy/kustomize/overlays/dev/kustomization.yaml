@@ -20,7 +20,7 @@ labels:
 images:
   - name: k8s-dashboard
     newName: zunshen/k8s-dashboard
-    newTag: main-a390d2a
+    newTag: main-8221f72
 
 # 副本数
 replicas:
