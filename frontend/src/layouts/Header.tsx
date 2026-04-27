@@ -59,7 +59,7 @@ export default function Header() {
   );
 
   const selectTriggerClass =
-    'flex min-h-[44px] items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-3 py-2 text-sm text-[var(--color-text-primary)] transition-colors duration-150 ease-out hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring';
+    'flex min-h-[44px] max-w-[220px] items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] px-3 py-2 text-sm text-[var(--color-text-primary)] transition-colors duration-150 ease-out hover:border-[var(--color-border-hover)] hover:bg-[var(--color-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring';
   const menuPanelClass =
     'absolute right-0 z-50 mt-2 w-56 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] shadow-lg focus:outline-none';
   const menuItemClass =
@@ -96,7 +96,7 @@ export default function Header() {
 
   return (
     <header className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-      <div className="flex h-10 items-center justify-between border-b border-divider-strong px-6">
+      <div className="flex h-10 items-center justify-between border-b border-divider-strong px-4 md:px-6">
         <div className="flex items-center gap-2 overflow-x-auto">
           <span className="inline-flex rounded-md bg-surface-emphasis px-2 py-1 text-[11px] font-semibold text-[var(--color-primary)]">
             状态中心
@@ -122,9 +122,9 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="flex h-16 items-center justify-between px-6">
+      <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
         {/* 左侧：搜索框 */}
-        <div className="flex items-center gap-4">
+        <div className="hidden items-center gap-4 lg:flex">
           <div className="relative">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--color-text-muted)]" />
             <input
@@ -140,13 +140,13 @@ export default function Header() {
         </div>
 
         {/* 右侧：操作区 */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-1 flex-wrap items-center justify-end gap-2 md:gap-3">
           {/* 集群选择器 */}
           {clusters.length > 0 && (
             <Menu as="div" className="relative">
               <Menu.Button className={selectTriggerClass} aria-label="选择集群">
                 <ServerIcon className="h-4 w-4 text-[var(--color-text-muted)]" />
-                <span className="text-sm text-[var(--color-text-primary)]">
+                <span className="truncate text-sm text-[var(--color-text-primary)]">
                   {currentCluster || '选择集群'}
                 </span>
                 <ChevronDownIcon className="h-4 w-4 text-[var(--color-text-muted)]" />
@@ -201,8 +201,8 @@ export default function Header() {
           {/* 命名空间选择器 */}
           <Menu as="div" className="relative">
             <Menu.Button className={selectTriggerClass} aria-label="选择命名空间">
-              <span className="text-sm text-[var(--color-text-muted)]">Namespace:</span>
-              <span className="text-sm text-[var(--color-text-primary)]">{currentNamespace}</span>
+              <span className="hidden text-sm text-[var(--color-text-muted)] sm:inline">Namespace:</span>
+              <span className="truncate text-sm text-[var(--color-text-primary)]">{currentNamespace}</span>
               <ChevronDownIcon className="h-4 w-4 text-[var(--color-text-muted)]" />
             </Menu.Button>
             <Transition

@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: k8s-dashboard
 data:
   # 服务器配置
-  PORT: "8080"
+  PORT: "9099"
   TZ: "Asia/Shanghai"
 
   # PostgreSQL 配置（可选；未配置时自动使用 SQLite）
@@ -23,8 +23,9 @@ data:
   ALLOW_SQLITE_FALLBACK: "true"
   MULTI_CLUSTER_ENABLED: "true"
 
-  # VictoriaMetrics 配置
-  VICTORIA_METRICS_URL: "http://vmauth-vmks-victoria-metrics-k8s-stack.victoriametrics.svc.cluster.local:8427"
+  # Alertmanager 默认关闭。启用时必须同时设置 ALERTMANAGER_URL。
+  ALERTMANAGER_ENABLED: "false"
+  ALERTMANAGER_URL: ""
 
   # 审计日志配置
   AUDIT_LOG_ENABLED: "true"

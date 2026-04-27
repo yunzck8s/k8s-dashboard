@@ -25,11 +25,11 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 9099
               protocol: TCP
           env:
             - name: PORT
-              value: "8080"
+              value: "9099"
             - name: TZ
               value: "Asia/Shanghai"
             - name: POSTGRES_DSN
@@ -53,6 +53,10 @@ spec:
             - name: MULTI_CLUSTER_ENABLED
               value: "true"
             - name: CLUSTER_ENCRYPTION_KEY
+              value: ""
+            - name: ALERTMANAGER_ENABLED
+              value: "false"
+            - name: ALERTMANAGER_URL
               value: ""
           resources:
             requests:

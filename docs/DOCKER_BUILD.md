@@ -93,21 +93,19 @@ docker pull ghcr.io/your-github-username/k8s-dashboard:1.2.3
 # 方式1：仅使用 SQLite（无需 PostgreSQL）
 docker run -d \
   --name k8s-dashboard \
-  -p 8080:8080 \
+  -p 9099:9099 \
   -v dashboard-data:/var/lib/k8s-dashboard \
   -e SQLITE_PATH=/var/lib/k8s-dashboard/dashboard.db \
   -e ALLOW_SQLITE_FALLBACK=true \
-  -e VICTORIA_METRICS_URL=http://your-vm:8428 \
-  -e ALERTMANAGER_URL=http://your-am:9093 \
+  -e ALERTMANAGER_ENABLED=false \
   -e JWT_SECRET=your-secret-key \
   your-dockerhub-username/k8s-dashboard:latest
 
 # 方式2：使用 PostgreSQL（推荐生产）
 docker run -d \
   --name k8s-dashboard \
-  -p 8080:8080 \
-  -e VICTORIA_METRICS_URL=http://your-vm:8428 \
-  -e ALERTMANAGER_URL=http://your-am:9093 \
+  -p 9099:9099 \
+  -e ALERTMANAGER_ENABLED=false \
   -e POSTGRES_DSN='postgres://postgres:your-password@your-pg-host:5432/k8s_dashboard?sslmode=disable' \
   -e POSTGRES_HOST=your-pg-host \
   -e POSTGRES_PORT=5432 \
@@ -128,12 +126,12 @@ services:
   k8s-dashboard:
     image: your-dockerhub-username/k8s-dashboard:latest
     ports:
-      - "8080:8080"
+      - "9099:9099"
     volumes:
       - dashboard-data:/var/lib/k8s-dashboard
     environment:
-      VICTORIA_METRICS_URL: http://victoria-metrics:8428
-      ALERTMANAGER_URL: http://alertmanager:9093
+      ALERTMANAGER_ENABLED: "false"
+      ALERTMANAGER_URL: ""
       SQLITE_PATH: /var/lib/k8s-dashboard/dashboard.db
       ALLOW_SQLITE_FALLBACK: "true"
       POSTGRES_HOST: postgres

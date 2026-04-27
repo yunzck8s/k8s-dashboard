@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 IMAGE_NAME="k8s-dashboard"
 TAG="${1:-local}"
 CONTAINER_NAME="k8s-dashboard-test"
-PORT=8080
+PORT=9099
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  K8s Dashboard - Docker 本地构建测试${NC}"
@@ -65,7 +65,7 @@ echo ""
 echo -e "${YELLOW}[5/5] 启动并测试容器...${NC}"
 docker run -d \
     --name "$CONTAINER_NAME" \
-    -p "${PORT}:8080" \
+    -p "${PORT}:9099" \
     "${IMAGE_NAME}:${TAG}"
 
 echo -e "${GREEN}✓ 容器已启动${NC}"

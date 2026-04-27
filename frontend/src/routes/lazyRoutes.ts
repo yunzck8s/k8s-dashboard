@@ -23,6 +23,7 @@ const statefulSetDetailRoute = createLazyRoute(
 );
 const daemonSetsRoute = createLazyRoute(() => import('../pages/workloads/daemonsets/DaemonSets'));
 const daemonSetDetailRoute = createLazyRoute(() => import('../pages/workloads/daemonsets/DaemonSetDetail'));
+const replicaSetsRoute = createLazyRoute(() => import('../pages/workloads/replicasets/ReplicaSets'));
 const jobsRoute = createLazyRoute(() => import('../pages/workloads/jobs/Jobs'));
 const jobDetailRoute = createLazyRoute(() => import('../pages/workloads/jobs/JobDetail'));
 const cronJobsRoute = createLazyRoute(() => import('../pages/workloads/jobs/CronJobs'));
@@ -71,6 +72,7 @@ export const lazyRoutes = {
   StatefulSetDetail: statefulSetDetailRoute.Component,
   DaemonSets: daemonSetsRoute.Component,
   DaemonSetDetail: daemonSetDetailRoute.Component,
+  ReplicaSets: replicaSetsRoute.Component,
   Jobs: jobsRoute.Component,
   JobDetail: jobDetailRoute.Component,
   CronJobs: cronJobsRoute.Component,
@@ -113,6 +115,7 @@ const routePreloaders: Record<string, RouteImporter[]> = {
   '/workloads/deployments': [deploymentsRoute.preload, deploymentDetailRoute.preload],
   '/workloads/statefulsets': [statefulSetsRoute.preload, statefulSetDetailRoute.preload],
   '/workloads/daemonsets': [daemonSetsRoute.preload, daemonSetDetailRoute.preload],
+  '/workloads/replicasets': [replicaSetsRoute.preload],
   '/workloads/jobs': [jobsRoute.preload, jobDetailRoute.preload],
   '/workloads/cronjobs': [cronJobsRoute.preload, cronJobDetailRoute.preload],
   '/network/services': [servicesRoute.preload, serviceDetailRoute.preload],

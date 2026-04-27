@@ -73,7 +73,7 @@ export const useAppStore = create<AppState>()(
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 
       // 主题
-      theme: 'light',
+      theme: 'dark',
       toggleTheme: () =>
         set((state) => ({
           theme: state.theme === 'dark' ? 'light' : 'dark',

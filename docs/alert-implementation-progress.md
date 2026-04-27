@@ -708,7 +708,7 @@ export function useAlertWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8080/api/v1/ws/alerts');
+    const ws = new WebSocket('ws://localhost:9099/api/v1/ws/alerts');
 
     ws.onopen = () => {
       setIsConnected(true);
@@ -840,16 +840,16 @@ describe('AlertsActive', () => {
 
 ```bash
 # 获取告警列表
-curl http://localhost:8080/api/v1/alerts
+curl http://localhost:9099/api/v1/alerts
 
 # 确认告警
-curl -X POST http://localhost:8080/api/v1/alerts/abc123/acknowledge \
+curl -X POST http://localhost:9099/api/v1/alerts/abc123/acknowledge \
   -H "Content-Type: application/json" \
   -H "X-User-Name: admin" \
   -d '{"comment": "已处理"}'
 
 # 创建静默规则
-curl -X POST http://localhost:8080/api/v1/silences \
+curl -X POST http://localhost:9099/api/v1/silences \
   -H "Content-Type: application/json" \
   -H "X-User-Name: admin" \
   -d '{

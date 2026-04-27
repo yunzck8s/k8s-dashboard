@@ -12,5 +12,6 @@ data:
   POSTGRES_HOST: "pgsql-postgresql.middle.svc.cluster.local"
   POSTGRES_DB: "k8s_dashboard"
 
-  # 开发环境 VictoriaMetrics
-  VICTORIA_METRICS_URL: "http://vmauth-vmks-victoria-metrics-k8s-stack.victoriametrics.svc.cluster.local:8427"
+  # 开发环境 Alertmanager 默认关闭
+  ALERTMANAGER_ENABLED: "false"
+  ALERTMANAGER_URL: ""

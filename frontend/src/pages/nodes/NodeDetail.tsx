@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { nodeApi } from '../../api';
@@ -17,34 +17,114 @@ import {
 
 type TabType = 'overview' | 'pods' | 'yaml' | 'metrics';
 
+// ─── useMountAnimation ────────────────────────────────────────────────────────
+
+function useMountAnimation(delayMs = 80) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), delayMs);
+    return () => clearTimeout(t);
+  }, [delayMs]);
+  return mounted;
+}
+
+// ─── GaugeRing ────────────────────────────────────────────────────────────────
+
+function GaugeRing({
+  pct,
+  label,
+  sublabel,
+  color,
+}: {
+  pct: number;
+  label: string;
+  sublabel: string;
+  color: string;
+}) {
+  const mounted = useMountAnimation(150);
+  const radius = 40;
+  const circ = 2 * Math.PI * radius;
+  const offset = circ - (Math.min(pct, 100) / 100) * circ;
+  const ringColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : color;
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative grid h-28 w-28 place-items-center">
+        <svg viewBox="0 0 96 96" className="h-28 w-28 -rotate-90">
+          <circle cx="48" cy="48" r={radius} fill="none" stroke="rgba(30,41,59,.95)" strokeWidth="8" />
+          <circle
+            cx="48"
+            cy="48"
+            r={radius}
+            fill="none"
+            stroke={ringColor}
+            strokeDasharray={circ}
+            strokeDashoffset={mounted ? offset : circ}
+            strokeLinecap="round"
+            strokeWidth="8"
+            style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1), stroke 0.3s' }}
+          />
+        </svg>
+        <div className="absolute text-center">
+          <div className="font-mono text-2xl font-semibold text-white">{pct.toFixed(0)}<span className="text-sm text-slate-400">%</span></div>
+        </div>
+      </div>
+      <div className="text-center">
+        <div className="text-sm font-medium text-slate-200">{label}</div>
+        <div className="mt-0.5 font-mono text-xs text-slate-500">{sublabel}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── InfoRow ──────────────────────────────────────────────────────────────────
+
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-slate-800/60 py-2.5 last:border-0">
+      <dt className="shrink-0 text-xs text-slate-500">{label}</dt>
+      <dd className={clsx('text-right text-xs text-slate-200 break-all', mono && 'font-mono')}>{value}</dd>
+    </div>
+  );
+}
+
+// ─── SectionCard ──────────────────────────────────────────────────────────────
+
+function SectionCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-slate-700/80 bg-slate-900/65 p-5 transition-colors duration-200 hover:border-slate-700/50 ${className}`}>
+      <h3 className="mb-3 text-sm font-semibold text-slate-300">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+// ─── NodeDetail ───────────────────────────────────────────────────────────────
+
 export default function NodeDetail() {
   const { name } = useParams<{ name: string }>();
   const pollingInterval = usePollingInterval('standard');
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const queryClient = useQueryClient();
 
-  // 获取节点详情
-  const { data: node, isLoading, error, refetch } = useQuery({
+  const { data: node, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['node', name],
     queryFn: () => nodeApi.get(name!),
     enabled: !!name,
   });
 
-  // 获取节点 YAML
   const { data: yamlData } = useQuery({
     queryKey: ['node-yaml', name],
     queryFn: () => nodeApi.getYaml(name!),
     enabled: !!name && activeTab === 'yaml',
   });
 
-  // 获取节点上的 Pods
   const { data: podsData } = useQuery({
     queryKey: ['node-pods', name],
     queryFn: () => nodeApi.getPods(name!),
     enabled: !!name && activeTab === 'pods',
   });
 
-  // 获取节点指标
   const { data: metricsData } = useQuery({
     queryKey: ['node-metrics', name],
     queryFn: () => nodeApi.getMetrics(name!),
@@ -52,54 +132,40 @@ export default function NodeDetail() {
     refetchInterval: pollingInterval,
   });
 
-  // Cordon 节点
   const cordonMutation = useMutation({
     mutationFn: () => nodeApi.cordon(name!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['node', name] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['node', name] }),
   });
 
-  // Uncordon 节点
   const uncordonMutation = useMutation({
     mutationFn: () => nodeApi.uncordon(name!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['node', name] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['node', name] }),
   });
 
-  // Drain 节点
   const drainMutation = useMutation({
     mutationFn: () => nodeApi.drain(name!, { force: true, gracePeriod: 30 }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['node', name] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['node', name] }),
   });
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div
-          className="animate-spin rounded-full h-8 w-8 border-b-2"
-          style={{ borderColor: 'var(--color-primary)' }}
-        />
+      <div className="space-y-5 text-slate-100">
+        <div className="flex items-center gap-4">
+          <div className="h-9 w-9 rounded-lg skeleton" />
+          <div className="h-8 w-48 rounded-lg skeleton" />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-40 rounded-xl skeleton" />)}
+        </div>
       </div>
     );
   }
 
   if (error || !node) {
     return (
-      <div
-        className="p-6 text-center rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <p style={{ color: '#F87171' }}>加载失败：{(error as Error)?.message || '节点不存在'}</p>
-        <button onClick={() => refetch()} className="btn btn-primary mt-4">
-          重试
-        </button>
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-400/20 bg-rose-400/5 py-16 text-center">
+        <p className="text-rose-300">加载失败：{(error as Error)?.message ?? '节点不存在'}</p>
+        <button onClick={() => refetch()} className="btn btn-secondary btn-sm">重试</button>
       </div>
     );
   }
@@ -111,58 +177,69 @@ export default function NodeDetail() {
     { id: 'yaml', label: 'YAML' },
   ];
 
-  // 检查节点是否就绪
-  const isReady = node.status.conditions?.some(
-    (c) => c.type === 'Ready' && c.status === 'True'
-  );
-
-  // 检查节点是否被 cordon
+  const isReady = node.status.conditions?.some((c) => c.type === 'Ready' && c.status === 'True');
   const isUnschedulable = node.spec.unschedulable;
 
   return (
-    <div className="space-y-6">
-      {/* 页面头部 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/nodes" className="btn btn-secondary p-2">
-            <ArrowLeftIcon className="w-5 h-5" />
+    <div className="space-y-5 text-slate-100">
+      {/* 头部 */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-4">
+          <Link to="/nodes" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/60 text-slate-400 transition-colors hover:border-slate-600/80 hover:text-slate-200">
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">{name}</h1>
-              <span className={clsx('badge', isReady ? 'badge-success' : 'badge-error')}>
-                {isReady ? 'Ready' : 'NotReady'}
-              </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold text-slate-100">{name}</h1>
+              {/* 状态点 */}
+              {isReady ? (
+                <>
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                  </span>
+                  <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-xs text-emerald-300">Ready</span>
+                </>
+              ) : (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-rose-400" />
+                  <span className="rounded-full bg-rose-400/10 px-2 py-0.5 text-xs text-rose-300">NotReady</span>
+                </>
+              )}
               {isUnschedulable && (
-                <span className="badge badge-warning">SchedulingDisabled</span>
+                <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs text-amber-300">Cordoned</span>
               )}
             </div>
-            <p className="mt-1 text-[var(--color-text-secondary)]">
-              {node.status.nodeInfo?.kubeletVersion} | {node.status.nodeInfo?.osImage}
+            <p className="mt-1 font-mono text-xs text-slate-500">
+              {node.status.nodeInfo?.kubeletVersion} · {node.status.nodeInfo?.osImage}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => refetch()} className="btn btn-secondary">
-            <ArrowPathIcon className="w-4 h-4 mr-2" />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => refetch()}
+            className="btn btn-secondary btn-sm flex items-center gap-2"
+          >
+            <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
             刷新
           </button>
           {isUnschedulable ? (
             <button
               onClick={() => uncordonMutation.mutate()}
-              className="btn btn-primary"
+              className="btn btn-primary btn-sm flex items-center gap-2"
               disabled={uncordonMutation.isPending}
             >
-              <ShieldCheckIcon className="w-4 h-4 mr-2" />
+              <ShieldCheckIcon className="h-4 w-4" />
               Uncordon
             </button>
           ) : (
             <button
               onClick={() => cordonMutation.mutate()}
-              className="btn btn-warning"
+              className="btn btn-warning btn-sm flex items-center gap-2"
               disabled={cordonMutation.isPending}
             >
-              <ShieldExclamationIcon className="w-4 h-4 mr-2" />
+              <ShieldExclamationIcon className="h-4 w-4" />
               Cordon
             </button>
           )}
@@ -172,7 +249,7 @@ export default function NodeDetail() {
                 drainMutation.mutate();
               }
             }}
-            className="btn btn-danger"
+            className="btn btn-danger btn-sm"
             disabled={drainMutation.isPending}
           >
             Drain
@@ -180,222 +257,155 @@ export default function NodeDetail() {
         </div>
       </div>
 
-      {/* 标签页导航 */}
-      <div style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <nav className="flex gap-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors duration-150',
-                activeTab === tab.id
-                  ? 'border-current'
-                  : 'border-transparent'
-              )}
-              style={{
-                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                borderColor: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+      {/* Tab 导航 */}
+      <div className="flex gap-1 rounded-xl border border-slate-700/80 bg-slate-900/60 p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={clsx(
+              'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150',
+              activeTab === tab.id
+                ? 'bg-slate-800 text-slate-100 shadow-sm'
+                : 'text-slate-500 hover:text-slate-300'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* 标签页内容 */}
-      <div>
-        {activeTab === 'overview' && <OverviewTab node={node} />}
-        {activeTab === 'pods' && <PodsTab pods={podsData?.items || []} />}
-        {activeTab === 'metrics' && <MetricsTab metrics={metricsData} />}
-        {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-      </div>
+      {/* Tab 内容 */}
+      {activeTab === 'overview' && <OverviewTab node={node} />}
+      {activeTab === 'pods' && <PodsTab pods={podsData?.items ?? []} />}
+      {activeTab === 'metrics' && <MetricsTab metrics={metricsData} />}
+      {activeTab === 'yaml' && <YamlTab yaml={yamlData ?? ''} />}
     </div>
   );
 }
 
-// 概览标签页
+// ─── OverviewTab ──────────────────────────────────────────────────────────────
+
 function OverviewTab({ node }: { node: Node }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* 基本信息 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">基本信息</h3>
-        <dl className="space-y-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <SectionCard title="基本信息">
+        <dl>
           <InfoRow label="名称" value={node.metadata.name} />
           <InfoRow label="UID" value={node.metadata.uid} mono />
           <InfoRow
             label="创建时间"
-            value={formatDistanceToNow(new Date(node.metadata.creationTimestamp), {
-              addSuffix: true,
-              locale: zhCN,
-            })}
+            value={formatDistanceToNow(new Date(node.metadata.creationTimestamp), { addSuffix: true, locale: zhCN })}
           />
-          <InfoRow label="Pod CIDR" value={node.spec.podCIDR || '-'} />
-          <InfoRow label="Provider ID" value={node.spec.providerID || '-'} mono />
+          <InfoRow label="Pod CIDR" value={node.spec.podCIDR ?? '-'} />
+          <InfoRow label="Provider ID" value={node.spec.providerID ?? '-'} mono />
         </dl>
-      </div>
+      </SectionCard>
 
-      {/* 系统信息 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">系统信息</h3>
-        <dl className="space-y-3">
-          <InfoRow label="操作系统" value={node.status.nodeInfo?.osImage || '-'} />
-          <InfoRow label="内核版本" value={node.status.nodeInfo?.kernelVersion || '-'} />
-          <InfoRow label="容器运行时" value={node.status.nodeInfo?.containerRuntimeVersion || '-'} />
-          <InfoRow label="Kubelet 版本" value={node.status.nodeInfo?.kubeletVersion || '-'} />
-          <InfoRow label="Kube-Proxy 版本" value={node.status.nodeInfo?.kubeProxyVersion || '-'} />
-          <InfoRow label="架构" value={node.status.nodeInfo?.architecture || '-'} />
+      <SectionCard title="系统信息">
+        <dl>
+          <InfoRow label="操作系统" value={node.status.nodeInfo?.osImage ?? '-'} />
+          <InfoRow label="内核版本" value={node.status.nodeInfo?.kernelVersion ?? '-'} mono />
+          <InfoRow label="容器运行时" value={node.status.nodeInfo?.containerRuntimeVersion ?? '-'} mono />
+          <InfoRow label="Kubelet 版本" value={node.status.nodeInfo?.kubeletVersion ?? '-'} mono />
+          <InfoRow label="Kube-Proxy" value={node.status.nodeInfo?.kubeProxyVersion ?? '-'} mono />
+          <InfoRow label="架构" value={node.status.nodeInfo?.architecture ?? '-'} />
         </dl>
-      </div>
+      </SectionCard>
 
-      {/* 资源容量 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">资源容量</h3>
-        <dl className="space-y-3">
-          <InfoRow label="CPU" value={node.status.capacity?.cpu || '-'} />
-          <InfoRow label="内存" value={formatMemory(node.status.capacity?.memory)} />
-          <InfoRow label="存储" value={formatMemory(node.status.capacity?.['ephemeral-storage'])} />
-          <InfoRow label="Pods" value={node.status.capacity?.pods || '-'} />
-        </dl>
-      </div>
-
-      {/* 可分配资源 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">可分配资源</h3>
-        <dl className="space-y-3">
-          <InfoRow label="CPU" value={node.status.allocatable?.cpu || '-'} />
-          <InfoRow label="内存" value={formatMemory(node.status.allocatable?.memory)} />
-          <InfoRow label="存储" value={formatMemory(node.status.allocatable?.['ephemeral-storage'])} />
-          <InfoRow label="Pods" value={node.status.allocatable?.pods || '-'} />
-        </dl>
-      </div>
-
-      {/* 地址 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">地址</h3>
-        <dl className="space-y-3">
+      <SectionCard title="地址">
+        <dl>
           {node.status.addresses?.map((addr) => (
             <InfoRow key={addr.type} label={addr.type} value={addr.address} mono />
           ))}
         </dl>
-      </div>
+      </SectionCard>
 
-      {/* 标签 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">标签</h3>
-        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-          {Object.entries(node.metadata.labels || {}).map(([key, value]) => (
-            <span key={key} className="badge badge-default text-xs">
-              {key}: {value}
+      <SectionCard title="资源">
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <p className="mb-2 text-[11px] uppercase tracking-wider text-slate-500">容量</p>
+            <dl>
+              <InfoRow label="CPU" value={node.status.capacity?.cpu ?? '-'} />
+              <InfoRow label="内存" value={formatMemory(node.status.capacity?.memory)} />
+              <InfoRow label="存储" value={formatMemory(node.status.capacity?.['ephemeral-storage'])} />
+              <InfoRow label="Pods" value={node.status.capacity?.pods ?? '-'} />
+            </dl>
+          </div>
+          <div>
+            <p className="mb-2 text-[11px] uppercase tracking-wider text-slate-500">可分配</p>
+            <dl>
+              <InfoRow label="CPU" value={node.status.allocatable?.cpu ?? '-'} />
+              <InfoRow label="内存" value={formatMemory(node.status.allocatable?.memory)} />
+              <InfoRow label="存储" value={formatMemory(node.status.allocatable?.['ephemeral-storage'])} />
+              <InfoRow label="Pods" value={node.status.allocatable?.pods ?? '-'} />
+            </dl>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="标签">
+        <div className="flex max-h-36 flex-wrap gap-1.5 overflow-y-auto">
+          {Object.entries(node.metadata.labels ?? {}).map(([key, value]) => (
+            <span key={key} className="rounded-md bg-slate-800/80 px-2 py-0.5 font-mono text-[11px] text-slate-400">
+              {key}={value}
             </span>
           ))}
         </div>
-      </div>
+      </SectionCard>
 
-      {/* 污点 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">污点 (Taints)</h3>
-        <div className="space-y-2">
-          {node.spec.taints?.map((taint, idx) => (
-            <div key={idx} className="badge badge-warning text-xs">
-              {taint.key}={taint.value}:{taint.effect}
-            </div>
-          )) || <span className="text-[var(--color-text-muted)]">无污点</span>}
-        </div>
-      </div>
+      <SectionCard title="污点 (Taints)">
+        {(node.spec.taints?.length ?? 0) > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {node.spec.taints?.map((taint, idx) => (
+              <span key={idx} className="rounded-md bg-amber-400/10 px-2 py-0.5 font-mono text-[11px] text-amber-300 ring-1 ring-amber-400/20">
+                {taint.key}={taint.value ?? ''}:{taint.effect}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">无污点</p>
+        )}
+      </SectionCard>
 
-      {/* 条件状态 */}
-      <div
-        className="p-6 lg:col-span-2 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">条件状态</h3>
+      {/* 条件状态 全宽 */}
+      <SectionCard title="条件状态" className="lg:col-span-2">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-sm text-[var(--color-text-muted)]">
-                <th className="pb-3">类型</th>
-                <th className="pb-3">状态</th>
-                <th className="pb-3">原因</th>
-                <th className="pb-3">消息</th>
-                <th className="pb-3">最后心跳</th>
+              <tr className="border-b border-slate-800">
+                {['类型', '状态', '原因', '消息', '最后心跳'].map((h) => (
+                  <th key={h} className="pb-2 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 last:pr-0">
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="text-sm">
+            <tbody>
               {node.status.conditions?.map((condition) => (
-                <tr key={condition.type} style={{ borderTop: '1px solid var(--color-border)' }}>
-                  <td className="py-3 text-[var(--color-text-secondary)]">{condition.type}</td>
-                  <td className="py-3">
+                <tr key={condition.type} className="border-b border-slate-800/50 transition-colors hover:bg-slate-800/30">
+                  <td className="py-2.5 pr-4 text-xs text-slate-300">{condition.type}</td>
+                  <td className="py-2.5 pr-4">
                     <span
                       className={clsx(
-                        'badge',
+                        'rounded-full px-2 py-0.5 text-[11px]',
                         condition.type === 'Ready'
                           ? condition.status === 'True'
-                            ? 'badge-success'
-                            : 'badge-error'
+                            ? 'bg-emerald-400/10 text-emerald-300'
+                            : 'bg-rose-400/10 text-rose-300'
                           : condition.status === 'False'
-                          ? 'badge-success'
-                          : 'badge-warning'
+                          ? 'bg-emerald-400/10 text-emerald-300'
+                          : 'bg-amber-400/10 text-amber-300'
                       )}
                     >
                       {condition.status}
                     </span>
                   </td>
-                  <td className="py-3 text-[var(--color-text-muted)]">{condition.reason || '-'}</td>
-                  <td className="py-3 max-w-xs truncate text-[var(--color-text-muted)]">{condition.message || '-'}</td>
-                  <td className="py-3 text-[var(--color-text-muted)]">
+                  <td className="py-2.5 pr-4 text-xs text-slate-500">{condition.reason ?? '-'}</td>
+                  <td className="max-w-xs py-2.5 pr-4 text-xs text-slate-500 truncate">{condition.message ?? '-'}</td>
+                  <td className="py-2.5 text-xs text-slate-500">
                     {condition.lastHeartbeatTime
-                      ? formatDistanceToNow(new Date(condition.lastHeartbeatTime), {
-                          addSuffix: true,
-                          locale: zhCN,
-                        })
+                      ? formatDistanceToNow(new Date(condition.lastHeartbeatTime), { addSuffix: true, locale: zhCN })
                       : '-'}
                   </td>
                 </tr>
@@ -403,92 +413,68 @@ function OverviewTab({ node }: { node: Node }) {
             </tbody>
           </table>
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }
 
-// Pods 标签页
+// ─── PodsTab ──────────────────────────────────────────────────────────────────
+
 function PodsTab({ pods }: { pods: Pod[] }) {
-  // 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
-  const getPodStatusColor = (pod: Pod): string => {
+  const getPodBadge = (pod: Pod) => {
     const phase = pod.status.phase;
-
-    // 对于 Running 状态，检查容器是否真的准备好
     if (phase === 'Running') {
-      const containerStatuses = pod.status.containerStatuses ?? [];
-      const ready = containerStatuses.filter((cs) => cs.ready).length;
-      const total = containerStatuses.length;
-
-      // 如果不是所有容器都 ready，显示为警告状态（黄色）
-      if (total > 0 && ready < total) {
-        return 'badge-warning';
-      }
-
-      // 所有容器都 ready，显示为成功状态（绿色）
-      return 'badge-success';
+      const cs = pod.status.containerStatuses ?? [];
+      const ready = cs.filter((c) => c.ready).length;
+      if (cs.length > 0 && ready < cs.length) return { cls: 'bg-amber-400/10 text-amber-300', label: 'Running' };
+      return { cls: 'bg-emerald-400/10 text-emerald-300', label: 'Running' };
     }
-
-    // 其他状态
-    if (phase === 'Succeeded') return 'badge-info';
-    if (phase === 'Failed') return 'badge-error';
-    if (phase === 'Pending') return 'badge-warning';
-    return 'badge-default';
+    if (phase === 'Succeeded') return { cls: 'bg-blue-400/10 text-blue-300', label: 'Succeeded' };
+    if (phase === 'Failed') return { cls: 'bg-rose-400/10 text-rose-300', label: 'Failed' };
+    if (phase === 'Pending') return { cls: 'bg-amber-400/10 text-amber-300', label: 'Pending' };
+    return { cls: 'bg-slate-700/50 text-slate-400', label: phase ?? 'Unknown' };
   };
 
   return (
-    <div
-      className="overflow-hidden rounded-xl"
-      style={{
-        background: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-      }}
-    >
-      <div className="table-container">
-        <table>
+    <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+      <div className="overflow-x-auto">
+        <table className="w-full">
           <thead>
-            <tr>
-              <th>名称</th>
-              <th>命名空间</th>
-              <th>状态</th>
-              <th>Ready</th>
-              <th>重启</th>
-              <th>IP</th>
-              <th>创建时间</th>
+            <tr className="border-b border-slate-800 bg-slate-950/60">
+              {['名称', '命名空间', '状态', 'Ready', '重启', 'IP', '创建时间'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {pods.map((pod) => {
-              const ready = pod.status.containerStatuses?.filter((c) => c.ready).length || 0;
-              const total = pod.status.containerStatuses?.length || 0;
-              const restarts = pod.status.containerStatuses?.reduce((sum, c) => sum + c.restartCount, 0) || 0;
+              const ready = pod.status.containerStatuses?.filter((c) => c.ready).length ?? 0;
+              const total = pod.status.containerStatuses?.length ?? 0;
+              const restarts = pod.status.containerStatuses?.reduce((s, c) => s + c.restartCount, 0) ?? 0;
+              const badge = getPodBadge(pod);
               return (
-                <tr key={pod.metadata.uid}>
-                  <td>
+                <tr key={pod.metadata.uid} className="border-b border-slate-800/50 transition-colors hover:bg-slate-800/40">
+                  <td className="px-4 py-3">
                     <Link
                       to={`/workloads/pods/${pod.metadata.namespace}/${pod.metadata.name}`}
-                      className="transition-colors"
-                      style={{ color: 'var(--color-primary)' }}
+                      className="text-sm text-blue-400 transition-colors hover:text-blue-300"
                     >
                       {pod.metadata.name}
                     </Link>
                   </td>
-                  <td>
-                    <span className="badge badge-default">{pod.metadata.namespace}</span>
+                  <td className="px-4 py-3">
+                    <span className="rounded-md bg-slate-800/80 px-2 py-0.5 text-[11px] text-slate-400">{pod.metadata.namespace}</span>
                   </td>
-                  <td>
-                    <span className={clsx('badge', getPodStatusColor(pod))}>
-                      {pod.status.phase}
-                    </span>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${badge.cls}`}>{badge.label}</span>
                   </td>
-                  <td>{ready}/{total}</td>
-                  <td>{restarts}</td>
-                  <td className="font-mono text-sm text-[var(--color-text-muted)]">{pod.status.podIP || '-'}</td>
-                  <td className="text-[var(--color-text-muted)]">
-                    {formatDistanceToNow(new Date(pod.metadata.creationTimestamp), {
-                      addSuffix: true,
-                      locale: zhCN,
-                    })}
+                  <td className="px-4 py-3 font-mono text-xs text-slate-300">{ready}/{total}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-400">{restarts}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500">{pod.status.podIP ?? '-'}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">
+                    {formatDistanceToNow(new Date(pod.metadata.creationTimestamp), { addSuffix: true, locale: zhCN })}
                   </td>
                 </tr>
               );
@@ -497,161 +483,73 @@ function PodsTab({ pods }: { pods: Pod[] }) {
         </table>
       </div>
       {pods.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-muted)]">此节点上暂无 Pods</div>
+        <div className="py-12 text-center text-sm text-slate-500">此节点上暂无 Pods</div>
       )}
     </div>
   );
 }
 
-// 指标标签页
+// ─── MetricsTab ───────────────────────────────────────────────────────────────
+
 function MetricsTab({ metrics }: { metrics?: NodeMetrics }) {
   if (!metrics) {
     return (
-      <div
-        className="p-6 text-center rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <p className="text-[var(--color-text-muted)]">暂无指标数据</p>
+      <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900/40 py-16 text-sm text-slate-500">
+        暂无指标数据
       </div>
     );
   }
 
-  const cpuPercentage = metrics.cpu?.percentage || 0;
-  const memoryPercentage = metrics.memory?.percentage || 0;
-  const cpuUsage = metrics.cpu?.usage || 0;
-  const cpuCapacity = metrics.cpu?.capacity || 1;
-  const memoryUsage = metrics.memory?.usage || 0;
-  const memoryCapacity = metrics.memory?.capacity || 1;
+  const cpuPct = metrics.cpu?.percentage ?? 0;
+  const memPct = metrics.memory?.percentage ?? 0;
+  const cpuUsage = metrics.cpu?.usage ?? 0;
+  const cpuCap = metrics.cpu?.capacity ?? 1;
+  const memUsage = metrics.memory?.usage ?? 0;
+  const memCap = metrics.memory?.capacity ?? 1;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">CPU 使用率</h3>
-        <div className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
-          {cpuPercentage.toFixed(1)}%
-        </div>
-        <div className="text-sm text-[var(--color-text-muted)]">
-          <div className="flex justify-between mb-1">
-            <span>使用量:</span>
-            <span className="font-mono">{(cpuUsage / 1000).toFixed(2)} cores</span>
-          </div>
-          <div className="flex justify-between">
-            <span>总容量:</span>
-            <span className="font-mono">{(cpuCapacity / 1000).toFixed(2)} cores</span>
-          </div>
-        </div>
-        <div
-          className="w-full rounded-full h-2 mt-4"
-          style={{ background: 'var(--color-bg-tertiary)' }}
-        >
-          <div
-            className="h-2 rounded-full transition-all duration-300"
-            style={{
-              width: `${Math.min(cpuPercentage, 100)}%`,
-              background: 'var(--color-primary)',
-            }}
-          />
-        </div>
-      </div>
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">内存使用率</h3>
-        <div className="text-4xl font-bold mb-4" style={{ color: '#10B981' }}>
-          {memoryPercentage.toFixed(1)}%
-        </div>
-        <div className="text-sm text-[var(--color-text-muted)]">
-          <div className="flex justify-between mb-1">
-            <span>使用量:</span>
-            <span className="font-mono">{(memoryUsage / 1024 / 1024 / 1024).toFixed(2)} GB</span>
-          </div>
-          <div className="flex justify-between">
-            <span>总容量:</span>
-            <span className="font-mono">{(memoryCapacity / 1024 / 1024 / 1024).toFixed(2)} GB</span>
-          </div>
-        </div>
-        <div
-          className="w-full rounded-full h-2 mt-4"
-          style={{ background: 'var(--color-bg-tertiary)' }}
-        >
-          <div
-            className="h-2 rounded-full transition-all duration-300"
-            style={{
-              width: `${Math.min(memoryPercentage, 100)}%`,
-              background: '#10B981',
-            }}
-          />
-        </div>
-      </div>
+    <div className="flex flex-wrap justify-center gap-12 rounded-xl border border-slate-700/80 bg-slate-900/65 p-8">
+      <GaugeRing
+        pct={cpuPct}
+        label="CPU 使用率"
+        sublabel={`${(cpuUsage / 1000).toFixed(2)} / ${(cpuCap / 1000).toFixed(2)} cores`}
+        color="#3b82f6"
+      />
+      <GaugeRing
+        pct={memPct}
+        label="内存使用率"
+        sublabel={`${(memUsage / 1024 ** 3).toFixed(2)} / ${(memCap / 1024 ** 3).toFixed(2)} GB`}
+        color="#a855f7"
+      />
     </div>
   );
 }
 
-// YAML 标签页
-function YamlTab({ yaml }: { yaml: string }) {
-  const copyYaml = () => {
-    navigator.clipboard.writeText(yaml);
-  };
+// ─── YamlTab ──────────────────────────────────────────────────────────────────
 
+function YamlTab({ yaml }: { yaml: string }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={copyYaml} className="btn btn-secondary">
-          <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
+        <button
+          onClick={() => navigator.clipboard.writeText(yaml)}
+          className="btn btn-secondary btn-sm flex items-center gap-2"
+        >
+          <ClipboardDocumentIcon className="h-4 w-4" />
           复制 YAML
         </button>
       </div>
-      <div
-        className="p-4 rounded-xl max-h-[600px] overflow-auto"
-        style={{
-          background: 'var(--color-bg-tertiary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <pre className="text-sm font-mono text-[var(--color-text-secondary)]">
-          {yaml || '加载中...'}
-        </pre>
+      <div className="max-h-[600px] overflow-auto rounded-xl border border-slate-700/80 bg-slate-950/60 p-5">
+        <pre className="font-mono text-xs leading-relaxed text-slate-300">{yaml || '加载中...'}</pre>
       </div>
     </div>
   );
 }
 
-// 信息行组件
-function InfoRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex justify-between">
-      <dt className="text-[var(--color-text-muted)]">{label}</dt>
-      <dd className={clsx(mono && 'font-mono text-sm')} style={{ color: 'var(--color-text-secondary)' }}>{value}</dd>
-    </div>
-  );
-}
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-// 格式化内存
 function formatMemory(value?: string): string {
   if (!value) return '-';
-  const num = parseInt(value);
-  if (isNaN(num)) return value;
   if (value.endsWith('Ki')) {
     const ki = parseInt(value);
     if (ki > 1024 * 1024) return `${(ki / 1024 / 1024).toFixed(1)} Gi`;

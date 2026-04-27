@@ -143,7 +143,10 @@ func (c *Client) GetClusterMetrics() (*ClusterMetrics, error) {
 
 	// CPU 使用量 (cores)
 	cpuUsedResp, err := c.Query(`sum(rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]))`)
-	if err == nil && len(cpuUsedResp.Data.Result) > 0 {
+	if err != nil {
+		return nil, err
+	}
+	if len(cpuUsedResp.Data.Result) > 0 {
 		if val, ok := cpuUsedResp.Data.Result[0].Value[1].(string); ok {
 			fmt.Sscanf(val, "%f", &metrics.CPU.Used)
 		}

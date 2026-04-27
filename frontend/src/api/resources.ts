@@ -20,8 +20,6 @@ import type {
   StorageClass,
   Node,
   Namespace,
-  ResourceQuota,
-  LimitRange,
   Event,
   Role,
   ClusterRole,
@@ -33,6 +31,7 @@ import type {
   ListResponse,
   ClusterOverview,
   NodeMetrics,
+  NodeMetricSummaryList,
   PodMetrics,
   ListParams,
   ScaleRequest,
@@ -68,7 +67,6 @@ export const namespaceApi = {
     get<ListResponse<Namespace>>('/namespaces', buildParams(params)),
   get: (name: string) => get<Namespace>(`/namespaces/${name}`),
   create: (data: Namespace) => post<Namespace>('/namespaces', data),
-  update: (name: string, data: Namespace) => put<Namespace>(`/namespaces/${name}`, data),
   delete: (name: string) => del<void>(`/namespaces/${name}`),
 };
 
@@ -85,7 +83,7 @@ export const podApi = {
   getYaml: (namespace: string, name: string) =>
     get<string>(`/namespaces/${namespace}/pods/${name}/yaml`),
   getMetrics: (namespace: string, name: string) =>
-    get<PodMetrics>(`/namespaces/${namespace}/pods/${name}/metrics`),
+    get<PodMetrics>(`/metrics/pods/${namespace}/${name}`),
   getEvents: (namespace: string, name: string) =>
     get<ListResponse<Event>>(`/namespaces/${namespace}/pods/${name}/events`),
   getLogs: (namespace: string, name: string, container: string, tailLines: number = 500) =>
@@ -144,10 +142,6 @@ export const statefulSetApi = {
     get<ListResponse<StatefulSet>>('/statefulsets', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<StatefulSet>(`/namespaces/${namespace}/statefulsets/${name}`),
-  create: (namespace: string, data: StatefulSet) =>
-    post<StatefulSet>(`/namespaces/${namespace}/statefulsets`, data),
-  update: (namespace: string, name: string, data: StatefulSet) =>
-    put<StatefulSet>(`/namespaces/${namespace}/statefulsets/${name}`, data),
   delete: (namespace: string, name: string) =>
     del<void>(`/namespaces/${namespace}/statefulsets/${name}`),
   scale: (namespace: string, name: string, data: ScaleRequest) =>
@@ -178,10 +172,6 @@ export const daemonSetApi = {
     get<ListResponse<DaemonSet>>('/daemonsets', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<DaemonSet>(`/namespaces/${namespace}/daemonsets/${name}`),
-  create: (namespace: string, data: DaemonSet) =>
-    post<DaemonSet>(`/namespaces/${namespace}/daemonsets`, data),
-  update: (namespace: string, name: string, data: DaemonSet) =>
-    put<DaemonSet>(`/namespaces/${namespace}/daemonsets/${name}`, data),
   delete: (namespace: string, name: string) =>
     del<void>(`/namespaces/${namespace}/daemonsets/${name}`),
   restart: (namespace: string, name: string) =>
@@ -206,8 +196,6 @@ export const jobApi = {
     get<ListResponse<Job>>('/jobs', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<Job>(`/namespaces/${namespace}/jobs/${name}`),
-  create: (namespace: string, data: Job) =>
-    post<Job>(`/namespaces/${namespace}/jobs`, data),
   delete: (namespace: string, name: string) =>
     del<void>(`/namespaces/${namespace}/jobs/${name}`),
   getYaml: (namespace: string, name: string) =>
@@ -224,10 +212,6 @@ export const cronJobApi = {
     get<ListResponse<CronJob>>('/cronjobs', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<CronJob>(`/namespaces/${namespace}/cronjobs/${name}`),
-  create: (namespace: string, data: CronJob) =>
-    post<CronJob>(`/namespaces/${namespace}/cronjobs`, data),
-  update: (namespace: string, name: string, data: CronJob) =>
-    put<CronJob>(`/namespaces/${namespace}/cronjobs/${name}`, data),
   delete: (namespace: string, name: string) =>
     del<void>(`/namespaces/${namespace}/cronjobs/${name}`),
   trigger: (namespace: string, name: string) =>
@@ -270,8 +254,6 @@ export const serviceApi = {
     get<string>(`/namespaces/${namespace}/services/${name}/yaml`),
   updateYaml: (namespace: string, name: string, yaml: string) =>
     putYaml<Service>(`/namespaces/${namespace}/services/${name}/yaml`, yaml),
-  getEndpoints: (namespace: string, name: string) =>
-    get<Pod[]>(`/namespaces/${namespace}/services/${name}/endpoints`),
 };
 
 // ============ Ingress ============
@@ -340,14 +322,8 @@ export const pvApi = {
     get<ListResponse<PersistentVolume>>('/persistentvolumes', buildParams(params)),
   get: (name: string) =>
     get<PersistentVolume>(`/persistentvolumes/${name}`),
-  create: (data: PersistentVolume) =>
-    post<PersistentVolume>('/persistentvolumes', data),
-  update: (name: string, data: PersistentVolume) =>
-    put<PersistentVolume>(`/persistentvolumes/${name}`, data),
   delete: (name: string) =>
     del<void>(`/persistentvolumes/${name}`),
-  getYaml: (name: string) =>
-    get<string>(`/persistentvolumes/${name}/yaml`),
 };
 
 // ============ PersistentVolumeClaim ============
@@ -358,14 +334,8 @@ export const pvcApi = {
     get<ListResponse<PersistentVolumeClaim>>('/persistentvolumeclaims', buildParams(params)),
   get: (namespace: string, name: string) =>
     get<PersistentVolumeClaim>(`/namespaces/${namespace}/persistentvolumeclaims/${name}`),
-  create: (namespace: string, data: PersistentVolumeClaim) =>
-    post<PersistentVolumeClaim>(`/namespaces/${namespace}/persistentvolumeclaims`, data),
-  update: (namespace: string, name: string, data: PersistentVolumeClaim) =>
-    put<PersistentVolumeClaim>(`/namespaces/${namespace}/persistentvolumeclaims/${name}`, data),
   delete: (namespace: string, name: string) =>
     del<void>(`/namespaces/${namespace}/persistentvolumeclaims/${name}`),
-  getYaml: (namespace: string, name: string) =>
-    get<string>(`/namespaces/${namespace}/persistentvolumeclaims/${name}/yaml`),
 };
 
 // ============ StorageClass ============
@@ -374,18 +344,14 @@ export const storageClassApi = {
     get<ListResponse<StorageClass>>('/storageclasses', buildParams(params)),
   get: (name: string) =>
     get<StorageClass>(`/storageclasses/${name}`),
-  create: (data: StorageClass) =>
-    post<StorageClass>('/storageclasses', data),
-  delete: (name: string) =>
-    del<void>(`/storageclasses/${name}`),
-  getYaml: (name: string) =>
-    get<string>(`/storageclasses/${name}/yaml`),
 };
 
 // ============ Node ============
 export const nodeApi = {
   list: (params?: ListParams) =>
     get<ListResponse<Node>>('/nodes', buildParams(params)),
+  listMetrics: () =>
+    get<NodeMetricSummaryList>('/nodes/metrics'),
   get: (name: string) =>
     get<Node>(`/nodes/${name}`),
   getMetrics: (name: string) =>
@@ -398,42 +364,8 @@ export const nodeApi = {
     post<void>(`/nodes/${name}/uncordon`),
   drain: (name: string, options?: { force?: boolean; gracePeriod?: number }) =>
     post<void>(`/nodes/${name}/drain`, options),
-  updateLabels: (name: string, labels: Record<string, string>) =>
-    put<void>(`/nodes/${name}/labels`, { labels }),
-  updateTaints: (name: string, taints: Array<{ key: string; value?: string; effect: string }>) =>
-    put<void>(`/nodes/${name}/taints`, { taints }),
   getPods: (name: string) =>
     get<ListResponse<Pod>>(`/nodes/${name}/pods`),
-  getEvents: (name: string) =>
-    get<ListResponse<Event>>(`/nodes/${name}/events`),
-};
-
-// ============ ResourceQuota ============
-export const resourceQuotaApi = {
-  list: (namespace: string, params?: ListParams) =>
-    get<ListResponse<ResourceQuota>>(`/namespaces/${namespace}/resourcequotas`, buildParams(params)),
-  get: (namespace: string, name: string) =>
-    get<ResourceQuota>(`/namespaces/${namespace}/resourcequotas/${name}`),
-  create: (namespace: string, data: ResourceQuota) =>
-    post<ResourceQuota>(`/namespaces/${namespace}/resourcequotas`, data),
-  update: (namespace: string, name: string, data: ResourceQuota) =>
-    put<ResourceQuota>(`/namespaces/${namespace}/resourcequotas/${name}`, data),
-  delete: (namespace: string, name: string) =>
-    del<void>(`/namespaces/${namespace}/resourcequotas/${name}`),
-};
-
-// ============ LimitRange ============
-export const limitRangeApi = {
-  list: (namespace: string, params?: ListParams) =>
-    get<ListResponse<LimitRange>>(`/namespaces/${namespace}/limitranges`, buildParams(params)),
-  get: (namespace: string, name: string) =>
-    get<LimitRange>(`/namespaces/${namespace}/limitranges/${name}`),
-  create: (namespace: string, data: LimitRange) =>
-    post<LimitRange>(`/namespaces/${namespace}/limitranges`, data),
-  update: (namespace: string, name: string, data: LimitRange) =>
-    put<LimitRange>(`/namespaces/${namespace}/limitranges/${name}`, data),
-  delete: (namespace: string, name: string) =>
-    del<void>(`/namespaces/${namespace}/limitranges/${name}`),
 };
 
 // ============ Event ============
@@ -448,53 +380,21 @@ export const eventApi = {
 export const roleApi = {
   list: (namespace: string, params?: ListParams) =>
     get<ListResponse<Role>>(`/namespaces/${namespace}/roles`, buildParams(params)),
-  get: (namespace: string, name: string) =>
-    get<Role>(`/namespaces/${namespace}/roles/${name}`),
-  create: (namespace: string, data: Role) =>
-    post<Role>(`/namespaces/${namespace}/roles`, data),
-  update: (namespace: string, name: string, data: Role) =>
-    put<Role>(`/namespaces/${namespace}/roles/${name}`, data),
-  delete: (namespace: string, name: string) =>
-    del<void>(`/namespaces/${namespace}/roles/${name}`),
 };
 
 export const clusterRoleApi = {
   list: (params?: ListParams) =>
     get<ListResponse<ClusterRole>>('/clusterroles', buildParams(params)),
-  get: (name: string) =>
-    get<ClusterRole>(`/clusterroles/${name}`),
-  create: (data: ClusterRole) =>
-    post<ClusterRole>('/clusterroles', data),
-  update: (name: string, data: ClusterRole) =>
-    put<ClusterRole>(`/clusterroles/${name}`, data),
-  delete: (name: string) =>
-    del<void>(`/clusterroles/${name}`),
 };
 
 export const roleBindingApi = {
   list: (namespace: string, params?: ListParams) =>
     get<ListResponse<RoleBinding>>(`/namespaces/${namespace}/rolebindings`, buildParams(params)),
-  get: (namespace: string, name: string) =>
-    get<RoleBinding>(`/namespaces/${namespace}/rolebindings/${name}`),
-  create: (namespace: string, data: RoleBinding) =>
-    post<RoleBinding>(`/namespaces/${namespace}/rolebindings`, data),
-  update: (namespace: string, name: string, data: RoleBinding) =>
-    put<RoleBinding>(`/namespaces/${namespace}/rolebindings/${name}`, data),
-  delete: (namespace: string, name: string) =>
-    del<void>(`/namespaces/${namespace}/rolebindings/${name}`),
 };
 
 export const clusterRoleBindingApi = {
   list: (params?: ListParams) =>
     get<ListResponse<ClusterRoleBinding>>('/clusterrolebindings', buildParams(params)),
-  get: (name: string) =>
-    get<ClusterRoleBinding>(`/clusterrolebindings/${name}`),
-  create: (data: ClusterRoleBinding) =>
-    post<ClusterRoleBinding>('/clusterrolebindings', data),
-  update: (name: string, data: ClusterRoleBinding) =>
-    put<ClusterRoleBinding>(`/clusterrolebindings/${name}`, data),
-  delete: (name: string) =>
-    del<void>(`/clusterrolebindings/${name}`),
 };
 
 export const serviceAccountApi = {
@@ -502,12 +402,6 @@ export const serviceAccountApi = {
     get<ListResponse<ServiceAccount>>(`/namespaces/${namespace}/serviceaccounts`, buildParams(params)),
   listAll: (params?: ListParams) =>
     get<ListResponse<ServiceAccount>>('/serviceaccounts', buildParams(params)),
-  get: (namespace: string, name: string) =>
-    get<ServiceAccount>(`/namespaces/${namespace}/serviceaccounts/${name}`),
-  create: (namespace: string, data: ServiceAccount) =>
-    post<ServiceAccount>(`/namespaces/${namespace}/serviceaccounts`, data),
-  delete: (namespace: string, name: string) =>
-    del<void>(`/namespaces/${namespace}/serviceaccounts/${name}`),
 };
 
 // ============ 审计日志 ============

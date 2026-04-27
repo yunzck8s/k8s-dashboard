@@ -61,6 +61,7 @@ function App() {
                   path="daemonsets/:namespace/:name"
                   element={<lazyRoutes.DaemonSetDetail />}
                 />
+                <Route path="replicasets" element={<lazyRoutes.ReplicaSets />} />
                 <Route path="jobs" element={<lazyRoutes.Jobs />} />
                 <Route path="jobs/:namespace/:name" element={<lazyRoutes.JobDetail />} />
                 <Route path="cronjobs" element={<lazyRoutes.CronJobs />} />

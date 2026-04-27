@@ -9,7 +9,7 @@ Kubernetes Dashboard - an enterprise K8s cluster management web UI with real-tim
 ## Common Commands
 
 ```bash
-# Development (runs frontend on :5173 and backend on :8080 concurrently)
+# Development (runs frontend on :5173 and backend on :9099 concurrently)
 make dev
 make dev-frontend    # frontend only
 make dev-backend     # backend only
@@ -61,18 +61,18 @@ backend/internal/
 ├── audit/                  # Audit logging to PostgreSQL
 ├── alerts/                 # Alert rules persistence (PostgreSQL)
 ├── alertmanager/           # Alertmanager HTTP client
-├── metrics/                # VictoriaMetrics HTTP client
+├── metrics/                # Legacy VictoriaMetrics HTTP client (removed from startup path)
 └── observation/            # Cluster observation service (anomaly detection, trends)
 ```
 
 **Key patterns:**
-- `Handler` struct in `handlers.go` is the main handler holding `k8s.Client`, `metrics.Client`, `alertmanager.Client`, `alerts.Service`, and `audit.Client`. All K8s resource handlers are methods on this struct.
+- `Handler` struct in `handlers.go` is the main handler holding `k8s.Client`, optional `alertmanager.Client`, `alerts.Service`, and `audit.Client`. All K8s resource handlers are methods on this struct.
 - Authentication is optional - if PostgreSQL is unavailable, the backend runs without auth/audit (no-auth mode).
 - Routes are split into three groups: public (`/api/v1/auth/login|logout`), authenticated (`/api/v1/*`), and admin (`/api/v1/admin/*` - requires admin role).
 - WebSocket endpoints at `/ws/logs`, `/ws/exec`, `/ws/watch` for real-time log streaming, terminal access, and resource watches.
 - The backend serves the built frontend static files from `./frontend/dist/` with a SPA fallback (NoRoute -> index.html).
 
-**Environment variables:** `PORT` (8080), `VICTORIA_METRICS_URL`, `ALERTMANAGER_URL`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `TZ` (Asia/Shanghai).
+**Environment variables:** `PORT` (9099), `ALERTMANAGER_ENABLED` (default `false`), `ALERTMANAGER_URL` (required only when Alertmanager is enabled), `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `JWT_SECRET`, `TZ` (Asia/Shanghai).
 
 ### Frontend (`frontend/`)
 
@@ -107,13 +107,13 @@ frontend/src/
 
 ### Dev Proxy
 
-Vite dev server proxies `/api` to `http://localhost:8080` and `/ws` to `ws://localhost:8080` (configured in `vite.config.ts`).
+Vite dev server proxies `/api` to `http://localhost:9099` and `/ws` to `ws://localhost:9099` (configured in `vite.config.ts`).
 
 ### Deployment (`deploy/`)
 
 - `docker/Dockerfile` - Multi-stage build: Node 20 (frontend) -> Go 1.25 (backend) -> Alpine 3.19 (runtime). Single container serves both.
 - `kubernetes/` - Deployment, Service, Ingress, RBAC manifests for the `k8s-dashboard` namespace.
-- `kustomize/` - Base + overlays (dev/prod) with PostgreSQL and VictoriaMetrics dependencies.
+- `kustomize/` - Base + overlays (dev/prod) with PostgreSQL dependency examples. VictoriaMetrics examples are legacy and not required for metrics.
 
 ## Design System
 

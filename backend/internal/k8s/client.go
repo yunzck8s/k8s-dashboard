@@ -14,11 +14,11 @@ import (
 // Client 封装 Kubernetes 客户端
 type Client struct {
 	// 标准客户端
-	Clientset *kubernetes.Clientset
+	Clientset kubernetes.Interface
 	// 动态客户端（用于处理任意资源）
 	DynamicClient dynamic.Interface
 	// Metrics 客户端
-	MetricsClient *versioned.Clientset
+	MetricsClient versioned.Interface
 	// REST 配置
 	Config *rest.Config
 }

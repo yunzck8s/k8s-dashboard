@@ -7,8 +7,8 @@
 
 - 在一个界面里查看和管理核心资源：Pod、Deployment、StatefulSet、DaemonSet、Job/CronJob、Service、Ingress、ConfigMap、Secret、PV/PVC、StorageClass、Node、Namespace、RBAC。
 - 对工作负载执行常见运维动作：扩缩容、重启、回滚、YAML 编辑、查看事件、查看日志、Web 终端进入容器。
-- 处理告警与静默：接入 Alertmanager，支持告警摘要、告警确认（ack）、静默规则管理。
-- 做集群状态观测：结合 VictoriaMetrics 展示资源趋势、重启趋势与异常摘要。
+- 处理告警与静默：可选接入 Alertmanager，支持告警摘要、告警确认（ack）、静默规则管理。
+- 做集群状态观测：通过 Kubernetes Metrics Server 展示实时资源使用，趋势由前端滚动采样生成。
 - 做权限治理：基于用户角色和命名空间范围控制访问。
 - 做安全追踪：写操作审计日志、会话管理、审批流。
 - 在多集群之间切换：通过请求级 `X-Cluster` 路由到目标集群。
@@ -66,7 +66,7 @@ make dev
 启动后：
 
 - 前端: `http://localhost:5173`
-- 后端: `http://localhost:8080`
+- 后端: `http://localhost:9099`
 
 ### 3. 首次登录
 
@@ -123,7 +123,7 @@ make push DOCKER_REGISTRY=<registry>
 - `base/`: 通用基础配置
 - `overlays/dev`: 开发环境覆盖
 - `overlays/prod`: 生产环境覆盖
-- `dependencies/`: PostgreSQL、VictoriaMetrics 示例依赖
+- `dependencies/`: PostgreSQL、已废弃的 VictoriaMetrics 示例依赖
 
 ```bash
 # 查看渲染结果
@@ -162,7 +162,7 @@ kubectl apply -k deploy/kustomize/overlays/prod
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `PORT` | 服务端口 | `8080` |
+| `PORT` | 服务端口 | `9099` |
 | `TZ` | 时区 | `Asia/Shanghai` |
 | `KUBECONFIG` | kubeconfig 路径 | `~/.kube/config` |
 | `JWT_SECRET` | JWT 密钥 | `k8s-dashboard-secret-key-change-in-production` |
@@ -177,8 +177,8 @@ kubectl apply -k deploy/kustomize/overlays/prod
 | `POSTGRES_SSLMODE` | PostgreSQL SSL 模式 | `disable` |
 | `SQLITE_PATH` | SQLite 数据文件路径 | `./data/k8s-dashboard.db` |
 | `ALLOW_SQLITE_FALLBACK` | PostgreSQL 失败时是否回落 SQLite | `true` |
-| `VICTORIA_METRICS_URL` | VictoriaMetrics 地址 | `http://192.168.1.90:31007` |
-| `ALERTMANAGER_URL` | Alertmanager 地址 | `http://192.168.1.90:32607` |
+| `ALERTMANAGER_ENABLED` | 是否启用 Alertmanager | `false` |
+| `ALERTMANAGER_URL` | Alertmanager 地址，仅 `ALERTMANAGER_ENABLED=true` 时必填 | 空 |
 
 ## 认证、权限与多集群
 
@@ -251,7 +251,7 @@ k8s-dashboard/
 │       ├── clusters/           # 多集群管理
 │       ├── audit/              # 审计日志
 │       ├── alerts/             # 告警业务
-│       ├── metrics/            # VictoriaMetrics 客户端
+│       ├── metrics/            # 旧 VictoriaMetrics 客户端（已从启动路径移除）
 │       └── observation/        # 集群观测服务
 ├── deploy/
 │   ├── docker/                 # Dockerfile

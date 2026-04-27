@@ -28,14 +28,12 @@ kubectl wait --for=condition=ready pod -l app=postgresql -n k8s-dashboard --time
 
 > 如果你不打算部署 PostgreSQL，可以跳过本节。应用会自动使用 SQLite。
 
-#### 部署 VictoriaMetrics
+#### 确认 Metrics Server
+
+Dashboard 的实时 CPU/内存指标来自 Kubernetes Metrics Server。若未安装，首页仍会显示资源数量，但资源使用率会显示指标不可用。
 
 ```bash
-# 部署
-kubectl apply -f deploy/kustomize/dependencies/victoria-metrics.yaml
-
-# 等待 VictoriaMetrics 就绪
-kubectl wait --for=condition=ready pod -l app=victoria-metrics -n monitoring --timeout=300s
+kubectl get apiservice v1beta1.metrics.k8s.io
 ```
 
 ### 2. 配置应用
@@ -56,7 +54,7 @@ stringData:
 
 #### 修改 ConfigMap（可选）
 
-如果您的 PostgreSQL 或 VictoriaMetrics 地址不同，需要修改：
+如果您的 PostgreSQL 或 Alertmanager 开关不同，需要修改：
 
 ```bash
 vim deploy/kustomize/base/configmap.yaml
@@ -65,7 +63,8 @@ vim deploy/kustomize/base/configmap.yaml
 data:
   POSTGRES_DSN: ""  # 可选，优先于 HOST/PORT 方式
   POSTGRES_HOST: "postgresql.k8s-dashboard.svc.cluster.local"
-  VICTORIA_METRICS_URL: "http://victoria-metrics.monitoring.svc.cluster.local:8428"
+  ALERTMANAGER_ENABLED: "false"
+  ALERTMANAGER_URL: ""
   SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
   ALLOW_SQLITE_FALLBACK: "true"
   MULTI_CLUSTER_ENABLED: "true"
@@ -132,10 +131,10 @@ kubectl get ingress -n k8s-dashboard
 
 ```bash
 # 端口转发
-kubectl port-forward -n k8s-dashboard svc/k8s-dashboard 8080:80
+kubectl port-forward -n k8s-dashboard svc/k8s-dashboard 9099:80
 
 # 浏览器访问
-http://localhost:8080
+http://localhost:9099
 ```
 
 ## 验证部署
@@ -147,9 +146,8 @@ http://localhost:8080
 kubectl get pods -n k8s-dashboard -l app=postgresql
 kubectl logs -n k8s-dashboard -l app=postgresql --tail=20
 
-# 检查 VictoriaMetrics
-kubectl get pods -n monitoring -l app=victoria-metrics
-kubectl logs -n monitoring -l app=victoria-metrics --tail=20
+# 检查 Metrics Server API
+kubectl get apiservice v1beta1.metrics.k8s.io
 
 # 检查 Dashboard
 kubectl get pods -n k8s-dashboard -l app.kubernetes.io/name=k8s-dashboard
@@ -165,8 +163,8 @@ kubectl exec -it -n k8s-dashboard deployment/k8s-dashboard -- sh
 # 测试 PostgreSQL 连接（如果你启用了 PostgreSQL 且安装了 psql 客户端）
 # psql -h postgresql -U k8s_dashboard -d k8s_dashboard
 
-# 测试 VictoriaMetrics 连接
-# wget -O- http://victoria-metrics.monitoring.svc.cluster.local:8428/health
+# 测试 Metrics Server 是否可用
+kubectl top nodes
 ```
 
 ## 常见问题

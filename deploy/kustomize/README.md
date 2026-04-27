@@ -60,17 +60,9 @@ kubectl apply -f dependencies/postgresql.yaml
 
 如果不配置 PostgreSQL，服务将自动使用 SQLite（`SQLITE_PATH`）。
 
-### VictoriaMetrics
+### Metrics Server
 
-用于存储和查询 Kubernetes 指标数据。
-
-```bash
-# 部署示例 VictoriaMetrics
-kubectl apply -f dependencies/victoria-metrics.yaml
-```
-
-配置项（在 ConfigMap 中）：
-- `VICTORIA_METRICS_URL`: VictoriaMetrics 服务地址
+实时 CPU/内存指标来自 Kubernetes Metrics Server。Dashboard 不再依赖 VictoriaMetrics；`dependencies/victoria-metrics.yaml` 仅作为旧示例保留。
 
 ## 部署步骤
 
@@ -88,7 +80,8 @@ data:
   SQLITE_PATH: "/var/lib/k8s-dashboard/dashboard.db"
   ALLOW_SQLITE_FALLBACK: "true"
   MULTI_CLUSTER_ENABLED: "true"
-  VICTORIA_METRICS_URL: "your-vm-url"
+  ALERTMANAGER_ENABLED: "false"
+  ALERTMANAGER_URL: ""
 
 # base/secret.yaml
 stringData:
@@ -131,7 +124,7 @@ kubectl apply -k overlays/prod
 
 | 配置项 | 说明 | 默认值 | 必填 |
 |--------|------|--------|------|
-| `PORT` | 服务端口 | 8080 | 是 |
+| `PORT` | 服务端口 | 9099 | 是 |
 | `TZ` | 时区 | Asia/Shanghai | 否 |
 | `LOG_LEVEL` | 日志级别 (debug/info/warn/error) | info | 否 |
 | `LOG_FORMAT` | 日志格式 (json/text) | json | 否 |
@@ -144,7 +137,8 @@ kubectl apply -k overlays/prod
 | `SQLITE_PATH` | SQLite 数据文件路径 | /var/lib/k8s-dashboard/dashboard.db | 否 |
 | `ALLOW_SQLITE_FALLBACK` | PostgreSQL 失败时是否回落 SQLite | true | 否 |
 | `MULTI_CLUSTER_ENABLED` | 启用多集群管理 | true | 否 |
-| `VICTORIA_METRICS_URL` | VictoriaMetrics URL | - | 是 |
+| `ALERTMANAGER_ENABLED` | 启用 Alertmanager | false | 否 |
+| `ALERTMANAGER_URL` | Alertmanager URL（启用时必填） | - | 否 |
 | `AUDIT_LOG_ENABLED` | 启用审计日志 | true | 否 |
 | `AUDIT_LOG_MAX_SIZE` | 日志文件最大大小(MB) | 100 | 否 |
 | `AUDIT_LOG_MAX_AGE` | 日志保留天数 | 30 | 否 |
@@ -239,11 +233,11 @@ kubectl logs -l app.kubernetes.io/name=k8s-dashboard -n k8s-dashboard --tail=100
 4. 检查 Secret 中的密码是否正确
 5. 如为单副本环境，可将 `ALLOW_SQLITE_FALLBACK` 设为 `true` 自动回落 SQLite
 
-### 无法连接 VictoriaMetrics
+### 无法读取 Metrics Server 指标
 
-1. 检查 VictoriaMetrics 服务是否运行
-2. 检查 ConfigMap 中的 URL 配置
-3. 检查网络策略是否允许访问
+1. 检查 `v1beta1.metrics.k8s.io` APIService 是否可用
+2. 检查 Metrics Server 是否已安装并能访问 kubelet
+3. 使用 `kubectl top nodes` 验证指标链路
 
 ### ConfigMap 更新后 Pod 没有重启
 
@@ -270,4 +264,3 @@ kubectl rollout restart deployment/k8s-dashboard -n k8s-dashboard
 - [Kustomize 官方文档](https://kustomize.io/)
 - [Kubernetes 官方文档](https://kubernetes.io/docs/)
 - [PostgreSQL on Kubernetes](https://www.postgresql.org/docs/)
-- [VictoriaMetrics 文档](https://docs.victoriametrics.com/)

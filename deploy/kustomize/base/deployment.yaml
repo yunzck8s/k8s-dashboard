@@ -29,7 +29,7 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 8080
+              containerPort: 9099
               protocol: TCP
           env:
             # 从 ConfigMap 读取配置
@@ -109,12 +109,17 @@ spec:
                   name: k8s-dashboard-config
                   key: MULTI_CLUSTER_ENABLED
 
-            # VictoriaMetrics 配置
-            - name: VICTORIA_METRICS_URL
+            # Alertmanager 配置（默认关闭）
+            - name: ALERTMANAGER_ENABLED
               valueFrom:
                 configMapKeyRef:
                   name: k8s-dashboard-config
-                  key: VICTORIA_METRICS_URL
+                  key: ALERTMANAGER_ENABLED
+            - name: ALERTMANAGER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: k8s-dashboard-config
+                  key: ALERTMANAGER_URL
 
             # 审计日志配置
             - name: AUDIT_LOG_ENABLED

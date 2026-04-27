@@ -20,7 +20,6 @@ import (
 	"github.com/k8s-dashboard/backend/internal/auth"
 	"github.com/k8s-dashboard/backend/internal/clusters"
 	"github.com/k8s-dashboard/backend/internal/k8s"
-	"github.com/k8s-dashboard/backend/internal/metrics"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -41,7 +40,6 @@ import (
 type Handler struct {
 	k8s          *k8s.Client
 	clusters     *clusters.Manager
-	metrics      *metrics.Client
 	alerts       *alertmanager.Client
 	alertService *alerts.Service
 	audit        *audit.Client
@@ -49,11 +47,10 @@ type Handler struct {
 }
 
 // NewHandler 创建处理器
-func NewHandler(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsClient *metrics.Client, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *Handler {
+func NewHandler(k8sClient *k8s.Client, clusterManager *clusters.Manager, alertClient *alertmanager.Client, alertService *alerts.Service, auditClient *audit.Client, authClient *auth.Client) *Handler {
 	return &Handler{
 		k8s:          k8sClient,
 		clusters:     clusterManager,
-		metrics:      metricsClient,
 		alerts:       alertClient,
 		alertService: alertService,
 		audit:        auditClient,
@@ -349,46 +346,23 @@ func (h *Handler) GetOverview(c *gin.Context) {
 		}
 	}
 
-	// 优先从 VictoriaMetrics 获取资源使用数据
-	vmDataUsed := false
-	if h.metrics != nil {
-		clusterMetrics, err := h.metrics.GetClusterMetrics()
-		if err == nil {
-			usedCPU = clusterMetrics.CPU.Used
-			usedMemory = clusterMetrics.Memory.Used
-			usedNodeMemory = clusterMetrics.NodeMemory.Used
-			// 如果 VM 返回了总量数据，也使用它
-			if clusterMetrics.CPU.Total > 0 {
-				totalCPU = clusterMetrics.CPU.Total
-			}
-			if clusterMetrics.Memory.Total > 0 {
-				totalMemory = clusterMetrics.Memory.Total
-			}
-			if clusterMetrics.NodeMemory.Total > 0 {
-				totalNodeMemory = clusterMetrics.NodeMemory.Total
-			}
-			if clusterMetrics.Pods.Total > 0 {
-				totalPods = clusterMetrics.Pods.Total
-			}
-			if clusterMetrics.Pods.Used > 0 {
-				usedPods = clusterMetrics.Pods.Used
-			}
-			vmDataUsed = true
-		}
-	}
+	totalNodeMemory = totalMemory
 
-	// 如果 VM 不可用，回退到 Kubernetes Metrics Server
-	if !vmDataUsed && h.getK8s(c).MetricsClient != nil {
+	// 从 Kubernetes Metrics Server 获取当前资源使用量。Metrics Server 不提供历史数据。
+	if h.getK8s(c).MetricsClient != nil {
 		nodeMetrics, err := h.getK8s(c).MetricsClient.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
 		if err == nil {
 			usedCPU = 0
 			usedMemory = 0
+			usedNodeMemory = 0
 			for _, nm := range nodeMetrics.Items {
 				if cpu := nm.Usage.Cpu(); cpu != nil {
 					usedCPU += float64(cpu.MilliValue()) / 1000
 				}
 				if mem := nm.Usage.Memory(); mem != nil {
-					usedMemory += float64(mem.Value()) / (1024 * 1024 * 1024)
+					value := float64(mem.Value()) / (1024 * 1024 * 1024)
+					usedMemory += value
+					usedNodeMemory += value
 				}
 			}
 		}
@@ -1137,6 +1111,68 @@ func (h *Handler) DeleteJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
+func (h *Handler) GetJobYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	job, err := h.getK8s(c).Clientset.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	job.ManagedFields = nil
+	yamlBytes, err := yaml.Marshal(job)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.String(http.StatusOK, string(yamlBytes))
+}
+
+func (h *Handler) GetJobPods(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	job, err := h.getK8s(c).Clientset.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if job.Spec.Selector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		pods, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: selector.String(),
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: pods.Items, Total: len(pods.Items)})
+		return
+	}
+
+	pods, err := h.getK8s(c).Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	items := make([]corev1.Pod, 0)
+	for _, pod := range pods.Items {
+		for _, owner := range pod.OwnerReferences {
+			if owner.Kind == "Job" && owner.Name == name && owner.UID == job.UID {
+				items = append(items, pod)
+				break
+			}
+		}
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: items, Total: len(items)})
+}
+
 // ========== CronJobs ==========
 
 func (h *Handler) ListAllCronJobs(c *gin.Context) {
@@ -1184,6 +1220,51 @@ func (h *Handler) DeleteCronJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
+func (h *Handler) SuspendCronJob(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+
+	var req struct {
+		Suspend bool `json:"suspend"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid suspend request"})
+		return
+	}
+
+	cj, err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	cj.Spec.Suspend = &req.Suspend
+	result, err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).Update(ctx, cj, metav1.UpdateOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) GetCronJobYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	cj, err := h.getK8s(c).Clientset.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	cj.ManagedFields = nil
+	yamlBytes, err := yaml.Marshal(cj)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.String(http.StatusOK, string(yamlBytes))
+}
+
 func (h *Handler) TriggerCronJob(c *gin.Context) {
 	ctx := context.Background()
 	namespace := c.Param("ns")
@@ -1219,6 +1300,112 @@ func (h *Handler) TriggerCronJob(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+// ========== ReplicaSets ==========
+
+func (h *Handler) ListAllReplicaSets(c *gin.Context) {
+	ctx := context.Background()
+	listOpts := parseListOptions(c)
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	if scope.unrestricted {
+		list, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets("").List(ctx, listOpts)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+		return
+	}
+
+	items := make([]appsv1.ReplicaSet, 0)
+	for _, ns := range scope.allowed {
+		list, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(ns).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = append(items, list.Items...)
+	}
+
+	paged, nextToken, err := paginateSlice(items, listOpts.Limit, listOpts.Continue)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ListResponse{Items: paged, Total: len(items), Continue: nextToken})
+}
+
+func (h *Handler) ListReplicaSets(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	scope, err := h.getNamespaceAccessScope(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if !namespaceAllowed(scope, namespace) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权访问该命名空间"})
+		return
+	}
+
+	list, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(namespace).List(ctx, parseListOptions(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: list.Items, Total: len(list.Items), Continue: list.Continue})
+}
+
+func (h *Handler) GetReplicaSet(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	rs, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, rs)
+}
+
+func (h *Handler) DeleteReplicaSet(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	propagation := metav1.DeletePropagationBackground
+	err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(namespace).Delete(ctx, name, metav1.DeleteOptions{
+		PropagationPolicy: &propagation,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *Handler) GetReplicaSetYAML(c *gin.Context) {
+	ctx := context.Background()
+	namespace := c.Param("ns")
+	name := c.Param("name")
+	rs, err := h.getK8s(c).Clientset.AppsV1().ReplicaSets(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	rs.ManagedFields = nil
+	yamlBytes, err := yaml.Marshal(rs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.String(http.StatusOK, string(yamlBytes))
 }
 
 // ========== Services ==========
@@ -2112,6 +2299,69 @@ func (h *Handler) GetNodeMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ListAllNodeMetrics 返回所有节点的实际 Metrics Server 用量（对应 kubectl top nodes）
+func (h *Handler) ListAllNodeMetrics(c *gin.Context) {
+	ctx := context.Background()
+	client := h.getK8s(c)
+
+	if client.MetricsClient == nil {
+		c.JSON(http.StatusOK, gin.H{"items": []gin.H{}, "available": false})
+		return
+	}
+
+	nodes, err := client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	type nodeCap struct{ cpu, memory int64 }
+	caps := make(map[string]nodeCap, len(nodes.Items))
+	for _, node := range nodes.Items {
+		caps[node.Name] = nodeCap{
+			cpu:    node.Status.Allocatable.Cpu().MilliValue(),
+			memory: node.Status.Allocatable.Memory().Value(),
+		}
+	}
+
+	nodeMetrics, err := client.MetricsClient.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"items": []gin.H{}, "available": false})
+		return
+	}
+
+	items := make([]gin.H, 0, len(nodeMetrics.Items))
+	for _, nm := range nodeMetrics.Items {
+		cap := caps[nm.Name]
+		cpuUsage := nm.Usage.Cpu().MilliValue()
+		memUsage := nm.Usage.Memory().Value()
+
+		var cpuPct, memPct float64
+		if cap.cpu > 0 {
+			cpuPct = float64(cpuUsage) / float64(cap.cpu) * 100
+		}
+		if cap.memory > 0 {
+			memPct = float64(memUsage) / float64(cap.memory) * 100
+		}
+
+		items = append(items, gin.H{
+			"name": nm.Name,
+			"cpu": gin.H{
+				"usage":      cpuUsage,
+				"capacity":   cap.cpu,
+				"percentage": cpuPct,
+			},
+			"memory": gin.H{
+				"usage":      memUsage,
+				"capacity":   cap.memory,
+				"percentage": memPct,
+			},
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"items": items, "available": true})
+}
+
 func (h *Handler) GetNodePods(c *gin.Context) {
 	ctx := context.Background()
 	name := c.Param("name")
@@ -2621,114 +2871,174 @@ func (h *Handler) WatchResources(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
 }
 
-// ========== VictoriaMetrics 指标 ==========
+// ========== Metrics Server 指标 ==========
 
 // GetClusterMetrics 获取集群指标
 func (h *Handler) GetClusterMetrics(c *gin.Context) {
-	if h.metrics == nil {
+	client := h.getK8s(c)
+	if client.MetricsClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "metrics client not configured"})
 		return
 	}
 
-	metrics, err := h.metrics.GetClusterMetrics()
+	ctx := context.Background()
+	nodes, err := client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, metrics)
+	var totalCPU, totalMemory, totalPods float64
+	for _, node := range nodes.Items {
+		if cpu := node.Status.Allocatable.Cpu(); cpu != nil {
+			totalCPU += float64(cpu.MilliValue()) / 1000
+		}
+		if mem := node.Status.Allocatable.Memory(); mem != nil {
+			totalMemory += float64(mem.Value()) / (1024 * 1024 * 1024)
+		}
+		if pods := node.Status.Allocatable.Pods(); pods != nil {
+			totalPods += float64(pods.Value())
+		}
+	}
+
+	pods, err := client.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	nodeMetrics, err := client.MetricsClient.MetricsV1beta1().NodeMetricses().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
+
+	var usedCPU, usedMemory float64
+	for _, item := range nodeMetrics.Items {
+		if cpu := item.Usage.Cpu(); cpu != nil {
+			usedCPU += float64(cpu.MilliValue()) / 1000
+		}
+		if mem := item.Usage.Memory(); mem != nil {
+			usedMemory += float64(mem.Value()) / (1024 * 1024 * 1024)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"cpu":        UsageMetric{Used: usedCPU, Total: totalCPU, Unit: "cores"},
+		"memory":     UsageMetric{Used: usedMemory, Total: totalMemory, Unit: "GB"},
+		"nodeMemory": UsageMetric{Used: usedMemory, Total: totalMemory, Unit: "GB"},
+		"pods":       UsageMetric{Used: float64(len(pods.Items)), Total: totalPods, Unit: "pods"},
+	})
 }
 
 // GetCPUHistory 获取 CPU 历史数据
 func (h *Handler) GetCPUHistory(c *gin.Context) {
-	if h.metrics == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "metrics client not configured"})
-		return
-	}
-
-	duration := c.DefaultQuery("duration", "1h")
-	step := c.DefaultQuery("step", "1m")
-
-	data, err := h.metrics.GetCPUHistory(duration, step)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, gin.H{
+		"data":    []interface{}{},
+		"status":  "unavailable",
+		"message": "metrics-server has no historical storage",
+	})
 }
 
 // GetMemoryHistory 获取内存历史数据
 func (h *Handler) GetMemoryHistory(c *gin.Context) {
-	if h.metrics == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "metrics client not configured"})
-		return
-	}
-
-	duration := c.DefaultQuery("duration", "1h")
-	step := c.DefaultQuery("step", "1m")
-
-	data, err := h.metrics.GetMemoryHistory(duration, step)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, gin.H{
+		"data":    []interface{}{},
+		"status":  "unavailable",
+		"message": "metrics-server has no historical storage",
+	})
 }
 
-// GetNodeMetricsVM 从 VictoriaMetrics 获取节点指标
+// GetNodeMetricsVM 从 Metrics Server 获取节点指标
 func (h *Handler) GetNodeMetricsVM(c *gin.Context) {
-	if h.metrics == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "metrics client not configured"})
-		return
-	}
-
-	nodeName := c.Param("name")
-	metrics, err := h.metrics.GetNodeMetrics(nodeName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, metrics)
+	h.GetNodeMetrics(c)
 }
 
-// GetPodMetricsVM 从 VictoriaMetrics 获取 Pod 指标
+// GetPodMetricsVM 从 Metrics Server 获取 Pod 指标
 func (h *Handler) GetPodMetricsVM(c *gin.Context) {
-	if h.metrics == nil {
+	client := h.getK8s(c)
+	if client.MetricsClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "metrics client not configured"})
 		return
 	}
 
 	ns := c.Param("ns")
 	name := c.Param("name")
-
-	metrics, err := h.metrics.GetPodMetrics(ns, name)
+	item, err := client.MetricsClient.MetricsV1beta1().PodMetricses(ns).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, metrics)
+	var cpuUsage float64
+	var memoryUsage int64
+	containers := make([]gin.H, 0, len(item.Containers))
+	for _, container := range item.Containers {
+		cpu := container.Usage.Cpu()
+		memory := container.Usage.Memory()
+		cpuText := ""
+		memoryText := ""
+		if cpu != nil {
+			cpuUsage += float64(cpu.MilliValue()) / 1000
+			cpuText = cpu.String()
+		}
+		if memory != nil {
+			memoryUsage += memory.Value()
+			memoryText = memory.String()
+		}
+		containers = append(containers, gin.H{
+			"name":   container.Name,
+			"cpu":    cpuText,
+			"memory": memoryText,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"namespace":   item.Namespace,
+		"name":        item.Name,
+		"cpuUsage":    cpuUsage,
+		"memoryUsage": memoryUsage,
+		"containers":  containers,
+	})
 }
 
 // ListAllPodMetricsVM 批量获取所有 Pod 的指标
 func (h *Handler) ListAllPodMetricsVM(c *gin.Context) {
-	if h.metrics == nil {
+	client := h.getK8s(c)
+	if client.MetricsClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "metrics client not configured"})
 		return
 	}
 
-	podMetrics, err := h.metrics.GetAllPodMetrics()
+	podMetrics, err := client.MetricsClient.MetricsV1beta1().PodMetricses("").List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
 		return
 	}
 
+	items := make([]gin.H, 0, len(podMetrics.Items))
+	for _, item := range podMetrics.Items {
+		var cpuUsage float64
+		var memoryUsage int64
+		for _, container := range item.Containers {
+			if cpu := container.Usage.Cpu(); cpu != nil {
+				cpuUsage += float64(cpu.MilliValue()) / 1000
+			}
+			if memory := container.Usage.Memory(); memory != nil {
+				memoryUsage += memory.Value()
+			}
+		}
+		items = append(items, gin.H{
+			"namespace":   item.Namespace,
+			"name":        item.Name,
+			"cpuUsage":    cpuUsage,
+			"memoryUsage": memoryUsage,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"items": podMetrics,
-		"total": len(podMetrics),
+		"items": items,
+		"total": len(items),
 	})
 }
 
@@ -2804,7 +3114,13 @@ func (h *Handler) GetAlertNames(c *gin.Context) {
 // GetAlertSummary 获取告警摘要
 func (h *Handler) GetAlertSummary(c *gin.Context) {
 	if h.alerts == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Alertmanager not configured"})
+		c.JSON(http.StatusOK, gin.H{
+			"enabled":  false,
+			"total":    0,
+			"critical": 0,
+			"warning":  0,
+			"info":     0,
+		})
 		return
 	}
 
@@ -2814,7 +3130,13 @@ func (h *Handler) GetAlertSummary(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, summary)
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":  true,
+		"total":    summary.Total,
+		"critical": summary.Critical,
+		"warning":  summary.Warning,
+		"info":     summary.Info,
+	})
 }
 
 // AcknowledgeAlert 确认告警

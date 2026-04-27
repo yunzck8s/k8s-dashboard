@@ -18,7 +18,6 @@ import (
 	"github.com/k8s-dashboard/backend/internal/clusters"
 	"github.com/k8s-dashboard/backend/internal/db"
 	"github.com/k8s-dashboard/backend/internal/k8s"
-	"github.com/k8s-dashboard/backend/internal/metrics"
 )
 
 func main() {
@@ -28,21 +27,19 @@ func main() {
 		log.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
 
-	// 初始化 VictoriaMetrics 客户端
-	vmURL := os.Getenv("VICTORIA_METRICS_URL")
-	if vmURL == "" {
-		vmURL = "http://192.168.1.90:31007"
+	// 初始化 Alertmanager 客户端（默认关闭，避免未配置环境阻塞首页）
+	alertmanagerEnabled := parseBoolEnv("ALERTMANAGER_ENABLED", false)
+	var alertClient *alertmanager.Client
+	if alertmanagerEnabled {
+		amURL := strings.TrimSpace(os.Getenv("ALERTMANAGER_URL"))
+		if amURL == "" {
+			log.Fatal("ALERTMANAGER_ENABLED=true requires ALERTMANAGER_URL")
+		}
+		alertClient = alertmanager.NewClient(amURL)
+		log.Printf("Alertmanager URL: %s", amURL)
+	} else {
+		log.Printf("Alertmanager disabled (ALERTMANAGER_ENABLED=false)")
 	}
-	metricsClient := metrics.NewClient(vmURL)
-	log.Printf("VictoriaMetrics URL: %s", vmURL)
-
-	// 初始化 Alertmanager 客户端
-	amURL := os.Getenv("ALERTMANAGER_URL")
-	if amURL == "" {
-		amURL = "http://192.168.1.90:32607"
-	}
-	alertClient := alertmanager.NewClient(amURL)
-	log.Printf("Alertmanager URL: %s", amURL)
 
 	// JWT 密钥
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -81,6 +78,8 @@ func main() {
 	alertRepo, err := alerts.NewRepository(database, dialect)
 	if err != nil {
 		log.Printf("Warning: 告警数据仓库初始化失败: %v", err)
+	} else if !alertmanagerEnabled {
+		log.Printf("告警服务未启用")
 	} else {
 		alertService = alerts.NewService(alertRepo, alertClient)
 		log.Printf("告警服务初始化成功")
@@ -98,12 +97,12 @@ func main() {
 	}
 
 	// 创建路由
-	router := api.NewRouter(k8sClient, clusterManager, metricsClient, alertClient, alertService, auditClient, authClient)
+	router := api.NewRouter(k8sClient, clusterManager, nil, alertClient, alertService, auditClient, authClient)
 
 	// 配置 HTTP 服务器
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "9099"
 	}
 
 	srv := &http.Server{

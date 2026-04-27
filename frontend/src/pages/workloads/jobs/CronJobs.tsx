@@ -1,28 +1,46 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { cronJobApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import clsx from 'clsx';
+import { ArrowPathIcon, PlayIcon, PauseIcon } from '@heroicons/react/24/outline';
+import Pagination from '../../../components/common/Pagination';
 import type { CronJob } from '../../../types';
+
+function CronJobsSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="h-8 w-32 rounded-lg skeleton" />
+        <div className="h-9 w-16 rounded-lg skeleton" />
+      </div>
+      <div className="h-64 rounded-xl skeleton" />
+    </div>
+  );
+}
+
+function getLastSchedule(cronJob: CronJob): string {
+  if (!cronJob.status.lastScheduleTime) return '从未';
+  return formatDistanceToNow(new Date(cronJob.status.lastScheduleTime), { addSuffix: true, locale: zhCN });
+}
 
 export default function CronJobs() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
   const queryClient = useQueryClient();
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isRefetching, error, refetch } = useQuery({
     queryKey: ['cronjobs', currentNamespace],
     queryFn: () =>
-      currentNamespace === 'all'
-        ? cronJobApi.listAll()
-        : cronJobApi.list(currentNamespace),
+      currentNamespace === 'all' ? cronJobApi.listAll() : cronJobApi.list(currentNamespace),
     refetchInterval: pollingInterval,
   });
 
-  // 暂停/恢复 CronJob
   const suspendMutation = useMutation({
     mutationFn: ({ namespace, name, suspend }: { namespace: string; name: string; suspend: boolean }) =>
       cronJobApi.suspend(namespace, name, suspend),
@@ -31,7 +49,6 @@ export default function CronJobs() {
     },
   });
 
-  // 触发 CronJob
   const triggerMutation = useMutation({
     mutationFn: ({ namespace, name }: { namespace: string; name: string }) =>
       cronJobApi.trigger(namespace, name),
@@ -41,102 +58,127 @@ export default function CronJobs() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-      </div>
-    );
-  }
+  const cronJobs = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalPages = Math.ceil(cronJobs.length / pageSize);
+  const currentItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return cronJobs.slice(start, start + pageSize);
+  }, [currentPage, pageSize, cronJobs]);
+
+  if (isLoading) return <CronJobsSkeleton />;
 
   if (error) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-red-400">加载失败：{(error as Error).message}</p>
-        <button onClick={() => refetch()} className="btn btn-primary mt-4">
-          重试
-        </button>
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-400/20 bg-rose-400/5 py-16 text-center">
+        <p className="text-rose-300">加载失败：{(error as Error).message}</p>
+        <button onClick={() => refetch()} className="btn btn-secondary btn-sm">重试</button>
       </div>
     );
   }
 
-  const cronJobs = data?.items ?? [];
-
-  // 获取最后调度时间
-  const getLastSchedule = (cronJob: CronJob) => {
-    if (!cronJob.status.lastScheduleTime) return '从未';
-    return formatDistanceToNow(new Date(cronJob.status.lastScheduleTime), {
-      addSuffix: true,
-      locale: zhCN,
-    });
-  };
+  const activeCount = cronJobs.filter((c) => !(c.spec.suspend ?? false)).length;
+  const suspendedCount = cronJobs.length - activeCount;
 
   return (
-    <div className="space-y-6">
-      {/* 页面头部 */}
+    <div className="space-y-5 text-slate-100">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">CronJobs</h1>
-          <p className="text-text-muted mt-1">
-            共 {cronJobs.length} 个 CronJob
-            {currentNamespace !== 'all' && ` 在 ${currentNamespace} 命名空间`}
+          <h1 className="text-xl font-semibold text-slate-100">CronJobs</h1>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {activeCount} 运行中
+            {suspendedCount > 0 && <> · <span className="text-amber-400">{suspendedCount} 已暂停</span></>}
+            {' '}· 共 {cronJobs.length}
+            {currentNamespace !== 'all' && (
+              <> · <span className="text-slate-400">{currentNamespace}</span></>
+            )}
           </p>
         </div>
-        <button onClick={() => refetch()} className="btn btn-secondary">
+        <button
+          onClick={() => refetch()}
+          className="btn btn-secondary btn-sm flex items-center gap-2"
+        >
+          <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
           刷新
         </button>
       </div>
 
-      {/* CronJob 列表 */}
-      <div className="card overflow-hidden">
-        <div className="table-container">
-          <table>
+      <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+        <div className="overflow-x-auto">
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>名称</th>
-                {currentNamespace === 'all' && <th>命名空间</th>}
-                <th>调度表达式</th>
-                <th>状态</th>
-                <th>活跃 Jobs</th>
-                <th>最后调度</th>
-                <th>操作</th>
+              <tr className="border-b border-slate-800 bg-slate-950/60">
+                <th className="py-3 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">名称</th>
+                {currentNamespace === 'all' && (
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">命名空间</th>
+                )}
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">调度</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">状态</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">活跃 Jobs</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">最后调度</th>
+                <th className="py-3 pl-3 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">操作</th>
               </tr>
             </thead>
             <tbody>
-              {cronJobs.map((cronJob) => {
+              {currentItems.map((cronJob) => {
                 const isSuspended = cronJob.spec.suspend ?? false;
                 const activeJobs = cronJob.status.active?.length ?? 0;
+                const isSuspendPending =
+                  suspendMutation.isPending &&
+                  suspendMutation.variables?.namespace === cronJob.metadata.namespace &&
+                  suspendMutation.variables?.name === cronJob.metadata.name;
+                const isTriggerPending =
+                  triggerMutation.isPending &&
+                  triggerMutation.variables?.namespace === cronJob.metadata.namespace &&
+                  triggerMutation.variables?.name === cronJob.metadata.name;
+
                 return (
-                  <tr key={cronJob.metadata.uid}>
-                    <td>
+                  <tr key={cronJob.metadata.uid} className="group border-b border-slate-800/60 transition-colors duration-100 hover:bg-slate-800/50">
+                    <td className="py-3 pl-4 pr-3">
                       <Link
                         to={`/workloads/cronjobs/${cronJob.metadata.namespace}/${cronJob.metadata.name}`}
-                        className="text-blue-400 hover:text-blue-300 font-medium"
+                        className="font-medium text-blue-400 transition-colors duration-150 hover:text-blue-300"
                       >
                         {cronJob.metadata.name}
                       </Link>
                     </td>
                     {currentNamespace === 'all' && (
-                      <td>
-                        <span className="badge badge-default">{cronJob.metadata.namespace}</span>
+                      <td className="px-3 py-3">
+                        <span className="rounded-full bg-slate-700/50 px-2 py-0.5 text-[11px] text-slate-400 ring-1 ring-slate-600/40">
+                          {cronJob.metadata.namespace}
+                        </span>
                       </td>
                     )}
-                    <td className="font-mono text-sm text-text-secondary">
-                      {cronJob.spec.schedule}
-                    </td>
-                    <td>
-                      <span
-                        className={clsx(
-                          'badge',
-                          isSuspended ? 'badge-warning' : 'badge-success'
-                        )}
-                      >
-                        {isSuspended ? 'Suspended' : 'Active'}
+                    <td className="px-3 py-3">
+                      <span className="rounded bg-slate-800/80 px-2 py-0.5 font-mono text-[11px] text-slate-300">
+                        {cronJob.spec.schedule}
                       </span>
                     </td>
-                    <td>{activeJobs}</td>
-                    <td className="text-text-muted">{getLastSchedule(cronJob)}</td>
-                    <td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {!isSuspended && (
+                          <span className="relative flex h-1.5 w-1.5 shrink-0">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          </span>
+                        )}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                            isSuspended
+                              ? 'bg-amber-400/10 text-amber-300 ring-amber-400/25'
+                              : 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/25'
+                          }`}
+                        >
+                          {isSuspended ? 'Suspended' : 'Active'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="font-mono text-xs text-slate-400">{activeJobs}</span>
+                    </td>
+                    <td className="px-3 py-3 text-xs text-slate-500">
+                      {getLastSchedule(cronJob)}
+                    </td>
+                    <td className="py-3 pl-3 pr-4">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() =>
@@ -145,10 +187,11 @@ export default function CronJobs() {
                               name: cronJob.metadata.name,
                             })
                           }
-                          disabled={triggerMutation.isPending}
-                          className="btn btn-sm btn-primary"
+                          disabled={isTriggerPending}
+                          className="flex items-center gap-1 rounded-md bg-blue-500/10 px-2.5 py-1 text-[11px] font-medium text-blue-300 ring-1 ring-blue-400/25 transition-colors hover:bg-blue-500/20 disabled:opacity-50"
                         >
-                          触发
+                          <PlayIcon className="h-3 w-3" />
+                          {isTriggerPending ? '触发中' : '触发'}
                         </button>
                         <button
                           onClick={() =>
@@ -158,13 +201,18 @@ export default function CronJobs() {
                               suspend: !isSuspended,
                             })
                           }
-                          disabled={suspendMutation.isPending}
-                          className={clsx(
-                            'btn btn-sm',
-                            isSuspended ? 'btn-success' : 'btn-warning'
-                          )}
+                          disabled={isSuspendPending}
+                          className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium ring-1 transition-colors disabled:opacity-50 ${
+                            isSuspended
+                              ? 'bg-emerald-500/10 text-emerald-300 ring-emerald-400/25 hover:bg-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-300 ring-amber-400/25 hover:bg-amber-500/20'
+                          }`}
                         >
-                          {isSuspended ? '恢复' : '暂停'}
+                          {isSuspended ? (
+                            <><PlayIcon className="h-3 w-3" />{isSuspendPending ? '恢复中' : '恢复'}</>
+                          ) : (
+                            <><PauseIcon className="h-3 w-3" />{isSuspendPending ? '暂停中' : '暂停'}</>
+                          )}
                         </button>
                       </div>
                     </td>
@@ -175,9 +223,20 @@ export default function CronJobs() {
           </table>
         </div>
         {cronJobs.length === 0 && (
-          <div className="text-center py-12 text-text-muted">没有找到 CronJob</div>
+          <div className="py-16 text-center text-sm text-slate-500">没有找到 CronJob</div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={cronJobs.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+        />
+      )}
     </div>
   );
 }

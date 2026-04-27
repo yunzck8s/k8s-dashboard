@@ -1,17 +1,68 @@
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { daemonSetApi } from '../../../api';
 import { useAppStore } from '../../../store';
 import { usePollingInterval } from '../../../utils/polling';
+import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import clsx from 'clsx';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import Pagination from '../../../components/common/Pagination';
+
+function useMountAnimation(delayMs = 100) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), delayMs);
+    return () => clearTimeout(t);
+  }, [delayMs]);
+  return mounted;
+}
+
+function DaemonSetsSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="h-8 w-36 rounded-lg skeleton" />
+        <div className="h-9 w-16 rounded-lg skeleton" />
+      </div>
+      <div className="h-64 rounded-xl skeleton" />
+    </div>
+  );
+}
+
+function CoverageBar({ ready, desired, delay = 0 }: { ready: number; desired: number; delay?: number }) {
+  const mounted = useMountAnimation(120 + delay);
+  if (desired === 0) return <span className="font-mono text-xs text-slate-600">0/0</span>;
+  const pct = Math.min((ready / desired) * 100, 100);
+  const color = ready === desired ? '#10b981' : ready > 0 ? '#f59e0b' : '#ef4444';
+  return (
+    <div className="min-w-[80px]">
+      <div className="mb-1 flex items-baseline gap-1">
+        <span className="font-mono text-xs font-semibold text-slate-200">{ready}</span>
+        <span className="text-[10px] text-slate-600">/</span>
+        <span className="font-mono text-[10px] text-slate-500">{desired}</span>
+      </div>
+      <div className="h-1 overflow-hidden rounded-full bg-slate-800">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${mounted ? pct : 0}%`,
+            backgroundColor: color,
+            transition: `width 0.75s cubic-bezier(0.4,0,0.2,1) ${delay}ms`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function DaemonSets() {
   const { currentNamespace } = useAppStore();
   const pollingInterval = usePollingInterval('standard');
+  const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isRefetching, error, refetch } = useQuery({
     queryKey: ['daemonsets', currentNamespace],
     queryFn: () =>
       currentNamespace === 'all'
@@ -20,115 +71,128 @@ export default function DaemonSets() {
     refetchInterval: pollingInterval,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-      </div>
-    );
-  }
+  const daemonSets = useMemo(() => data?.items ?? [], [data?.items]);
+  const totalPages = Math.ceil(daemonSets.length / pageSize);
+  const currentItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return daemonSets.slice(start, start + pageSize);
+  }, [currentPage, pageSize, daemonSets]);
+
+  if (isLoading) return <DaemonSetsSkeleton />;
 
   if (error) {
     return (
-      <div className="card p-6 text-center">
-        <p className="text-red-400">加载失败：{(error as Error).message}</p>
-        <button onClick={() => refetch()} className="btn btn-primary mt-4">
-          重试
-        </button>
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-400/20 bg-rose-400/5 py-16 text-center">
+        <p className="text-rose-300">加载失败：{(error as Error).message}</p>
+        <button onClick={() => refetch()} className="btn btn-secondary btn-sm">重试</button>
       </div>
     );
   }
 
-  const daemonSets = data?.items ?? [];
+  const healthyCount = daemonSets.filter(
+    (d) => d.status.numberReady === d.status.desiredNumberScheduled && (d.status.desiredNumberScheduled ?? 0) > 0
+  ).length;
 
   return (
-    <div className="space-y-6">
-      {/* 页面头部 */}
+    <div className="space-y-5 text-slate-100">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-green-100 to-emerald-100 bg-clip-text text-transparent">
-            DaemonSets
-          </h1>
-          <p className="text-text-muted mt-2 text-sm font-medium">
-            共 <span className="text-green-400 font-semibold">{daemonSets.length}</span> 个 DaemonSet
+          <h1 className="text-xl font-semibold text-slate-100">DaemonSets</h1>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {healthyCount}/{daemonSets.length} 健康
             {currentNamespace !== 'all' && (
-              <>
-                {' '}在 <span className="text-emerald-400 font-semibold">{currentNamespace}</span> 命名空间
-              </>
+              <> · <span className="text-slate-400">{currentNamespace}</span></>
             )}
           </p>
         </div>
         <button
           onClick={() => refetch()}
-          className="group relative px-5 py-2.5 bg-[color-mix(in_srgb,var(--color-bg-secondary)_60%,transparent)] backdrop-blur-sm hover:bg-[color-mix(in_srgb,var(--color-bg-tertiary)_80%,transparent)] border border-[color-mix(in_srgb,var(--color-border)_50%,transparent)] hover:border-green-500/50 rounded-lg text-sm font-semibold text-text-secondary hover:text-white shadow-lg hover:shadow-green-500/20 transition-all duration-300 overflow-hidden"
+          className="btn btn-secondary btn-sm flex items-center gap-2"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-green-600/0 via-green-600/10 to-green-600/0 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <span className="relative z-10 flex items-center gap-2">
-            <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            刷新
-          </span>
+          <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+          刷新
         </button>
       </div>
 
-      {/* DaemonSet 列表 */}
-      <div className="card overflow-hidden">
-        <div className="table-container">
-          <table>
+      <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+        <div className="overflow-x-auto">
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>名称</th>
-                {currentNamespace === 'all' && <th>命名空间</th>}
-                <th>状态</th>
-                <th>期望</th>
-                <th>就绪</th>
-                <th>可用</th>
-                <th>节点选择器</th>
-                <th>创建时间</th>
+              <tr className="border-b border-slate-800 bg-slate-950/60">
+                <th className="py-3 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">名称</th>
+                {currentNamespace === 'all' && (
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">命名空间</th>
+                )}
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">状态</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">期望 / 就绪</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">可用</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">节点选择器</th>
+                <th className="py-3 pl-3 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">时间</th>
               </tr>
             </thead>
             <tbody>
-              {daemonSets.map((ds) => {
-                const isHealthy =
-                  ds.status.numberReady === ds.status.desiredNumberScheduled &&
-                  (ds.status.desiredNumberScheduled ?? 0) > 0;
+              {currentItems.map((ds, index) => {
+                const desired = ds.status.desiredNumberScheduled ?? 0;
+                const ready = ds.status.numberReady ?? 0;
+                const available = ds.status.numberAvailable ?? 0;
+                const isHealthy = ready === desired && desired > 0;
                 const nodeSelector = ds.spec.template.spec.nodeSelector
                   ? Object.entries(ds.spec.template.spec.nodeSelector)
                       .map(([k, v]) => `${k}=${v}`)
                       .join(', ')
-                  : '-';
+                  : null;
+
                 return (
-                  <tr key={ds.metadata.uid}>
-                    <td>
+                  <tr key={ds.metadata.uid} className="group border-b border-slate-800/60 transition-colors duration-100 hover:bg-slate-800/50">
+                    <td className="py-3 pl-4 pr-3">
                       <Link
                         to={`/workloads/daemonsets/${ds.metadata.namespace}/${ds.metadata.name}`}
-                        className="text-blue-400 hover:text-blue-300 font-medium"
+                        className="font-medium text-blue-400 transition-colors duration-150 hover:text-blue-300"
                       >
                         {ds.metadata.name}
                       </Link>
                     </td>
                     {currentNamespace === 'all' && (
-                      <td>
-                        <span className="badge badge-default">{ds.metadata.namespace}</span>
+                      <td className="px-3 py-3">
+                        <span className="rounded-full bg-slate-700/50 px-2 py-0.5 text-[11px] text-slate-400 ring-1 ring-slate-600/40">
+                          {ds.metadata.namespace}
+                        </span>
                       </td>
                     )}
-                    <td>
-                      <span className={clsx('badge', isHealthy ? 'badge-success' : 'badge-warning')}>
-                        {isHealthy ? 'Healthy' : 'Progressing'}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {isHealthy ? (
+                          <span className="relative flex h-1.5 w-1.5 shrink-0">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          </span>
+                        ) : (
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                        )}
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                            isHealthy
+                              ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/25'
+                              : 'bg-amber-400/10 text-amber-300 ring-amber-400/25'
+                          }`}
+                        >
+                          {isHealthy ? 'Healthy' : 'Degraded'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <CoverageBar ready={ready} desired={desired} delay={index * 25} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className="font-mono text-xs text-slate-400">{available}</span>
+                    </td>
+                    <td className="px-3 py-3 max-w-[180px]">
+                      <span className="block truncate font-mono text-[11px] text-slate-500" title={nodeSelector ?? '-'}>
+                        {nodeSelector ?? <span className="text-slate-600">—</span>}
                       </span>
                     </td>
-                    <td>{ds.status.desiredNumberScheduled ?? 0}</td>
-                    <td>{ds.status.numberReady ?? 0}</td>
-                    <td>{ds.status.numberAvailable ?? 0}</td>
-                    <td className="text-text-muted max-w-xs truncate" title={nodeSelector}>
-                      {nodeSelector}
-                    </td>
-                    <td className="text-text-muted">
-                      {formatDistanceToNow(new Date(ds.metadata.creationTimestamp), {
-                        addSuffix: true,
-                        locale: zhCN,
-                      })}
+                    <td className="py-3 pl-3 pr-4 text-xs text-slate-500">
+                      {formatDistanceToNow(new Date(ds.metadata.creationTimestamp), { addSuffix: true, locale: zhCN })}
                     </td>
                   </tr>
                 );
@@ -137,9 +201,20 @@ export default function DaemonSets() {
           </table>
         </div>
         {daemonSets.length === 0 && (
-          <div className="text-center py-12 text-text-muted">没有找到 DaemonSet</div>
+          <div className="py-16 text-center text-sm text-slate-500">没有找到 DaemonSet</div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={daemonSets.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+        />
+      )}
     </div>
   );
 }

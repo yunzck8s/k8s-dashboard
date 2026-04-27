@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { podApi } from '../../../api';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import clsx from 'clsx';
 import type { Pod, Event, PodPhase } from '../../../types';
 import {
   ArrowLeftIcon,
@@ -15,40 +14,228 @@ import {
 
 const PodTerminal = lazy(() => import('../../../components/terminal/PodTerminal'));
 
-// Tab 类型
 type TabType = 'overview' | 'containers' | 'logs' | 'terminal' | 'yaml' | 'events';
 
-// 状态颜色
-const phaseColors: Record<PodPhase, string> = {
-  Running: 'badge-success',
-  Pending: 'badge-warning',
-  Succeeded: 'badge-info',
-  Failed: 'badge-error',
-  Unknown: 'badge-default',
+// ─── log highlighting ─────────────────────────────────────────────────────────
+
+type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'stacktrace' | 'plain';
+
+function detectLevel(line: string): LogLevel {
+  // Structured logging (logrus / zap / zerolog)
+  if (/level["']?\s*[=:]\s*["']?(fatal|critical|crit|panic)/i.test(line)) return 'fatal';
+  if (/level["']?\s*[=:]\s*["']?(error|err\b)/i.test(line)) return 'error';
+  if (/level["']?\s*[=:]\s*["']?(warn)/i.test(line)) return 'warn';
+  if (/level["']?\s*[=:]\s*["']?(info)/i.test(line)) return 'info';
+  if (/level["']?\s*[=:]\s*["']?(debug|dbg|trace|trc)/i.test(line)) return 'debug';
+  // Plain-text level keywords
+  if (/\b(FATAL|CRITICAL|CRIT|PANIC)\b/.test(line)) return 'fatal';
+  if (/\bERR(OR|O)?\b/.test(line)) return 'error';
+  if (/\bWARN(ING)?\b/.test(line)) return 'warn';
+  if (/\bINFO?\b/.test(line)) return 'info';
+  if (/\b(DEBUG|DEBU|TRAC(E)?|DBG)\b/.test(line)) return 'debug';
+  // klog / glog prefix (E0101, W0101, I0101, F0101)
+  if (/^[EF]\d{4}\s/.test(line.trimStart())) return 'error';
+  if (/^W\d{4}\s/.test(line.trimStart())) return 'warn';
+  if (/^I\d{4}\s/.test(line.trimStart())) return 'info';
+  // Java / Python exception class names (e.g. "SomeException: msg" or "Caused by:")
+  if (/^\s*(Caused by:|Suppressed:)\s/.test(line)) return 'error';
+  if (/^[\w.$]+Exception[:\s]/.test(line.trimStart())) return 'error';
+  if (/^[\w.$]+Error[:\s]/.test(line.trimStart())) return 'error';
+  if (/\b(Exception|Traceback|panic:|runtime error)\b/i.test(line)) return 'error';
+  // Go panic / goroutine dump
+  if (/^goroutine \d+ \[/.test(line.trimStart())) return 'error';
+  // Java stack trace continuation lines
+  if (/^\s+at [\w.$<>[\]]+/.test(line)) return 'stacktrace';
+  if (/^\s+\.\.\. \d+ more/.test(line)) return 'stacktrace';
+  // Python traceback frame
+  if (/^\s+File ".*", line \d+/.test(line)) return 'stacktrace';
+  // HTTP 5xx / 4xx
+  if (/["'\s]5\d{2}["'\s]/.test(line)) return 'error';
+  if (/["'\s]4\d{2}["'\s]/.test(line)) return 'warn';
+  return 'plain';
+}
+
+const LOG_ROW_STYLE: Record<LogLevel, React.CSSProperties> = {
+  fatal:      { background: 'rgba(120,10,10,0.45)', borderLeft: '3px solid #f87171' },
+  error:      { background: 'rgba(80,10,10,0.30)',  borderLeft: '3px solid #ef4444' },
+  warn:       { background: 'rgba(80,50,0,0.28)',   borderLeft: '3px solid #d97706' },
+  stacktrace: { background: 'rgba(50,5,5,0.18)',    borderLeft: '3px solid #7f1d1d' },
+  info:  {},
+  debug: {},
+  plain: {},
 };
 
-// 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
-function getPodStatusColor(pod: Pod): string {
-  const phase = pod.status.phase;
+const LOG_DEFAULT_COLOR: Record<LogLevel, string> = {
+  fatal:      '#fca5a5',
+  error:      '#fca5a5',
+  warn:       '#fcd34d',
+  stacktrace: '#9ca3af', // gray-400 — readable but clearly subordinate
+  info:       '#cbd5e1',
+  debug:      '#475569',
+  plain:      '#94a3b8',
+};
 
-  // 对于 Running 状态，检查容器是否真的准备好
-  if (phase === 'Running') {
-    const containerStatuses = pod.status.containerStatuses ?? [];
-    const ready = containerStatuses.filter((cs) => cs.ready).length;
-    const total = containerStatuses.length;
+interface Tok { text: string; color?: string; bold?: boolean; italic?: boolean }
 
-    // 如果不是所有容器都 ready，显示为警告状态（黄色）
-    if (total > 0 && ready < total) {
-      return 'badge-warning';
+const LOG_RE =
+  /((?:\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:\d{2})?)|(?:\d{2}\/\w+\/\d{4}:\d{2}:\d{2}:\d{2}))|(\b(?:FATAL|CRITICAL|CRIT|PANIC|ERROR|ERRO|WARN(?:ING)?|INFO?|DEBUG|DEBU|TRAC(?:E)?|DBG)\b)|([a-zA-Z_][\w.-]*=(?:"[^"]*"|'[^']*'|\S+))|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g;
+
+function tokenizeLog(line: string, level: LogLevel): Tok[] {
+  const def = LOG_DEFAULT_COLOR[level];
+  const out: Tok[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  LOG_RE.lastIndex = 0;
+  while ((m = LOG_RE.exec(line)) !== null) {
+    if (m.index > last) out.push({ text: line.slice(last, m.index), color: def });
+    const [full, ts, kw, kv, str] = m;
+    if (ts) {
+      out.push({ text: full, color: '#475569' });
+    } else if (kw) {
+      const u = kw.toUpperCase();
+      let color = def;
+      if (/FATAL|CRITICAL|CRIT|PANIC/.test(u)) color = '#f87171';
+      else if (/ERROR|ERRO/.test(u)) color = '#f87171';
+      else if (/WARN/.test(u)) color = '#fbbf24';
+      else if (/INFO/.test(u)) color = '#60a5fa';
+      else color = '#64748b';
+      out.push({ text: full, color, bold: true });
+    } else if (kv) {
+      const eq = full.indexOf('=');
+      out.push({ text: full.slice(0, eq), color: '#7dd3fc' });
+      out.push({ text: '=', color: '#475569' });
+      out.push({ text: full.slice(eq + 1), color: '#6ee7b7' });
+    } else if (str) {
+      out.push({ text: full, color: '#86efac' });
     }
-
-    // 所有容器都 ready，显示为成功状态（绿色）
-    return 'badge-success';
+    last = m.index + full.length;
   }
-
-  // 其他状态使用默认颜色
-  return phaseColors[phase] || 'badge-default';
+  if (last < line.length) out.push({ text: line.slice(last), color: def });
+  return out;
 }
+
+// ─── yaml highlighting ────────────────────────────────────────────────────────
+
+function tokenizeYamlLine(line: string): Tok[] {
+  const out: Tok[] = [];
+  const ws = line.match(/^(\s*)/)?.[1] ?? '';
+  const rest = line.slice(ws.length);
+  if (ws) out.push({ text: ws });
+  if (!rest) return out;
+
+  if (/^(---|\.\.\.)\s*$/.test(rest)) { out.push({ text: rest, color: '#64748b' }); return out; }
+  if (rest.startsWith('#')) { out.push({ text: rest, color: '#3d5166', italic: true }); return out; }
+
+  let cur = rest;
+  if (/^-\s/.test(cur) || cur === '-') {
+    const prefix = cur.match(/^(-\s*)/)?.[1] ?? '- ';
+    out.push({ text: prefix, color: '#64748b' });
+    cur = cur.slice(prefix.length);
+  }
+  if (!cur) return out;
+
+  const kv = cur.match(/^([^:#\[\]{},\n]+?)\s*(:)(\s.*|$)/s);
+  if (kv) {
+    const [, key, colon, after] = kv;
+    out.push({ text: key.trimEnd(), color: '#93c5fd' });
+    out.push({ text: colon, color: '#64748b' });
+    if (after.trim()) { out.push({ text: ' ' }); out.push(...yamlValue(after.trimStart())); }
+    return out;
+  }
+  out.push(...yamlValue(cur));
+  return out;
+}
+
+function yamlValue(text: string): Tok[] {
+  if (!text) return [];
+  let val = text, trail = '';
+  if (!/"/.test(text) && !/'/.test(text)) {
+    const ci = text.search(/\s#/);
+    if (ci !== -1) { val = text.slice(0, ci); trail = text.slice(ci); }
+  }
+  const t = val.trim();
+  const out: Tok[] = [];
+  if (/^[|>][-+]?\d*\s*$/.test(t)) out.push({ text: val, color: '#fb923c' });
+  else if (/^(null|~|Null|NULL)$/.test(t)) out.push({ text: val, color: '#f87171' });
+  else if (/^(true|false|yes|no|on|off)$/i.test(t)) out.push({ text: val, color: '#c084fc' });
+  else if (/^-?(0x[\da-fA-F]+|\d+(\.\d*)?([eE][+-]?\d+)?)$/.test(t)) out.push({ text: val, color: '#fb923c' });
+  else if (/^"/.test(t) || /^'/.test(t)) out.push({ text: val, color: '#6ee7b7' });
+  else if (/^&/.test(t)) out.push({ text: val, color: '#67e8f9' });
+  else if (/^\*/.test(t)) out.push({ text: val, color: '#a5f3fc' });
+  else out.push({ text: val, color: '#cbd5e1' });
+  if (trail) out.push({ text: trail, color: '#3d5166', italic: true });
+  return out;
+}
+
+function renderToks(toks: Tok[], key: string | number) {
+  return toks.map((t, i) => (
+    <span key={`${key}-${i}`} style={{ color: t.color, fontWeight: t.bold ? 600 : undefined, fontStyle: t.italic ? 'italic' : undefined }}>
+      {t.text}
+    </span>
+  ));
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const phaseStyle: Record<PodPhase, { bg: string; text: string; ring: string }> = {
+  Running:   { bg: 'bg-emerald-400/10', text: 'text-emerald-300', ring: 'ring-emerald-400/25' },
+  Pending:   { bg: 'bg-amber-400/10',   text: 'text-amber-300',   ring: 'ring-amber-400/25' },
+  Succeeded: { bg: 'bg-blue-400/10',    text: 'text-blue-300',    ring: 'ring-blue-400/25' },
+  Failed:    { bg: 'bg-rose-400/10',    text: 'text-rose-300',    ring: 'ring-rose-400/25' },
+  Unknown:   { bg: 'bg-slate-700/50',   text: 'text-slate-400',   ring: 'ring-slate-600/40' },
+};
+
+function getPodPhaseStyle(pod: Pod) {
+  const phase = pod.status.phase;
+  const cs = pod.status.containerStatuses ?? [];
+  const allReady = cs.length > 0 && cs.every((c) => c.ready);
+  const effective: PodPhase = phase === 'Running' && !allReady ? 'Pending' : phase;
+  return { style: phaseStyle[effective] ?? phaseStyle.Unknown, phase: effective };
+}
+
+// ─── skeleton ─────────────────────────────────────────────────────────────────
+
+function PodDetailSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-4">
+        <div className="h-9 w-9 rounded-lg skeleton" />
+        <div className="space-y-2">
+          <div className="h-6 w-64 rounded-md skeleton" />
+          <div className="h-4 w-48 rounded-md skeleton" />
+        </div>
+      </div>
+      <div className="h-10 w-full rounded-lg skeleton" />
+      <div className="h-80 rounded-xl skeleton" />
+    </div>
+  );
+}
+
+// ─── shared card ──────────────────────────────────────────────────────────────
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+      <div className="border-b border-slate-800 bg-slate-950/60 px-4 py-2.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{title}</span>
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between border-b border-slate-800/50 py-2 last:border-0">
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className={`text-xs text-slate-300 ${mono ? 'font-mono' : ''} max-w-[60%] truncate text-right`} title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
 
 export default function PodDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
@@ -56,37 +243,32 @@ export default function PodDetail() {
   const [selectedContainer, setSelectedContainer] = useState<string>('');
   const queryClient = useQueryClient();
 
-  // 获取 Pod 详情
   const { data: pod, isLoading, error, refetch } = useQuery({
     queryKey: ['pod', namespace, name],
     queryFn: () => podApi.get(namespace!, name!),
     enabled: !!namespace && !!name,
   });
 
-  // 获取 Pod YAML
   const { data: yamlData } = useQuery({
     queryKey: ['pod-yaml', namespace, name],
     queryFn: () => podApi.getYaml(namespace!, name!),
     enabled: !!namespace && !!name && activeTab === 'yaml',
   });
 
-  // 获取 Pod 事件
   const { data: eventsData } = useQuery({
     queryKey: ['pod-events', namespace, name],
     queryFn: () => podApi.getEvents(namespace!, name!),
     enabled: !!namespace && !!name && activeTab === 'events',
   });
 
-  // 获取 Pod 日志
-  const effectiveSelectedContainer = selectedContainer || pod?.spec.containers[0]?.name || '';
+  const effectiveContainer = selectedContainer || pod?.spec.containers[0]?.name || '';
 
   const { data: logsData, refetch: refetchLogs } = useQuery({
-    queryKey: ['pod-logs', namespace, name, effectiveSelectedContainer],
-    queryFn: () => podApi.getLogs(namespace!, name!, effectiveSelectedContainer, 500),
-    enabled: !!namespace && !!name && !!effectiveSelectedContainer && activeTab === 'logs',
+    queryKey: ['pod-logs', namespace, name, effectiveContainer],
+    queryFn: () => podApi.getLogs(namespace!, name!, effectiveContainer, 500),
+    enabled: !!namespace && !!name && !!effectiveContainer && activeTab === 'logs',
   });
 
-  // 删除 Pod
   const deleteMutation = useMutation({
     mutationFn: () => podApi.delete(namespace!, name!),
     onSuccess: () => {
@@ -95,33 +277,18 @@ export default function PodDetail() {
     },
   });
 
-  if (isLoading) {
+  if (isLoading) return <PodDetailSkeleton />;
+
+  if (error || !pod) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div
-          className="animate-spin rounded-full h-8 w-8 border-b-2"
-          style={{ borderColor: 'var(--color-primary)' }}
-        />
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-400/20 bg-rose-400/5 py-16 text-center">
+        <p className="text-rose-300">加载失败：{(error as Error)?.message || 'Pod 不存在'}</p>
+        <button onClick={() => refetch()} className="btn btn-secondary btn-sm">重试</button>
       </div>
     );
   }
 
-  if (error || !pod) {
-    return (
-      <div
-        className="p-6 text-center rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <p style={{ color: '#F87171' }}>加载失败：{(error as Error)?.message || 'Pod 不存在'}</p>
-        <button onClick={() => refetch()} className="btn btn-primary mt-4">
-          重试
-        </button>
-      </div>
-    );
-  }
+  const { style: ps } = getPodPhaseStyle(pod);
 
   const tabs: { id: TabType; label: string }[] = [
     { id: 'overview', label: '概览' },
@@ -133,163 +300,115 @@ export default function PodDetail() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* 页面头部 */}
+    <div className="space-y-5 text-slate-100">
+      {/* header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/workloads/pods" className="btn btn-secondary p-2">
-            <ArrowLeftIcon className="w-5 h-5" />
+        <div className="flex items-center gap-3">
+          <Link
+            to="/workloads/pods"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/80 bg-slate-900/65 text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">{name}</h1>
-              <span className={clsx('badge', getPodStatusColor(pod))}>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold text-slate-100">{name}</h1>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${ps.bg} ${ps.text} ${ps.ring}`}>
                 {pod.status.phase}
               </span>
             </div>
-            <p className="mt-1 text-[var(--color-text-secondary)]">
-              命名空间: {namespace} | 节点: {pod.spec.nodeName || 'Pending'}
+            <p className="mt-0.5 text-xs text-slate-500">
+              {namespace} · {pod.spec.nodeName || 'Pending'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => refetch()} className="btn btn-secondary">
-            <ArrowPathIcon className="w-4 h-4 mr-2" />
+        <div className="flex items-center gap-2">
+          <button onClick={() => refetch()} className="btn btn-secondary btn-sm flex items-center gap-1.5">
+            <ArrowPathIcon className="h-3.5 w-3.5" />
             刷新
           </button>
           <button
-            onClick={() => {
-              if (confirm('确定要删除此 Pod 吗？')) {
-                deleteMutation.mutate();
-              }
-            }}
-            className="btn btn-danger"
+            onClick={() => { if (confirm('确定要删除此 Pod 吗？')) deleteMutation.mutate(); }}
             disabled={deleteMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
           >
-            <TrashIcon className="w-4 h-4 mr-2" />
+            <TrashIcon className="h-3.5 w-3.5" />
             删除
           </button>
         </div>
       </div>
 
-      {/* 标签页导航 */}
-      <div style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <nav className="flex gap-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={clsx(
-                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors duration-150',
-                activeTab === tab.id
-                  ? 'border-current'
-                  : 'border-transparent'
-              )}
-              style={{
-                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                borderColor: activeTab === tab.id ? 'var(--color-primary)' : 'transparent',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+      {/* tabs */}
+      <div className="flex gap-1 rounded-lg border border-slate-700/80 bg-slate-900/65 p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
+              activeTab === tab.id
+                ? 'bg-slate-700 text-slate-100'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* 标签页内容 */}
-      <div>
-        {activeTab === 'overview' && <OverviewTab pod={pod} />}
-        {activeTab === 'containers' && <ContainersTab pod={pod} />}
-        {activeTab === 'logs' && (
-          <LogsTab
-            pod={pod}
-            logs={logsData || ''}
-            selectedContainer={effectiveSelectedContainer}
-            onContainerChange={setSelectedContainer}
-            onRefresh={() => refetchLogs()}
-          />
-        )}
-        {activeTab === 'terminal' && (
-          <div
-            className="overflow-hidden rounded-xl"
-            style={{
-              minHeight: '500px',
-              background: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <div className="p-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-              <div className="flex items-center gap-4">
-                <label className="text-sm text-[var(--color-text-secondary)]">选择容器:</label>
-                <select
-                  value={effectiveSelectedContainer}
-                  onChange={(e) => setSelectedContainer(e.target.value)}
-                  className="rounded px-3 py-1.5 text-sm"
-                  style={{
-                    background: 'var(--color-bg-tertiary)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  {pod.spec.containers.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {effectiveSelectedContainer && (
-              <Suspense
-                fallback={
-                  <div className="h-[420px] flex items-center justify-center">
-                    <div
-                      className="animate-spin rounded-full h-6 w-6 border-b-2"
-                      style={{ borderColor: 'var(--color-primary)' }}
-                    />
-                  </div>
-                }
-              >
-                <PodTerminal
-                  namespace={namespace!}
-                  name={name!}
-                  container={effectiveSelectedContainer}
-                />
-              </Suspense>
-            )}
+      {/* tab content */}
+      {activeTab === 'overview' && <OverviewTab pod={pod} />}
+      {activeTab === 'containers' && <ContainersTab pod={pod} />}
+      {activeTab === 'logs' && (
+        <LogsTab
+          pod={pod}
+          logs={logsData || ''}
+          selectedContainer={effectiveContainer}
+          onContainerChange={setSelectedContainer}
+          onRefresh={() => refetchLogs()}
+        />
+      )}
+      {activeTab === 'terminal' && (
+        <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65" style={{ minHeight: 500 }}>
+          <div className="flex items-center gap-3 border-b border-slate-800 bg-slate-950/60 px-4 py-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">终端</span>
+            <select
+              value={effectiveContainer}
+              onChange={(e) => setSelectedContainer(e.target.value)}
+              className="ml-2 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:outline-none"
+            >
+              {pod.spec.containers.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
+              ))}
+            </select>
           </div>
-        )}
-        {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
-        {activeTab === 'events' && <EventsTab events={eventsData?.items || []} />}
-      </div>
+          {effectiveContainer && (
+            <Suspense fallback={
+              <div className="flex h-[420px] items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-400" />
+              </div>
+            }>
+              <PodTerminal namespace={namespace!} name={name!} container={effectiveContainer} />
+            </Suspense>
+          )}
+        </div>
+      )}
+      {activeTab === 'yaml' && <YamlTab yaml={yamlData || ''} />}
+      {activeTab === 'events' && <EventsTab events={eventsData?.items || []} />}
     </div>
   );
 }
 
-// 概览标签页
+// ─── overview ─────────────────────────────────────────────────────────────────
+
 function OverviewTab({ pod }: { pod: Pod }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* 基本信息 */}
-      <div
-        className="p-6 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">基本信息</h3>
-        <dl className="space-y-3">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <SectionCard title="基本信息">
+        <dl>
           <InfoRow label="名称" value={pod.metadata.name} />
           <InfoRow label="命名空间" value={pod.metadata.namespace || '-'} />
           <InfoRow label="UID" value={pod.metadata.uid} mono />
-          <InfoRow
-            label="创建时间"
-            value={formatDistanceToNow(new Date(pod.metadata.creationTimestamp), {
-              addSuffix: true,
-              locale: zhCN,
-            })}
-          />
+          <InfoRow label="创建时间" value={formatDistanceToNow(new Date(pod.metadata.creationTimestamp), { addSuffix: true, locale: zhCN })} />
           <InfoRow label="节点" value={pod.spec.nodeName || 'Pending'} />
           <InfoRow label="Pod IP" value={pod.status.podIP || '-'} mono />
           <InfoRow label="Host IP" value={pod.status.hostIP || '-'} mono />
@@ -297,93 +416,69 @@ function OverviewTab({ pod }: { pod: Pod }) {
           <InfoRow label="重启策略" value={pod.spec.restartPolicy || '-'} />
           <InfoRow label="服务账户" value={pod.spec.serviceAccountName || 'default'} />
         </dl>
+      </SectionCard>
+
+      <div className="space-y-4">
+        <SectionCard title="标签">
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(pod.metadata.labels || {}).length > 0
+              ? Object.entries(pod.metadata.labels || {}).map(([k, v]) => (
+                  <span key={k} className="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400 ring-1 ring-slate-700">
+                    {k}={v}
+                  </span>
+                ))
+              : <span className="text-xs text-slate-600">无标签</span>
+            }
+          </div>
+        </SectionCard>
+
+        <SectionCard title="注解">
+          <div className="max-h-36 space-y-1.5 overflow-y-auto">
+            {Object.entries(pod.metadata.annotations || {}).length > 0
+              ? Object.entries(pod.metadata.annotations || {}).map(([k, v]) => (
+                  <div key={k} className="text-[11px]">
+                    <span className="text-slate-500">{k}:</span>
+                    <span className="ml-1 break-all text-slate-400">{v}</span>
+                  </div>
+                ))
+              : <span className="text-xs text-slate-600">无注解</span>
+            }
+          </div>
+        </SectionCard>
       </div>
 
-      {/* 标签和注解 */}
-      <div className="space-y-6">
-        <div
-          className="p-6 rounded-xl"
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">标签</h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(pod.metadata.labels || {}).map(([key, value]) => (
-              <span key={key} className="badge badge-default text-xs">
-                {key}: {value}
-              </span>
-            ))}
-            {!pod.metadata.labels && (
-              <span className="text-[var(--color-text-muted)]">无标签</span>
-            )}
-          </div>
+      <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65 lg:col-span-2">
+        <div className="border-b border-slate-800 bg-slate-950/60 px-4 py-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">条件状态</span>
         </div>
-
-        <div
-          className="p-6 rounded-xl"
-          style={{
-            background: 'var(--color-bg-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">注解</h3>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {Object.entries(pod.metadata.annotations || {}).map(([key, value]) => (
-              <div key={key} className="text-sm">
-                <span className="text-[var(--color-text-muted)]">{key}:</span>
-                <span className="ml-2 break-all text-[var(--color-text-secondary)]">{value}</span>
-              </div>
-            ))}
-            {!pod.metadata.annotations && (
-              <span className="text-[var(--color-text-muted)]">无注解</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 条件状态 */}
-      <div
-        className="p-6 lg:col-span-2 rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <h3 className="text-lg font-semibold mb-4 text-[var(--color-text-primary)]">条件状态</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-sm text-[var(--color-text-muted)]">
-                <th className="pb-3">类型</th>
-                <th className="pb-3">状态</th>
-                <th className="pb-3">原因</th>
-                <th className="pb-3">最后转换时间</th>
+              <tr className="border-b border-slate-800/60">
+                <th className="py-2.5 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">类型</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">状态</th>
+                <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">原因</th>
+                <th className="py-2.5 pl-3 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">最后转换</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
-              {pod.status.conditions?.map((condition) => (
-                <tr key={condition.type} style={{ borderTop: '1px solid var(--color-border)' }}>
-                  <td className="py-3 text-[var(--color-text-secondary)]">{condition.type}</td>
-                  <td className="py-3">
-                    <span
-                      className={clsx(
-                        'badge',
-                        condition.status === 'True' ? 'badge-success' : 'badge-warning'
-                      )}
-                    >
-                      {condition.status}
+            <tbody>
+              {pod.status.conditions?.map((cond) => (
+                <tr key={cond.type} className="border-b border-slate-800/40 last:border-0">
+                  <td className="py-2.5 pl-4 pr-3 text-xs text-slate-300">{cond.type}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                      cond.status === 'True'
+                        ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/25'
+                        : 'bg-amber-400/10 text-amber-300 ring-amber-400/25'
+                    }`}>
+                      {cond.status}
                     </span>
                   </td>
-                  <td className="py-3 text-[var(--color-text-muted)]">{condition.reason || '-'}</td>
-                  <td className="py-3 text-[var(--color-text-muted)]">
-                    {condition.lastTransitionTime
-                      ? formatDistanceToNow(new Date(condition.lastTransitionTime), {
-                          addSuffix: true,
-                          locale: zhCN,
-                        })
-                      : '-'}
+                  <td className="px-3 py-2.5 text-xs text-slate-500">{cond.reason || '—'}</td>
+                  <td className="py-2.5 pl-3 pr-4 text-xs text-slate-500">
+                    {cond.lastTransitionTime
+                      ? formatDistanceToNow(new Date(cond.lastTransitionTime), { addSuffix: true, locale: zhCN })
+                      : '—'}
                   </td>
                 </tr>
               ))}
@@ -395,122 +490,113 @@ function OverviewTab({ pod }: { pod: Pod }) {
   );
 }
 
-// 容器标签页
+// ─── containers ───────────────────────────────────────────────────────────────
+
 function ContainersTab({ pod }: { pod: Pod }) {
-  const containerStatuses = pod.status.containerStatuses || [];
+  const csMap = new Map((pod.status.containerStatuses ?? []).map((cs) => [cs.name, cs]));
 
   return (
     <div className="space-y-4">
       {pod.spec.containers.map((container) => {
-        const status = containerStatuses.find((cs) => cs.name === container.name);
+        const cs = csMap.get(container.name);
         return (
-          <div
-            key={container.name}
-            className="p-6 rounded-xl"
-            style={{
-              background: 'var(--color-bg-secondary)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">{container.name}</h3>
-                {status && (
-                  <span
-                    className={clsx(
-                      'badge',
-                      status.ready ? 'badge-success' : 'badge-warning'
-                    )}
-                  >
-                    {status.ready ? '就绪' : '未就绪'}
+          <div key={container.name} className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/60 px-4 py-2.5">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-200">{container.name}</span>
+                {cs && (
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                    cs.ready
+                      ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/25'
+                      : 'bg-amber-400/10 text-amber-300 ring-amber-400/25'
+                  }`}>
+                    {cs.ready ? '就绪' : '未就绪'}
                   </span>
                 )}
               </div>
-              {status && (
-                <span className="text-sm text-[var(--color-text-muted)]">
-                  重启次数: {status.restartCount}
+              {cs && (
+                <span className={`font-mono text-xs ${cs.restartCount > 5 ? 'text-rose-400' : cs.restartCount > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+                  重启 {cs.restartCount}
                 </span>
               )}
             </div>
+            <div className="p-4">
+              <dl>
+                <InfoRow label="镜像" value={container.image} mono />
+                <InfoRow label="拉取策略" value={container.imagePullPolicy || 'Always'} />
+              </dl>
 
-            <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InfoRow label="镜像" value={container.image} mono />
-              <InfoRow label="镜像拉取策略" value={container.imagePullPolicy || 'Always'} />
-
-              {/* 端口 */}
               {container.ports && container.ports.length > 0 && (
-                <div className="md:col-span-2">
-                  <dt className="text-sm text-text-muted">端口</dt>
-                  <dd className="mt-1 flex flex-wrap gap-2">
-                    {container.ports.map((port, idx) => (
-                      <span key={idx} className="badge badge-default">
+                <div className="mt-3">
+                  <div className="mb-1.5 text-[11px] text-slate-500">端口</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {container.ports.map((port, i) => (
+                      <span key={i} className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-400 ring-1 ring-slate-700">
                         {port.name ? `${port.name}: ` : ''}{port.containerPort}/{port.protocol || 'TCP'}
                       </span>
                     ))}
-                  </dd>
+                  </div>
                 </div>
               )}
 
-              {/* 资源限制 */}
               {container.resources && (
-                <div className="md:col-span-2">
-                  <dt className="text-sm mb-2 text-[var(--color-text-muted)]">资源</dt>
-                  <dd className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-[var(--color-text-muted)]">请求:</span>
-                      <span className="ml-2 text-[var(--color-text-secondary)]">
-                        CPU: {container.resources.requests?.cpu || '-'},
-                        内存: {container.resources.requests?.memory || '-'}
-                      </span>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                    <div className="mb-1 text-[10px] text-slate-500">请求</div>
+                    <div className="font-mono text-xs text-slate-300">
+                      CPU: {container.resources.requests?.cpu || '-'}
                     </div>
-                    <div>
-                      <span className="text-[var(--color-text-muted)]">限制:</span>
-                      <span className="ml-2 text-[var(--color-text-secondary)]">
-                        CPU: {container.resources.limits?.cpu || '-'},
-                        内存: {container.resources.limits?.memory || '-'}
-                      </span>
+                    <div className="font-mono text-xs text-slate-300">
+                      内存: {container.resources.requests?.memory || '-'}
                     </div>
-                  </dd>
+                  </div>
+                  <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                    <div className="mb-1 text-[10px] text-slate-500">限制</div>
+                    <div className="font-mono text-xs text-slate-300">
+                      CPU: {container.resources.limits?.cpu || '-'}
+                    </div>
+                    <div className="font-mono text-xs text-slate-300">
+                      内存: {container.resources.limits?.memory || '-'}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* 环境变量 */}
               {container.env && container.env.length > 0 && (
-                <div className="md:col-span-2">
-                  <dt className="text-sm mb-2 text-[var(--color-text-muted)]">环境变量</dt>
-                  <dd
-                    className="rounded p-3 max-h-40 overflow-y-auto"
-                    style={{ background: 'var(--color-bg-tertiary)' }}
-                  >
-                    {container.env.map((env, idx) => (
-                      <div key={idx} className="text-sm font-mono">
-                        <span className="text-[var(--color-primary)]">{env.name}</span>
-                        <span className="text-[var(--color-text-muted)]">=</span>
-                        <span className="text-[var(--color-text-secondary)]">
+                <div className="mt-3">
+                  <div className="mb-1.5 text-[11px] text-slate-500">环境变量</div>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2">
+                    {container.env.map((env, i) => (
+                      <div key={i} className="font-mono text-[11px]">
+                        <span className="text-blue-400">{env.name}</span>
+                        <span className="text-slate-600">=</span>
+                        <span className="text-slate-400">
                           {env.value || (env.valueFrom ? '[from secret/configmap]' : '')}
                         </span>
                       </div>
                     ))}
-                  </dd>
+                  </div>
                 </div>
               )}
 
-              {/* 挂载卷 */}
               {container.volumeMounts && container.volumeMounts.length > 0 && (
-                <div className="md:col-span-2">
-                  <dt className="text-sm mb-2 text-[var(--color-text-muted)]">挂载卷</dt>
-                  <dd className="space-y-1">
-                    {container.volumeMounts.map((mount, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-mono text-[var(--color-text-secondary)]">{mount.mountPath}</span>
-                        <span className="ml-2 text-[var(--color-text-muted)]">← {mount.name}</span>
-                        {mount.readOnly && <span className="badge badge-default ml-2">只读</span>}
+                <div className="mt-3">
+                  <div className="mb-1.5 text-[11px] text-slate-500">挂载卷</div>
+                  <div className="space-y-1">
+                    {container.volumeMounts.map((m, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[11px]">
+                        <span className="font-mono text-slate-300">{m.mountPath}</span>
+                        <span className="text-slate-600">←</span>
+                        <span className="text-slate-500">{m.name}</span>
+                        {m.readOnly && (
+                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500 ring-1 ring-slate-700">只读</span>
+                        )}
                       </div>
                     ))}
-                  </dd>
+                  </div>
                 </div>
               )}
-            </dl>
+            </div>
           </div>
         );
       })}
@@ -518,7 +604,8 @@ function ContainersTab({ pod }: { pod: Pod }) {
   );
 }
 
-// 日志标签页
+// ─── logs ─────────────────────────────────────────────────────────────────────
+
 function LogsTab({
   pod,
   logs,
@@ -529,130 +616,145 @@ function LogsTab({
   pod: Pod;
   logs: string;
   selectedContainer: string;
-  onContainerChange: (container: string) => void;
+  onContainerChange: (c: string) => void;
   onRefresh: () => void;
 }) {
-  const copyLogs = () => {
-    navigator.clipboard.writeText(logs);
-  };
+  const copyLogs = () => navigator.clipboard.writeText(logs);
+  const lines = logs ? logs.split('\n') : [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <label className="text-[var(--color-text-muted)]">容器:</label>
+    <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/60 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">日志</span>
           <select
             value={selectedContainer}
             onChange={(e) => onContainerChange(e.target.value)}
-            className="input w-48"
+            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:outline-none"
           >
             {pod.spec.containers.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name}
-              </option>
+              <option key={c.name} value={c.name}>{c.name}</option>
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={copyLogs} className="btn btn-secondary">
-            <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
-            复制
+        <div className="flex items-center gap-1.5">
+          <button onClick={copyLogs} className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200">
+            <ClipboardDocumentIcon className="h-3.5 w-3.5" />复制
           </button>
-          <button onClick={onRefresh} className="btn btn-secondary">
-            <ArrowPathIcon className="w-4 h-4 mr-2" />
-            刷新
+          <button onClick={onRefresh} className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200">
+            <ArrowPathIcon className="h-3.5 w-3.5" />刷新
           </button>
         </div>
       </div>
-
-      <div
-        className="p-4 rounded-xl max-h-[600px] overflow-auto"
-        style={{
-          background: 'var(--color-bg-tertiary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <pre className="text-sm font-mono whitespace-pre-wrap text-[var(--color-text-secondary)]">
-          {logs || '暂无日志'}
-        </pre>
+      <div className="max-h-[600px] overflow-auto" style={{ background: '#07090f' }}>
+        {lines.length > 0 ? (
+          <div className="py-1.5">
+            {lines.map((line, i) => {
+              const level = detectLevel(line);
+              const toks = tokenizeLog(line, level);
+              return (
+                <div key={i} className="flex min-w-0" style={LOG_ROW_STYLE[level]}>
+                  <span className="w-12 shrink-0 select-none py-[1px] pr-3 text-right font-mono text-[11px] leading-5 text-slate-700">
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 py-[1px] font-mono text-[12px] leading-5 whitespace-pre-wrap break-all">
+                    {renderToks(toks, i)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex h-24 items-center justify-center">
+            <span className="text-sm text-slate-600">暂无日志</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// YAML 标签页
+// ─── yaml ─────────────────────────────────────────────────────────────────────
+
 function YamlTab({ yaml }: { yaml: string }) {
-  const copyYaml = () => {
-    navigator.clipboard.writeText(yaml);
-  };
+  const copyYaml = () => navigator.clipboard.writeText(yaml);
+  const lines = yaml ? yaml.split('\n') : [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={copyYaml} className="btn btn-secondary">
-          <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
-          复制 YAML
+    <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950/60 px-3 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">YAML</span>
+        <button onClick={copyYaml} className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200">
+          <ClipboardDocumentIcon className="h-3.5 w-3.5" />复制
         </button>
       </div>
-      <div
-        className="p-4 rounded-xl max-h-[600px] overflow-auto"
-        style={{
-          background: 'var(--color-bg-tertiary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <pre className="text-sm font-mono text-[var(--color-text-secondary)]">
-          {yaml || '加载中...'}
-        </pre>
+      <div className="max-h-[600px] overflow-auto" style={{ background: '#07090f' }}>
+        {lines.length > 0 ? (
+          <div className="py-1.5">
+            {lines.map((line, i) => {
+              const toks = tokenizeYamlLine(line);
+              return (
+                <div key={i} className="flex min-w-0 transition-colors duration-75 hover:bg-slate-800/20">
+                  <span className="w-12 shrink-0 select-none py-[1px] pr-3 text-right font-mono text-[11px] leading-5 text-slate-700">
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 py-[1px] font-mono text-[12px] leading-5 whitespace-pre">
+                    {renderToks(toks, i)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex h-24 items-center justify-center">
+            <span className="text-sm text-slate-600">{yaml === '' ? '暂无内容' : '加载中…'}</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// 事件标签页
+// ─── events ───────────────────────────────────────────────────────────────────
+
 function EventsTab({ events }: { events: Event[] }) {
   return (
-    <div
-      className="overflow-hidden rounded-xl"
-      style={{
-        background: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-      }}
-    >
-      <div className="table-container">
-        <table>
+    <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+      <div className="border-b border-slate-800 bg-slate-950/60 px-4 py-2.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">事件</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
           <thead>
-            <tr>
-              <th>类型</th>
-              <th>原因</th>
-              <th>消息</th>
-              <th>次数</th>
-              <th>时间</th>
+            <tr className="border-b border-slate-800/60">
+              <th className="py-2.5 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">类型</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">原因</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">消息</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">次数</th>
+              <th className="py-2.5 pl-3 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">时间</th>
             </tr>
           </thead>
           <tbody>
-            {events.map((event, idx) => (
-              <tr key={idx}>
-                <td>
-                  <span
-                    className={clsx(
-                      'badge',
-                      event.type === 'Normal' ? 'badge-success' : 'badge-warning'
-                    )}
-                  >
-                    {event.type}
+            {events.map((ev, i) => (
+              <tr key={i} className="border-b border-slate-800/40 last:border-0 hover:bg-slate-800/30">
+                <td className="py-2.5 pl-4 pr-3">
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                    ev.type === 'Normal'
+                      ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/25'
+                      : 'bg-amber-400/10 text-amber-300 ring-amber-400/25'
+                  }`}>
+                    {ev.type}
                   </span>
                 </td>
-                <td className="text-[var(--color-text-secondary)]">{event.reason}</td>
-                <td className="max-w-md truncate text-[var(--color-text-muted)]">{event.message}</td>
-                <td className="text-[var(--color-text-muted)]">{event.count || 1}</td>
-                <td className="text-[var(--color-text-muted)]">
-                  {event.lastTimestamp
-                    ? formatDistanceToNow(new Date(event.lastTimestamp), {
-                        addSuffix: true,
-                        locale: zhCN,
-                      })
-                    : '-'}
+                <td className="px-3 py-2.5 text-xs text-slate-400">{ev.reason}</td>
+                <td className="max-w-sm px-3 py-2.5 text-xs text-slate-500">
+                  <span className="block truncate" title={ev.message}>{ev.message}</span>
+                </td>
+                <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{ev.count || 1}</td>
+                <td className="py-2.5 pl-3 pr-4 text-xs text-slate-500">
+                  {ev.lastTimestamp
+                    ? formatDistanceToNow(new Date(ev.lastTimestamp), { addSuffix: true, locale: zhCN })
+                    : '—'}
                 </td>
               </tr>
             ))}
@@ -660,26 +762,8 @@ function EventsTab({ events }: { events: Event[] }) {
         </table>
       </div>
       {events.length === 0 && (
-        <div className="text-center py-12 text-[var(--color-text-muted)]">暂无事件</div>
+        <div className="py-12 text-center text-sm text-slate-600">暂无事件</div>
       )}
-    </div>
-  );
-}
-
-// 信息行组件
-function InfoRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex justify-between">
-      <dt className="text-[var(--color-text-muted)]">{label}</dt>
-      <dd className={clsx(mono && 'font-mono text-sm')} style={{ color: 'var(--color-text-secondary)' }}>{value}</dd>
     </div>
   );
 }

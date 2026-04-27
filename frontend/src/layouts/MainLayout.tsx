@@ -91,8 +91,8 @@ export default function MainLayout() {
       {/* 主内容区 */}
       <div
         className={clsx(
-          'flex-1 flex flex-col min-h-screen transition-all duration-200',
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
+          'flex-1 min-w-0 flex flex-col min-h-screen transition-all duration-200',
+          sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] md:ml-[256px]'
         )}
       >
         {/* 顶部导航 */}
@@ -100,7 +100,7 @@ export default function MainLayout() {
 
         {clusterError && (
           <div
-            className="mx-6 mt-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-[var(--color-text-primary)]"
+            className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-[var(--color-text-primary)] md:mx-6"
             style={{ background: 'var(--sys-error-soft-bg)', borderColor: 'var(--sys-error-soft-border)' }}
           >
             <span className="text-sm">
@@ -122,7 +122,7 @@ export default function MainLayout() {
         )}
 
         {/* 页面内容 */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 overflow-auto p-4 md:p-6">
           <Outlet />
         </main>
       </div>

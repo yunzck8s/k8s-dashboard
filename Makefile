@@ -66,7 +66,7 @@ dev-backend:
 dev:
 	@echo "启动开发环境..."
 	@echo "前端: http://localhost:5173"
-	@echo "后端: http://localhost:8080"
+	@echo "后端: http://localhost:9099"
 	@make -j2 dev-frontend dev-backend
 
 # 清理

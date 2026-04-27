@@ -14,8 +14,9 @@ data:
   POSTGRES_SSLMODE: "require"  # 生产环境启用 SSL
   ALLOW_SQLITE_FALLBACK: "false"
 
-  # 生产环境 VictoriaMetrics
-  VICTORIA_METRICS_URL: "http://victoria-metrics.monitoring.svc.cluster.local:8428"
+  # 生产环境 Alertmanager 默认关闭，启用时设置为 true 并提供 ALERTMANAGER_URL
+  ALERTMANAGER_ENABLED: "false"
+  ALERTMANAGER_URL: ""
 
   # 审计日志配置（生产环境保留更长时间）
   AUDIT_LOG_MAX_AGE: "90"

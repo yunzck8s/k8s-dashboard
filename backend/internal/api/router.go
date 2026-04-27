@@ -45,7 +45,7 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 	})
 
 	// 创建处理器
-	h := handlers.NewHandler(k8sClient, clusterManager, metricsClient, alertClient, alertService, auditClient, authClient)
+	h := handlers.NewHandler(k8sClient, clusterManager, alertClient, alertService, auditClient, authClient)
 	authHandler := handlers.NewAuthHandler(authClient)
 
 	// 创建观测服务和处理器
@@ -176,6 +176,8 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 		v1.GET("/namespaces/:ns/jobs", h.ListJobs)
 		v1.GET("/namespaces/:ns/jobs/:name", h.GetJob)
 		v1.DELETE("/namespaces/:ns/jobs/:name", h.DeleteJob)
+		v1.GET("/namespaces/:ns/jobs/:name/yaml", h.GetJobYAML)
+		v1.GET("/namespaces/:ns/jobs/:name/pods", h.GetJobPods)
 
 		// CronJobs
 		v1.GET("/cronjobs", h.ListAllCronJobs)
@@ -183,6 +185,15 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 		v1.GET("/namespaces/:ns/cronjobs/:name", h.GetCronJob)
 		v1.DELETE("/namespaces/:ns/cronjobs/:name", h.DeleteCronJob)
 		v1.POST("/namespaces/:ns/cronjobs/:name/trigger", h.TriggerCronJob)
+		v1.POST("/namespaces/:ns/cronjobs/:name/suspend", h.SuspendCronJob)
+		v1.GET("/namespaces/:ns/cronjobs/:name/yaml", h.GetCronJobYAML)
+
+		// ReplicaSets
+		v1.GET("/replicasets", h.ListAllReplicaSets)
+		v1.GET("/namespaces/:ns/replicasets", h.ListReplicaSets)
+		v1.GET("/namespaces/:ns/replicasets/:name", h.GetReplicaSet)
+		v1.DELETE("/namespaces/:ns/replicasets/:name", h.DeleteReplicaSet)
+		v1.GET("/namespaces/:ns/replicasets/:name/yaml", h.GetReplicaSetYAML)
 
 		// Services
 		v1.GET("/services", h.ListAllServices)
@@ -241,6 +252,7 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 
 		// Nodes
 		v1.GET("/nodes", h.ListNodes)
+		v1.GET("/nodes/metrics", h.ListAllNodeMetrics)
 		v1.GET("/nodes/:name", h.GetNode)
 		v1.GET("/nodes/:name/yaml", h.GetNodeYAML)
 		v1.GET("/nodes/:name/metrics", h.GetNodeMetrics)
@@ -261,7 +273,7 @@ func NewRouter(k8sClient *k8s.Client, clusterManager *clusters.Manager, metricsC
 		v1.GET("/serviceaccounts", h.ListAllServiceAccounts)
 		v1.GET("/namespaces/:ns/serviceaccounts", h.ListServiceAccounts)
 
-		// Metrics (VictoriaMetrics)
+		// Metrics (Kubernetes Metrics Server)
 		v1.GET("/metrics/cluster", h.GetClusterMetrics)
 		v1.GET("/metrics/history/cpu", h.GetCPUHistory)
 		v1.GET("/metrics/history/memory", h.GetMemoryHistory)

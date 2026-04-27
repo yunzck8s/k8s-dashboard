@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { podApi } from '../../../api';
@@ -9,174 +9,228 @@ import { createVisibilityRefetchInterval } from '../../../api/queryPolicy';
 import { useNamespacePagination } from '../../../hooks/useNamespacePagination';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import clsx from 'clsx';
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import Pagination from '../../../components/common/Pagination';
 import type { Pod, PodPhase } from '../../../types';
 
-// Pod 状态颜色映射
-const phaseColors: Record<PodPhase, string> = {
-  Running: 'badge-success',
-  Pending: 'badge-warning',
-  Succeeded: 'badge-info',
-  Failed: 'badge-error',
-  Unknown: 'badge-default',
-};
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-// 获取 Pod 状态颜色（增强版：考虑容器 Ready 状态）
-function getPodStatusColor(pod: Pod): string {
-  const phase = pod.status.phase;
-
-  // 对于 Running 状态，检查容器是否真的准备好
-  if (phase === 'Running') {
-    const containerStatuses = pod.status.containerStatuses ?? [];
-    const ready = containerStatuses.filter((cs) => cs.ready).length;
-    const total = containerStatuses.length;
-
-    // 如果不是所有容器都 ready，显示为警告状态（黄色）
-    if (total > 0 && ready < total) {
-      return 'badge-warning';
-    }
-
-    // 所有容器都 ready，显示为成功状态（绿色）
-    return 'badge-success';
-  }
-
-  // 其他状态使用默认颜色
-  return phaseColors[phase] || 'badge-default';
+function useMountAnimation(delayMs = 100) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), delayMs);
+    return () => clearTimeout(t);
+  }, [delayMs]);
+  return mounted;
 }
 
-// 获取 Pod 状态
-function getPodStatus(pod: Pod): { phase: PodPhase; reason?: string } {
+function getPodEffectiveStatus(pod: Pod): { label: string; phase: PodPhase } {
   const phase = pod.status.phase;
-
-  // 检查容器状态
   const containerStatuses = pod.status.containerStatuses ?? [];
   for (const cs of containerStatuses) {
-    if (cs.state.waiting?.reason) {
-      return { phase, reason: cs.state.waiting.reason };
-    }
-    if (cs.state.terminated?.reason) {
-      return { phase, reason: cs.state.terminated.reason };
-    }
+    if (cs.state.waiting?.reason) return { label: cs.state.waiting.reason, phase };
+    if (cs.state.terminated?.reason) return { label: cs.state.terminated.reason, phase };
   }
-
-  return { phase };
+  return { label: phase, phase };
 }
 
-// 获取 Ready 容器数
-function getReadyContainers(pod: Pod): string {
-  const containerStatuses = pod.status.containerStatuses ?? [];
-  const ready = containerStatuses.filter((cs) => cs.ready).length;
-  const total = containerStatuses.length;
-  return `${ready}/${total}`;
+function getReadyContainers(pod: Pod): { ready: number; total: number } {
+  const cs = pod.status.containerStatuses ?? [];
+  return { ready: cs.filter((c) => c.ready).length, total: cs.length };
 }
 
-// 获取重启次数
 function getRestartCount(pod: Pod): number {
-  const containerStatuses = pod.status.containerStatuses ?? [];
-  return containerStatuses.reduce((sum, cs) => sum + cs.restartCount, 0);
+  return (pod.status.containerStatuses ?? []).reduce((s, c) => s + c.restartCount, 0);
 }
 
-// 获取 Pod 资源请求/限制
-function getPodResources(pod: Pod): {
-  cpuRequest: string;
-  cpuLimit: string;
-  memRequest: string;
-  memLimit: string;
-} {
-  let cpuRequest = 0;
-  let cpuLimit = 0;
-  let memRequest = 0;
-  let memLimit = 0;
-
-  const containers = pod.spec.containers ?? [];
-  for (const container of containers) {
-    const resources = container.resources ?? {};
-
-    // CPU requests/limits
-    if (resources.requests?.cpu) {
-      cpuRequest += parseCpu(resources.requests.cpu);
-    }
-    if (resources.limits?.cpu) {
-      cpuLimit += parseCpu(resources.limits.cpu);
-    }
-
-    // Memory requests/limits
-    if (resources.requests?.memory) {
-      memRequest += parseMemory(resources.requests.memory);
-    }
-    if (resources.limits?.memory) {
-      memLimit += parseMemory(resources.limits.memory);
-    }
-  }
-
-  return {
-    cpuRequest: cpuRequest > 0 ? formatCpu(cpuRequest) : '-',
-    cpuLimit: cpuLimit > 0 ? formatCpu(cpuLimit) : '-',
-    memRequest: memRequest > 0 ? formatMemory(memRequest) : '-',
-    memLimit: memLimit > 0 ? formatMemory(memLimit) : '-',
-  };
+function parseCpu(v: string): number {
+  return v.endsWith('m') ? parseInt(v) : parseFloat(v) * 1000;
 }
-
-// 解析 CPU 值（转换为毫核）
-function parseCpu(value: string): number {
-  if (value.endsWith('m')) {
-    return parseInt(value);
-  }
-  return parseFloat(value) * 1000;
+function parseMemory(v: string): number {
+  const units: Record<string, number> = { Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3, Ti: 1024 ** 4, K: 1e3, M: 1e6, G: 1e9, T: 1e12 };
+  for (const [u, m] of Object.entries(units)) if (v.endsWith(u)) return parseFloat(v) * m;
+  return parseFloat(v);
 }
-
-// 格式化 CPU 值
-function formatCpu(milliCores: number): string {
-  if (milliCores >= 1000) {
-    return `${(milliCores / 1000).toFixed(1)}`;
-  }
-  return `${milliCores}m`;
+function formatCpu(mc: number): string {
+  return mc >= 1000 ? `${(mc / 1000).toFixed(1)}` : `${mc}m`;
 }
-
-// 格式化 CPU 使用量（从 cores 转换）
 function formatCpuUsage(cores: number): string {
-  const milliCores = cores * 1000;
-  if (milliCores >= 1000) {
-    return `${(milliCores / 1000).toFixed(2)}`;
-  }
-  return `${Math.round(milliCores)}m`;
+  const mc = cores * 1000;
+  return mc >= 1000 ? `${(mc / 1000).toFixed(2)}` : `${Math.round(mc)}m`;
 }
-
-// 解析内存值（转换为字节）
-function parseMemory(value: string): number {
-  const units: Record<string, number> = {
-    Ki: 1024,
-    Mi: 1024 * 1024,
-    Gi: 1024 * 1024 * 1024,
-    Ti: 1024 * 1024 * 1024 * 1024,
-    K: 1000,
-    M: 1000 * 1000,
-    G: 1000 * 1000 * 1000,
-    T: 1000 * 1000 * 1000 * 1000,
-  };
-
-  for (const [unit, multiplier] of Object.entries(units)) {
-    if (value.endsWith(unit)) {
-      return parseFloat(value) * multiplier;
-    }
-  }
-  return parseFloat(value);
-}
-
-// 格式化内存值
 function formatMemory(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) {
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(1)}Gi`;
-  }
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / 1024 / 1024).toFixed(0)}Mi`;
-  }
-  if (bytes >= 1024) {
-    return `${(bytes / 1024).toFixed(0)}Ki`;
-  }
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}Gi`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(0)}Mi`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)}Ki`;
   return `${bytes}B`;
 }
+
+function getPodResources(pod: Pod) {
+  let cpuReq = 0, cpuLim = 0, memReq = 0, memLim = 0;
+  for (const c of pod.spec.containers ?? []) {
+    const r = c.resources ?? {};
+    if (r.requests?.cpu) cpuReq += parseCpu(r.requests.cpu);
+    if (r.limits?.cpu) cpuLim += parseCpu(r.limits.cpu);
+    if (r.requests?.memory) memReq += parseMemory(r.requests.memory);
+    if (r.limits?.memory) memLim += parseMemory(r.limits.memory);
+  }
+  return {
+    cpuRequest: cpuReq > 0 ? formatCpu(cpuReq) : null,
+    cpuLimit: cpuLim > 0 ? formatCpu(cpuLim) : null,
+    memRequest: memReq > 0 ? formatMemory(memReq) : null,
+    memLimit: memLim > 0 ? formatMemory(memLim) : null,
+  };
+}
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+function PodsSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="h-8 w-24 rounded-lg skeleton" />
+        <div className="h-9 w-16 rounded-lg skeleton" />
+      </div>
+      <div className="h-96 rounded-xl skeleton" />
+    </div>
+  );
+}
+
+const phaseStyle: Record<string, { bg: string; text: string; ring: string }> = {
+  Running:   { bg: 'bg-emerald-400/10', text: 'text-emerald-300', ring: 'ring-emerald-400/25' },
+  Pending:   { bg: 'bg-amber-400/10',   text: 'text-amber-300',   ring: 'ring-amber-400/25' },
+  Succeeded: { bg: 'bg-blue-400/10',    text: 'text-blue-300',    ring: 'ring-blue-400/25' },
+  Failed:    { bg: 'bg-rose-400/10',    text: 'text-rose-300',    ring: 'ring-rose-400/25' },
+  Unknown:   { bg: 'bg-slate-700/50',   text: 'text-slate-400',   ring: 'ring-slate-600/40' },
+};
+
+function PodStatusBadge({ pod }: { pod: Pod }) {
+  const { label, phase } = getPodEffectiveStatus(pod);
+  const cs = pod.status.containerStatuses ?? [];
+  const allReady = cs.length > 0 && cs.every((c) => c.ready);
+  const effectivePhase = phase === 'Running' && !allReady ? 'Pending' : phase;
+  const s = phaseStyle[effectivePhase] ?? phaseStyle.Unknown;
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {effectivePhase === 'Running' && allReady ? (
+        <span className="relative flex h-1.5 w-1.5 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        </span>
+      ) : (
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${s.text.replace('text-', 'bg-')}`} />
+      )}
+      <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${s.bg} ${s.text} ${s.ring}`}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function ResourceCell({
+  usage,
+  request,
+  limit,
+  delay = 0,
+}: {
+  usage: string | null;
+  request: string | null;
+  limit: string | null;
+  delay?: number;
+}) {
+  const mounted = useMountAnimation(150 + delay);
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="font-mono text-xs font-semibold text-emerald-400 transition-opacity duration-500"
+        style={{ opacity: mounted ? 1 : 0 }}
+      >
+        {usage ?? '-'}
+      </span>
+      {(request || limit) && (
+        <span className="text-[10px] text-slate-600">
+          {request && <span className="text-blue-400/70">{request}</span>}
+          {request && limit && <span> / </span>}
+          {limit && <span className="text-amber-400/70">{limit}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PodRow({
+  pod,
+  showNamespace,
+  metrics,
+  index,
+}: {
+  pod: Pod;
+  showNamespace: boolean;
+  metrics: { cpuUsage: number; memoryUsage: number } | undefined;
+  index: number;
+}) {
+  const { ready, total } = getReadyContainers(pod);
+  const restarts = getRestartCount(pod);
+  const resources = getPodResources(pod);
+
+  return (
+    <tr className="group border-b border-slate-800/60 transition-colors duration-100 hover:bg-slate-800/50">
+      <td className="py-3 pl-4 pr-3">
+        <Link
+          to={`/workloads/pods/${pod.metadata.namespace}/${pod.metadata.name}`}
+          className="font-medium text-blue-400 transition-colors duration-150 hover:text-blue-300"
+        >
+          {pod.metadata.name}
+        </Link>
+      </td>
+      {showNamespace && (
+        <td className="px-3 py-3">
+          <span className="rounded-full bg-slate-700/50 px-2 py-0.5 text-[11px] text-slate-400 ring-1 ring-slate-600/40">
+            {pod.metadata.namespace}
+          </span>
+        </td>
+      )}
+      <td className="px-3 py-3">
+        <PodStatusBadge pod={pod} />
+      </td>
+      <td className="px-3 py-3">
+        <span className={`font-mono text-xs ${ready === total && total > 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
+          {ready}/{total}
+        </span>
+      </td>
+      <td className="px-3 py-3">
+        <span className={`font-mono text-xs ${restarts > 5 ? 'text-rose-400' : restarts > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+          {restarts}
+        </span>
+      </td>
+      <td className="px-3 py-3">
+        <ResourceCell
+          usage={metrics ? formatCpuUsage(metrics.cpuUsage) : null}
+          request={resources.cpuRequest}
+          limit={resources.cpuLimit}
+          delay={index * 20}
+        />
+      </td>
+      <td className="px-3 py-3">
+        <ResourceCell
+          usage={metrics ? formatMemory(metrics.memoryUsage) : null}
+          request={resources.memRequest}
+          limit={resources.memLimit}
+          delay={index * 20 + 40}
+        />
+      </td>
+      <td className="px-3 py-3">
+        <span className="font-mono text-[11px] text-slate-500">{pod.spec.nodeName || '-'}</span>
+      </td>
+      <td className="py-3 pl-3 pr-4 text-xs text-slate-500">
+        {formatDistanceToNow(new Date(pod.metadata.creationTimestamp), { addSuffix: true, locale: zhCN })}
+      </td>
+    </tr>
+  );
+}
+
+// ─── main ─────────────────────────────────────────────────────────────────────
 
 export default function Pods() {
   const { currentNamespace } = useAppStore();
@@ -184,33 +238,23 @@ export default function Pods() {
   const refetchInterval = createVisibilityRefetchInterval(pollingInterval);
   const { currentPage, pageSize, setCurrentPage, setPageSize } = useNamespacePagination(currentNamespace);
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isRefetching, error, refetch } = useQuery({
     queryKey: queryKeys.pods(currentNamespace),
     queryFn: () =>
-      currentNamespace === 'all'
-        ? podApi.listAll()
-        : podApi.list(currentNamespace),
+      currentNamespace === 'all' ? podApi.listAll() : podApi.list(currentNamespace),
     refetchInterval,
   });
 
-  // 获取所有 Pod 的实际资源使用量
   const { data: metricsData } = useQuery({
     queryKey: queryKeys.podsMetrics,
     queryFn: () => podApi.listAllMetrics(),
     refetchInterval,
   });
 
-  // 创建 metrics 查找 map
   const metricsMap = useMemo(() => {
     const map = new Map<string, { cpuUsage: number; memoryUsage: number }>();
-    if (!metricsData?.items) {
-      return map;
-    }
-    for (const metrics of metricsData.items) {
-      map.set(`${metrics.namespace}/${metrics.name}`, {
-        cpuUsage: metrics.cpuUsage,
-        memoryUsage: metrics.memoryUsage,
-      });
+    for (const m of metricsData?.items ?? []) {
+      map.set(`${m.namespace}/${m.name}`, { cpuUsage: m.cpuUsage, memoryUsage: m.memoryUsage });
     }
     return map;
   }, [metricsData]);
@@ -219,201 +263,94 @@ export default function Pods() {
   const totalItems = pods.length;
   const totalPages = Math.ceil(totalItems / pageSize);
   const currentPods = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return pods.slice(startIndex, endIndex);
+    const start = (currentPage - 1) * pageSize;
+    return pods.slice(start, start + pageSize);
   }, [currentPage, pageSize, pods]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div
-          className="animate-spin rounded-full h-8 w-8 border-b-2"
-          style={{ borderColor: 'var(--color-primary)' }}
-        />
-      </div>
-    );
-  }
+  if (isLoading) return <PodsSkeleton />;
 
   if (error) {
     return (
-      <div
-        className="p-6 text-center rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <p style={{ color: '#F87171' }}>加载失败：{(error as Error).message}</p>
-        <button onClick={() => refetch()} className="btn btn-primary mt-4">
-          重试
-        </button>
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-rose-400/20 bg-rose-400/5 py-16 text-center">
+        <p className="text-rose-300">加载失败：{(error as Error).message}</p>
+        <button onClick={() => refetch()} className="btn btn-secondary btn-sm">重试</button>
       </div>
     );
   }
 
-  // 处理页码变化
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // 处理每页数量变化
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1); // 重置到第一页
-  };
+  const runningCount = pods.filter((p) => p.status.phase === 'Running').length;
+  const failedCount = pods.filter((p) => p.status.phase === 'Failed').length;
 
   return (
-    <div className="space-y-6">
-      {/* 页面头部 */}
+    <div className="space-y-5 text-slate-100">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
-            Pods
-          </h1>
-          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            共 <span className="text-[var(--color-primary)]">{totalItems}</span> 个 Pod
+          <h1 className="text-xl font-semibold text-slate-100">Pods</h1>
+          <p className="mt-0.5 text-xs text-slate-500">
+            <span className="text-emerald-400">{runningCount}</span> 运行中
+            {failedCount > 0 && <> · <span className="text-rose-400">{failedCount}</span> 失败</>}
+            {' '}· 共 {totalItems}
             {currentNamespace !== 'all' && (
-              <>
-                {' '}在 <span className="text-[var(--color-primary)]">{currentNamespace}</span> 命名空间
-              </>
-            )}
-            {totalPages > 1 && (
-              <span className="ml-2 text-xs text-[var(--color-text-muted)]">
-                (第 {currentPage}/{totalPages} 页)
-              </span>
+              <> · <span className="text-slate-400">{currentNamespace}</span></>
             )}
           </p>
         </div>
         <button
           onClick={() => refetch()}
-          className="btn btn-secondary flex items-center gap-2"
+          className="btn btn-secondary btn-sm flex items-center gap-2"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
           刷新
         </button>
       </div>
 
-      {/* Pod 列表 */}
-      <div
-        className="overflow-hidden rounded-xl"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        <div className="table-container">
-          <table>
+      <div className="overflow-hidden rounded-xl border border-slate-700/80 bg-slate-900/65">
+        <div className="overflow-x-auto">
+          <table className="w-full">
             <thead>
-              <tr>
-                <th>名称</th>
-                {currentNamespace === 'all' && <th>命名空间</th>}
-                <th>状态</th>
-                <th>Ready</th>
-                <th>重启</th>
-                <th>CPU 使用</th>
-                <th>内存使用</th>
-                <th>节点</th>
-                <th>创建时间</th>
+              <tr className="border-b border-slate-800 bg-slate-950/60">
+                <th className="py-3 pl-4 pr-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">名称</th>
+                {currentNamespace === 'all' && (
+                  <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">命名空间</th>
+                )}
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">状态</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ready</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">重启</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">CPU 使用</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">内存使用</th>
+                <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">节点</th>
+                <th className="py-3 pl-3 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">时间</th>
               </tr>
             </thead>
             <tbody>
-              {currentPods.map((pod) => {
-                const status = getPodStatus(pod);
-                const resources = getPodResources(pod);
-                const podKey = `${pod.metadata.namespace}/${pod.metadata.name}`;
-                const metrics = metricsMap.get(podKey);
-
-                return (
-                  <tr key={pod.metadata.uid}>
-                    <td>
-                      <Link
-                        to={`/workloads/pods/${pod.metadata.namespace}/${pod.metadata.name}`}
-                        className="font-medium transition-colors"
-                        style={{ color: 'var(--color-primary)' }}
-                      >
-                        {pod.metadata.name}
-                      </Link>
-                    </td>
-                    {currentNamespace === 'all' && (
-                      <td>
-                        <span className="badge badge-default">
-                          {pod.metadata.namespace}
-                        </span>
-                      </td>
-                    )}
-                    <td>
-                      <span className={clsx('badge', getPodStatusColor(pod))}>
-                        {status.reason || status.phase}
-                      </span>
-                    </td>
-                    <td>{getReadyContainers(pod)}</td>
-                    <td>{getRestartCount(pod)}</td>
-                    <td className="font-mono text-sm">
-                      <div className="flex flex-col">
-                        <span style={{ color: '#34D399' }}>
-                          {metrics ? formatCpuUsage(metrics.cpuUsage) : '-'}
-                        </span>
-                        <span className="text-xs text-[var(--color-text-muted)]">
-                          请求: <span style={{ color: '#60A5FA' }}>{resources.cpuRequest}</span>
-                          {resources.cpuLimit !== '-' && (
-                            <> / 限制: <span style={{ color: '#FBBF24' }}>{resources.cpuLimit}</span></>
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="font-mono text-sm">
-                      <div className="flex flex-col">
-                        <span style={{ color: '#34D399' }}>
-                          {metrics ? formatMemory(metrics.memoryUsage) : '-'}
-                        </span>
-                        <span className="text-xs text-[var(--color-text-muted)]">
-                          请求: <span style={{ color: '#60A5FA' }}>{resources.memRequest}</span>
-                          {resources.memLimit !== '-' && (
-                            <> / 限制: <span style={{ color: '#FBBF24' }}>{resources.memLimit}</span></>
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-[var(--color-text-secondary)]">
-                      {pod.spec.nodeName || '-'}
-                    </td>
-                    <td className="text-[var(--color-text-secondary)]">
-                      {formatDistanceToNow(
-                        new Date(pod.metadata.creationTimestamp),
-                        { addSuffix: true, locale: zhCN }
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {currentPods.map((pod, i) => (
+                <PodRow
+                  key={pod.metadata.uid}
+                  pod={pod}
+                  showNamespace={currentNamespace === 'all'}
+                  metrics={metricsMap.get(`${pod.metadata.namespace}/${pod.metadata.name}`)}
+                  index={i}
+                />
+              ))}
             </tbody>
           </table>
         </div>
-
-        {/* 空状态 */}
         {pods.length === 0 && (
-          <div className="text-center py-12 text-[var(--color-text-muted)]">
-            没有找到 Pod
-          </div>
-        )}
-
-        {/* 分页 */}
-        {pods.length > 0 && totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-            pageSizeOptions={[10, 20, 50, 100]}
-          />
+          <div className="py-16 text-center text-sm text-slate-500">没有找到 Pod</div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={(p) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+          pageSizeOptions={[10, 20, 50, 100]}
+        />
+      )}
     </div>
   );
 }

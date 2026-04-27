@@ -45,6 +45,18 @@ export interface UsageMetric {
   unit: string;
 }
 
+// 节点实际用量（Metrics Server，对应 kubectl top nodes）
+export interface NodeMetricSummary {
+  name: string;
+  cpu: MetricValue;
+  memory: MetricValue;
+}
+
+export interface NodeMetricSummaryList {
+  items: NodeMetricSummary[];
+  available: boolean;
+}
+
 // 节点指标
 export interface NodeMetrics {
   name: string;
@@ -196,6 +208,7 @@ export interface AlertReceiver {
 
 // 告警摘要
 export interface AlertSummary {
+  enabled?: boolean;
   total: number;
   critical: number;
   warning: number;
